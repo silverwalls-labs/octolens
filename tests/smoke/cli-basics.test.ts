@@ -137,3 +137,105 @@ async function invalidSeverityCase() {
 
 	assert.equal(code, 2);
 }
+
+test('unknown --format exits 2', unknownFormatCase);
+
+async function unknownFormatCase() {
+	captureOutput();
+
+	const code = await main([
+		'scan',
+		'--repo',
+		'a/b',
+		'--format',
+		'csv',
+	]);
+
+	assert.equal(code, 2);
+}
+
+test('unknown option exits 2', unknownOptionCase);
+
+async function unknownOptionCase() {
+	captureOutput();
+
+	const code = await main([
+		'scan',
+		'--repo',
+		'a/b',
+		'--nope',
+	]);
+
+	assert.equal(code, 2);
+}
+
+test('--help inside scan exits 0', helpInsideScanCase);
+
+async function helpInsideScanCase() {
+	captureOutput();
+
+	const code = await main([
+		'scan',
+		'--repo',
+		'a/b',
+		'--help',
+	]);
+
+	assert.equal(code, 0);
+	assert.match(stdoutChunks.join(''), /Usage:/);
+}
+
+test('error message is written to stderr', stderrCase);
+
+async function stderrCase() {
+	captureOutput();
+
+	await main([ 'scan' ]);
+
+	assert.ok(stderrChunks.length > 0);
+	assert.match(stderrChunks.join(''), /--repo/);
+}
+
+test('help text lists all documented options', helpContentCase);
+
+async function helpContentCase() {
+	captureOutput();
+
+	await main([ '--help' ]);
+	const help = stdoutChunks.join('');
+
+	assert.match(help, /--repo/);
+	assert.match(help, /--token/);
+	assert.match(help, /--format/);
+	assert.match(help, /--severity/);
+	assert.match(help, /--verbose/);
+	assert.match(help, /--fail-on-skip/);
+}
+
+test('missing --token value exits 2', missingTokenValueCase);
+
+async function missingTokenValueCase() {
+	captureOutput();
+
+	const code = await main([
+		'scan',
+		'--repo',
+		'a/b',
+		'--token',
+	]);
+
+	assert.equal(code, 2);
+}
+
+test('--repo without value exits 2', repoWithoutValueCase);
+
+async function repoWithoutValueCase() {
+	captureOutput();
+
+	const code = await main([
+		'scan',
+		'--repo',
+	]);
+
+	assert.equal(code, 2);
+}

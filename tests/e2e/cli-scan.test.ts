@@ -40,9 +40,14 @@ async function scanReview(threshold = 'high' as const): Promise<ScanResult> {
 }
 
 if (token) {
-	test('scans a real repo and validates full results', { timeout: 60_000 }, realScanCase);
+	test('scans a real repo and produces valid JSON', { timeout: 60_000 }, realScanCase);
+	test('reports branch-protection-required', { timeout: 60_000 }, criticalFindingCase);
+	test('skips branch-protection-dependent rules', { timeout: 60_000 }, skippedRulesCase);
+	test('exits 1 due to findings', { timeout: 60_000 }, exitCode1Case);
 	test('--severity critical filters findings', { timeout: 60_000 }, severityCase);
+	test('--fail-on-skip returns 1 at critical threshold', { timeout: 60_000 }, failOnSkipCase);
 	test('scan with invalid repo produces errors', { timeout: 60_000 }, invalidRepoCase);
+	test('scan counts match between runs and summary', { timeout: 60_000 }, consistencyCase);
 }
 
 async function realScanCase() {
@@ -52,12 +57,20 @@ async function realScanCase() {
 	assert.equal(result.target.owner, 'silverwalls-labs');
 	assert.equal(result.target.name, 'review');
 	assert.ok(result.summary.rulesRun >= 40);
-	assert.equal(exitCodeFor(result), 1);
+	assert.equal(result.summary.rulesErrored, 0);
+}
+
+async function criticalFindingCase() {
+	const result = await scanReview();
 
 	const bpr = result.findings.find((f) => f.ruleId === 'repo-config/branch-protection-required');
 
 	assert.ok(bpr, 'branch-protection-required finding expected');
 	assert.equal(bpr.severity, 'critical');
+}
+
+async function skippedRulesCase() {
+	const result = await scanReview();
 
 	assert.ok(result.summary.rulesSkipped >= 9);
 
@@ -66,6 +79,34 @@ async function realScanCase() {
 	for (const run of skippedRuns) {
 		assert.equal(run.skipReason, 'default branch has no protection rule');
 	}
+}
+
+async function exitCode1Case() {
+	const result = await scanReview();
+
+	assert.equal(exitCodeFor(result), 1);
+}
+
+async function failOnSkipCase() {
+	const result = await scanReview('critical');
+
+	assert.equal(exitCodeFor(result, { failOnIncomplete: true }), 1);
+}
+
+async function consistencyCase() {
+	const result = await scanReview();
+
+	const okRuns = result.runs.filter((r) => r.status === 'ok').length;
+	const skippedRuns = result.runs.filter((r) => r.status === 'skipped').length;
+	const erroredRuns = result.runs.filter((r) => r.status === 'error').length;
+
+	assert.equal(okRuns + skippedRuns + erroredRuns, result.summary.rulesRun);
+	assert.equal(skippedRuns, result.summary.rulesSkipped);
+	assert.equal(erroredRuns, result.summary.rulesErrored);
+
+	const totalFindings = result.runs.reduce((sum, r) => sum + r.findings.length, 0);
+
+	assert.ok(totalFindings >= result.summary.findingsTotal);
 }
 
 async function severityCase() {

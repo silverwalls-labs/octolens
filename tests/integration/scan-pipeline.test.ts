@@ -212,3 +212,164 @@ async function serverErrorCase() {
 	assert.ok(result.summary.rulesErrored > 0);
 	assert.ok(result.summary.rulesRun > 0);
 }
+
+test('archived repo is skipped by default', archivedSkipCase);
+
+async function archivedSkipCase() {
+	nock(BASE)
+		.get('/repos/sheplu/Octolens')
+		.reply(200, { ...makeRepoResponse(), archived: true });
+
+	const result = await scanRepo({
+		repo: { owner: 'sheplu', name: 'Octolens' },
+		rules: [ ...allRules ],
+		octokit: makeOctokit(),
+		logger: silentLogger(),
+		threshold: 'high',
+	});
+
+	assert.equal(result.summary.rulesRun, 0);
+	assert.ok(result.summary.rulesSkipped > 0);
+	assert.equal(result.findings.length, 0);
+}
+
+test('archived repo is scanned when ignore.archived is false', archivedScanCase);
+
+async function archivedScanCase() {
+	nock(BASE)
+		.get('/repos/sheplu/Octolens')
+		.reply(200, { ...makeRepoResponse(), archived: true });
+	mockProtected();
+	mockCatchAll();
+
+	const result = await scanRepo({
+		repo: { owner: 'sheplu', name: 'Octolens' },
+		rules: [ ...allRules ],
+		octokit: makeOctokit(),
+		logger: silentLogger(),
+		threshold: 'high',
+		config: { ignore: { archived: false } },
+	});
+
+	assert.ok(result.summary.rulesRun > 0);
+}
+
+test('unprotected branch produces critical finding and skips dependent rules', unprotectedCase);
+
+async function unprotectedCase() {
+	mockRepoMetadata();
+	nock(BASE)
+		.get('/repos/sheplu/Octolens/branches/main/protection')
+		.reply(404, { message: 'Branch not protected' });
+	mockCatchAll();
+
+	const result = await runFullScan();
+
+	const bpr = result.findings.find((f) => f.ruleId === 'repo-config/branch-protection-required');
+
+	assert.ok(bpr);
+	assert.equal(bpr.severity, 'critical');
+	assert.ok(result.summary.rulesSkipped >= 9);
+
+	const skippedRuns = result.runs.filter((r) => r.status === 'skipped');
+
+	for (const run of skippedRuns) {
+		assert.equal(run.skipReason, 'default branch has no protection rule');
+	}
+}
+
+test('JSON output round-trips through parse', jsonRoundtripCase);
+
+async function jsonRoundtripCase() {
+	mockRepoMetadata();
+	mockProtected();
+	mockCatchAll();
+
+	const result = await runFullScan();
+	const json = formatJson(result);
+	const parsed = JSON.parse(json) as ScanResult;
+
+	assert.equal(parsed.schemaVersion, result.schemaVersion);
+	assert.equal(parsed.summary.rulesRun, result.summary.rulesRun);
+	assert.equal(parsed.summary.findingsTotal, result.summary.findingsTotal);
+	assert.equal(parsed.findings.length, result.findings.length);
+	assert.equal(parsed.runs.length, result.runs.length);
+}
+
+test('markdown output contains severity table and findings section', markdownContentCase);
+
+async function markdownContentCase() {
+	mockRepoMetadata();
+	nock(BASE)
+		.get('/repos/sheplu/Octolens/branches/main/protection')
+		.reply(404, { message: 'Branch not protected' });
+	mockCatchAll();
+
+	const result = await runFullScan();
+	const md = formatMarkdown(result);
+
+	assert.match(md, /\| Severity \| Count \|/);
+	assert.match(md, /## Findings/);
+	assert.match(md, /branch-protection-required/);
+}
+
+test('pretty output contains summary section', prettyContentCase);
+
+async function prettyContentCase() {
+	mockRepoMetadata();
+	nock(BASE)
+		.get('/repos/sheplu/Octolens/branches/main/protection')
+		.reply(404, { message: 'Branch not protected' });
+	mockCatchAll();
+
+	const result = await runFullScan();
+	const pretty = formatPretty(result, { color: false });
+
+	assert.match(pretty, /CRITICAL/);
+	assert.match(pretty, /Summary/);
+	assert.match(pretty, /passed .* flagged .* skipped/);
+}
+
+test('threshold filters out lower-severity findings', thresholdFilterCase);
+
+async function thresholdFilterCase() {
+	mockRepoMetadata();
+	mockProtected();
+	mockCatchAll();
+
+	const highResult = await scanRepo({
+		repo: { owner: 'sheplu', name: 'Octolens' },
+		rules: [ ...allRules ],
+		octokit: makeOctokit(),
+		logger: silentLogger(),
+		threshold: 'high',
+	});
+	const critResult = await scanRepo({
+		repo: { owner: 'sheplu', name: 'Octolens' },
+		rules: [ ...allRules ],
+		octokit: makeOctokit(),
+		logger: silentLogger(),
+		threshold: 'critical',
+	});
+
+	assert.ok(highResult.summary.findingsTotal >= critResult.summary.findingsTotal);
+}
+
+test('403 on branch protection skips dependent rules gracefully', permissionDeniedCase);
+
+async function permissionDeniedCase() {
+	mockRepoMetadata();
+	nock(BASE)
+		.get('/repos/sheplu/Octolens/branches/main/protection')
+		.reply(403, { message: 'Resource not accessible by integration' });
+	mockCatchAll();
+
+	const result = await runFullScan();
+
+	assert.ok(result.summary.rulesSkipped >= 9);
+
+	const reason = 'default branch has no protection rule';
+	const branchRules = result.runs.filter((r) => r.skipReason === reason);
+
+	assert.ok(branchRules.length >= 9);
+}
