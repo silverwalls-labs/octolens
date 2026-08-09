@@ -54,6 +54,19 @@ async function notFoundCase() {
 	assert.equal(findings.length, 1);
 }
 
+test('reports a finding when code scanning endpoint returns 403', permissionDeniedCase);
+
+async function permissionDeniedCase() {
+	nock('https://api.github.com')
+		.get('/repos/sheplu/Octolens/code-scanning/analyses')
+		.query(true)
+		.reply(403, { message: 'Resource not accessible by integration' });
+
+	const findings = await rule.check(makeContext());
+
+	assert.equal(findings.length, 1);
+}
+
 test('propagates server errors from the API', serverErrorCase);
 
 async function serverErrorCase() {

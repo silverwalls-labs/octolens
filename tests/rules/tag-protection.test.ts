@@ -9,6 +9,7 @@ import { rule } from '../../src/rules/repo-config/tag-protection.ts';
 import {
 	disableNet, makeContext, restoreNet,
 } from '../helpers/context.ts';
+import { makeRulesetsResponse } from '../helpers/fixtures.ts';
 
 beforeEach(disableNet);
 afterEach(restoreNet);
@@ -18,14 +19,14 @@ test('reports no findings when an active tag ruleset exists', tagRulesetCase);
 async function tagRulesetCase() {
 	nock('https://api.github.com')
 		.get('/repos/sheplu/Octolens/rulesets')
-		.reply(200, [
+		.reply(200, makeRulesetsResponse([
 			{
 				id: 1,
 				name: 'Tag protection',
 				target: 'tag',
 				enforcement: 'active',
 			},
-		]);
+		]));
 
 	const findings = await rule.check(makeContext());
 
@@ -37,7 +38,7 @@ test('reports a finding when no rulesets exist', emptyCase);
 async function emptyCase() {
 	nock('https://api.github.com')
 		.get('/repos/sheplu/Octolens/rulesets')
-		.reply(200, []);
+		.reply(200, makeRulesetsResponse([]));
 
 	const findings = await rule.check(makeContext());
 
@@ -51,14 +52,14 @@ test('reports a finding when only branch rulesets exist', branchOnlyCase);
 async function branchOnlyCase() {
 	nock('https://api.github.com')
 		.get('/repos/sheplu/Octolens/rulesets')
-		.reply(200, [
+		.reply(200, makeRulesetsResponse([
 			{
 				id: 1,
 				name: 'Branch protection',
 				target: 'branch',
 				enforcement: 'active',
 			},
-		]);
+		]));
 
 	const findings = await rule.check(makeContext());
 
@@ -70,14 +71,14 @@ test('reports a finding when tag ruleset is in evaluate mode', evaluateModeCase)
 async function evaluateModeCase() {
 	nock('https://api.github.com')
 		.get('/repos/sheplu/Octolens/rulesets')
-		.reply(200, [
+		.reply(200, makeRulesetsResponse([
 			{
 				id: 1,
 				name: 'Tag protection',
 				target: 'tag',
 				enforcement: 'evaluate',
 			},
-		]);
+		]));
 
 	const findings = await rule.check(makeContext());
 

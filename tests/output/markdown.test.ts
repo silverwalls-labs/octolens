@@ -135,3 +135,15 @@ function omitsChecks() {
 
 	assert.doesNotMatch(md, /## Checks/);
 }
+
+test('renders org target in header', orgTargetCase);
+
+function orgTargetCase() {
+	const result: ScanResult = {
+		...makeResult([]),
+		target: { type: 'org', org: 'my-org' },
+	};
+	const md = formatMarkdown(result);
+
+	assert.match(md, /^# Octolens scan — my-org/);
+}

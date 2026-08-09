@@ -9,6 +9,10 @@ import { rule } from '../../src/rules/access/required-custom-properties.ts';
 import {
 	disableNet, makeContext, restoreNet,
 } from '../helpers/context.ts';
+import {
+	makeOrgPropertySchema,
+	makeRepoPropertyValues,
+} from '../helpers/fixtures.ts';
 
 beforeEach(disableNet);
 afterEach(restoreNet);
@@ -91,6 +95,39 @@ async function noRequiredCase() {
 	const findings = await rule.check(makeContext());
 
 	assert.equal(findings.length, 0);
+}
+
+test('reports no findings when required property has a non-empty array value', arraySetCase);
+
+async function arraySetCase() {
+	nock('https://api.github.com')
+		.get('/orgs/sheplu/properties/schema')
+		.reply(200, makeOrgPropertySchema([ { property_name: 'team', required: true } ]));
+	nock('https://api.github.com')
+		.get('/repos/sheplu/Octolens/properties/values')
+		.reply(
+			200,
+			makeRepoPropertyValues([ { property_name: 'team', value: [ 'engineering' ] } ]),
+		);
+
+	const findings = await rule.check(makeContext());
+
+	assert.equal(findings.length, 0);
+}
+
+test('reports a finding when required property has an empty array value', emptyArrayCase);
+
+async function emptyArrayCase() {
+	nock('https://api.github.com')
+		.get('/orgs/sheplu/properties/schema')
+		.reply(200, makeOrgPropertySchema([ { property_name: 'team', required: true } ]));
+	nock('https://api.github.com')
+		.get('/repos/sheplu/Octolens/properties/values')
+		.reply(200, makeRepoPropertyValues([ { property_name: 'team', value: [] } ]));
+
+	const findings = await rule.check(makeContext());
+
+	assert.equal(findings.length, 1);
 }
 
 test('propagates server errors from the API', serverErrorCase);

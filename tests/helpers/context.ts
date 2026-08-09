@@ -3,7 +3,7 @@ import { Octokit } from '@octokit/rest';
 import { createCachedFetcher } from '../../src/github/fetcher.ts';
 import type { RuleConfigBag, RuleContext } from '../../src/types/index.ts';
 
-export function noop() {
+function noop() {
 	/* intentional no-op */
 }
 

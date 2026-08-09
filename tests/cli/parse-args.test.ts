@@ -136,6 +136,119 @@ function malformedAllowCall() {
 	]);
 }
 
+test('-v short-circuits to version', testShortVersion);
+
+function testShortVersion() {
+	const result = parseArgs([ '-v' ]);
+
+	assert.equal(result.command, 'version');
+}
+
+test('empty argv returns help', testEmptyArgv);
+
+function testEmptyArgv() {
+	const result = parseArgs([]);
+
+	assert.equal(result.command, 'help');
+}
+
+test('--token is parsed', testToken);
+
+function testToken() {
+	const result = parseArgs([
+		'scan',
+		'--repo',
+		'a/b',
+		'--token',
+		'ghp_abc123',
+	]);
+
+	if (result.command !== 'scan') {
+		throw new Error('expected scan');
+	}
+	assert.equal(result.token, 'ghp_abc123');
+}
+
+test('--out is parsed', testOut);
+
+function testOut() {
+	const result = parseArgs([
+		'scan',
+		'--repo',
+		'a/b',
+		'--out',
+		'report.json',
+	]);
+
+	if (result.command !== 'scan') {
+		throw new Error('expected scan');
+	}
+	assert.equal(result.out, 'report.json');
+}
+
+test('--verbose sets verbose flag', testVerbose);
+
+function testVerbose() {
+	const result = parseArgs([
+		'scan',
+		'--repo',
+		'a/b',
+		'--verbose',
+	]);
+
+	if (result.command !== 'scan') {
+		throw new Error('expected scan');
+	}
+	assert.equal(result.verbose, true);
+}
+
+test('--include-archived sets includeArchived flag', testIncludeArchived);
+
+function testIncludeArchived() {
+	const result = parseArgs([
+		'scan',
+		'--repo',
+		'a/b',
+		'--include-archived',
+	]);
+
+	if (result.command !== 'scan') {
+		throw new Error('expected scan');
+	}
+	assert.equal(result.includeArchived, true);
+}
+
+test('unknown option is rejected', testUnknownOption);
+
+function testUnknownOption() {
+	assert.throws(unknownOptionCall, CliUsageError);
+}
+
+function unknownOptionCall() {
+	parseArgs([
+		'scan',
+		'--repo',
+		'a/b',
+		'--bogus',
+	]);
+}
+
+test('unknown format is rejected', testUnknownFormat);
+
+function testUnknownFormat() {
+	assert.throws(unknownFormatCall, CliUsageError);
+}
+
+function unknownFormatCall() {
+	parseArgs([
+		'scan',
+		'--repo',
+		'a/b',
+		'--format',
+		'csv',
+	]);
+}
+
 test('--fail-on-skip defaults to false and is set by the flag', testFailOnSkip);
 
 function testFailOnSkip() {

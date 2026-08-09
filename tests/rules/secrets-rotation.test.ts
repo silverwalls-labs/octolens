@@ -104,6 +104,29 @@ async function staleCase() {
 	assert.doesNotMatch(findings[0]?.detail ?? '', /FRESH/);
 }
 
+test('treats secrets with unparseable dates as fresh', badDateCase);
+
+async function badDateCase() {
+	const badBody = {
+		total_count: 1,
+		secrets: [
+			{
+				name: 'BAD_DATE',
+				created_at: 'not-a-date',
+				updated_at: 'not-a-date',
+			},
+		],
+	};
+
+	mockSecrets(ACTIONS, 200, badBody);
+	mockSecrets(DEPENDABOT, 200, secretBody([]));
+	mockSecrets(CODESPACES, 200, secretBody([]));
+
+	const findings = await rule.check(makeContext());
+
+	assert.equal(findings.length, 0);
+}
+
 test('skips when all secret endpoints return a permission 403', forbiddenCase);
 
 async function forbiddenCase() {
