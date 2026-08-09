@@ -2,6 +2,7 @@ import {
 	getBranchProtection,
 	getRepoMetadata,
 } from '../../github/queries.ts';
+import { skip } from '../../types/index.ts';
 import type { Finding, Rule } from '../../types/index.ts';
 
 const RULE_ID = 'repo-config/dismiss-stale-reviews';
@@ -28,7 +29,11 @@ export const rule: Rule = {
 			meta.defaultBranch,
 		);
 
-		if (!protection.exists || !protection.requiredPullRequest) {
+		if (!protection.exists) {
+			return skip('default branch has no protection rule');
+		}
+
+		if (!protection.requiredPullRequest) {
 			return [];
 		}
 

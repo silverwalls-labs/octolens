@@ -6,6 +6,7 @@ import {
 import assert from 'node:assert/strict';
 import nock from 'nock';
 import { rule } from '../../src/rules/repo-config/require-conversation-resolution.ts';
+import { RuleSkipped } from '../../src/types/index.ts';
 import {
 	disableNet, makeContext, restoreNet,
 } from '../helpers/context.ts';
@@ -54,7 +55,7 @@ async function missingCase() {
 	assert.equal(findings[0]?.ruleId, 'repo-config/require-conversation-resolution');
 }
 
-test('does not fire when no protection rule exists', noProtectionCase);
+test('skips when no protection rule exists', noProtectionCase);
 
 async function noProtectionCase() {
 	nock('https://api.github.com')
@@ -64,7 +65,5 @@ async function noProtectionCase() {
 		.get('/repos/sheplu/Octolens/branches/main/protection')
 		.reply(404, { message: 'Branch not protected' });
 
-	const findings = await rule.check(makeContext());
-
-	assert.equal(findings.length, 0);
+	await assert.rejects(rule.check(makeContext()), RuleSkipped);
 }

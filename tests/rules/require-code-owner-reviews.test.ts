@@ -6,6 +6,7 @@ import {
 import assert from 'node:assert/strict';
 import nock from 'nock';
 import { rule } from '../../src/rules/access/require-code-owner-reviews.ts';
+import { RuleSkipped } from '../../src/types/index.ts';
 import {
 	disableNet, makeContext, restoreNet,
 } from '../helpers/context.ts';
@@ -77,7 +78,7 @@ async function missingCase() {
 	assert.equal(findings[0]?.severity, 'medium');
 }
 
-test('does not fire when no protection rule exists', noProtectionCase);
+test('skips when no protection rule exists', noProtectionCase);
 
 async function noProtectionCase() {
 	nock('https://api.github.com').get(CODEOWNERS_ROOT).reply(200, {
@@ -86,7 +87,5 @@ async function noProtectionCase() {
 	nock('https://api.github.com').get(REPO).reply(200, makeRepoResponse());
 	nock('https://api.github.com').get(PROTECTION).reply(404, { message: 'Branch not protected' });
 
-	const findings = await rule.check(makeContext());
-
-	assert.equal(findings.length, 0);
+	await assert.rejects(rule.check(makeContext()), RuleSkipped);
 }

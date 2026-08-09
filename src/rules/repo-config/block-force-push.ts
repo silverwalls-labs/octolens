@@ -2,6 +2,7 @@ import {
 	getBranchProtection,
 	getRepoMetadata,
 } from '../../github/queries.ts';
+import { skip } from '../../types/index.ts';
 import type { Finding, Rule } from '../../types/index.ts';
 
 const RULE_ID = 'repo-config/block-force-push';
@@ -27,7 +28,11 @@ export const rule: Rule = {
 			meta.defaultBranch,
 		);
 
-		if (!protection.exists || !protection.allowsForcePushes) {
+		if (!protection.exists) {
+			return skip('default branch has no protection rule');
+		}
+
+		if (!protection.allowsForcePushes) {
 			return [];
 		}
 

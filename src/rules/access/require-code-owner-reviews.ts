@@ -3,6 +3,7 @@ import {
 	getCodeownersFilePresent,
 	getRepoMetadata,
 } from '../../github/queries.ts';
+import { skip } from '../../types/index.ts';
 import type { Finding, Rule } from '../../types/index.ts';
 
 const RULE_ID = 'access/require-code-owner-reviews';
@@ -41,7 +42,7 @@ export const rule: Rule = {
 		);
 
 		if (!protection.exists) {
-			return [];
+			return skip('default branch has no protection rule');
 		}
 
 		if (protection.requireCodeOwnerReviews) {
