@@ -1,5 +1,5 @@
 {
-	"name": "@sheplu/octolens",
+	"name": "@silverwalls-labs/octolens",
 	"version": "1.0.0-alpha.0",
 	"description": "Configuration and security auditor for GitHub repositories and organizations.",
 	"type": "module",
@@ -27,6 +27,7 @@
 		"clean": "rm -rf dist",
 		"lint": "eslint .",
 		"lint:fix": "eslint . --fix",
+		"typecheck": "tsc -p tsconfig.json --noEmit",
 		"test": "node --test --import tsx 'tests/**/*.test.ts'",
 		"test:unit": "node --test --import tsx 'tests/unit/**/*.test.ts'",
 		"test:integration": "node --test --import tsx 'tests/integration/**/*.test.ts'",
@@ -36,7 +37,7 @@
 	},
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/sheplu/Octolens.git"
+		"url": "git+https://github.com/silverwalls-labs/octolens.git"
 	},
 	"keywords": [
 		"github",
@@ -51,9 +52,9 @@
 	"author": "Jean Burellier",
 	"license": "MIT",
 	"bugs": {
-		"url": "https://github.com/sheplu/Octolens/issues"
+		"url": "https://github.com/silverwalls-labs/octolens/issues"
 	},
-	"homepage": "https://github.com/sheplu/Octolens#readme",
+	"homepage": "https://github.com/silverwalls-labs/octolens#readme",
 	"dependencies": {
 		"@octokit/auth-token": "^6.0.0",
 		"@octokit/plugin-retry": "^8.1.1",

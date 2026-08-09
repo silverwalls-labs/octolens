@@ -1,0 +1,225 @@
+name: Quality Gates
+
+on:
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  osv-scan:
+    name: OSV Scan
+    runs-on: ubuntu-24.04-arm
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: OSV Scan
+        env:
+          OSV_VERSION: 2.5.0
+          OSV_SHA256: fe152e1a546af223e6c557cc3111a8bb3e5dc02fcbf7dbe95d26567c0f0041f2
+        run: |
+          set -euo pipefail
+          curl -sSLo osv-scanner "https://github.com/google/osv-scanner/releases/download/v${OSV_VERSION}/osv-scanner_linux_arm64"
+          echo "${OSV_SHA256}  osv-scanner" | sha256sum -c -
+          chmod +x osv-scanner
+          ./osv-scanner --lockfile=package-lock.json
+
+  semgrep:
+    name: Semgrep
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install Semgrep
+        run: |
+          pipx install semgrep
+
+      - name: Semgrep Scan
+        run: |
+          semgrep scan --config auto --error
+
+  audit:
+    name: Audit
+    runs-on: ubuntu-24.04-arm
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install Dependencies
+        run: |
+          npm ci --prefer-offline
+
+      - name: Audit
+        run: |
+          npm audit --audit-level=low
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-24.04-arm
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install Dependencies
+        run: |
+          npm ci --prefer-offline
+
+      - name: Lint
+        run: |
+          npm run lint
+
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-24.04-arm
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install Dependencies
+        run: |
+          npm ci --prefer-offline
+
+      - name: Typecheck
+        run: |
+          npm run typecheck
+
+  build:
+    name: Build & Package
+    runs-on: ubuntu-24.04-arm
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install Dependencies
+        run: |
+          npm ci --prefer-offline
+
+      - name: Build
+        run: |
+          npm run build
+
+      - name: Package Dry Run
+        run: |
+          npm pack 2>&1 | tee pack-output.txt
+
+      - name: Check Package Size
+        run: |
+          set -euo pipefail
+          TARBALL=$(ls *.tgz)
+          SIZE=$(stat --format=%s "$TARBALL")
+          SIZE_KB=$((SIZE / 1024))
+          echo "Package: $TARBALL"
+          echo "Size: ${SIZE_KB} KB"
+          echo ""
+          echo "Contents:"
+          tar tzf "$TARBALL"
+          echo ""
+          if [ "$SIZE" -gt 81920 ]; then
+            echo "::error::Package size ${SIZE_KB} KB exceeds 80 KB limit"
+            exit 1
+          fi
+          echo "✓ Package size ${SIZE_KB} KB is within 80 KB limit"
+
+  test-unit:
+    name: Test (Unit)
+    runs-on: ubuntu-24.04-arm
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install Dependencies
+        run: |
+          npm ci --prefer-offline
+
+      - name: Unit Tests
+        run: |
+          npm run test:unit
+
+  test-integration:
+    name: Test (Integration)
+    runs-on: ubuntu-24.04-arm
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install Dependencies
+        run: |
+          npm ci --prefer-offline
+
+      - name: Integration Tests
+        run: |
+          npm run test:integration
+
+  test-smoke:
+    name: Test (Smoke)
+    runs-on: ubuntu-24.04-arm
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install Dependencies
+        run: |
+          npm ci --prefer-offline
+
+      - name: Smoke Tests
+        run: |
+          npm run test:smoke

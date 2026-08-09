@@ -22,10 +22,10 @@ Whether you’re running a compliance audit, reviewing security health, or ensur
 
 ```bash
 # Install globally via npm
-npm install -g @sheplu/octolens
+npm install -g @silverwalls-labs/octolens
 
 # Or run via npx
-npx @sheplu/octolens <command>
+npx @silverwalls-labs/octolens <command>
 ```
 
 ## 🔧 Environment Variables
