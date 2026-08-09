@@ -27,7 +27,11 @@
 		"clean": "rm -rf dist",
 		"lint": "eslint .",
 		"lint:fix": "eslint . --fix",
-		"test": "node --test --import tsx 'tests/**/*.test.ts'"
+		"test": "node --test --import tsx 'tests/**/*.test.ts'",
+		"test:unit": "node --test --import tsx 'tests/unit/**/*.test.ts'",
+		"test:integration": "node --test --import tsx 'tests/integration/**/*.test.ts'",
+		"test:e2e": "node --test --import tsx 'tests/e2e/**/*.test.ts'",
+		"test:smoke": "node --test --import tsx 'tests/smoke/**/*.test.ts'"
 	},
 	"repository": {
 		"type": "git",
