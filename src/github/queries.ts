@@ -1,21 +1,38 @@
+/**
+ * GitHub API query functions.
+ *
+ * Every exported `get*` function accepts an Octokit client, a
+ * {@link CachedFetcher}, and a target (usually a {@link RepoRef}). Results
+ * are cached per-scan so the same query is never issued twice.
+ *
+ * Error handling: 404s and non-rate-limited 403s are swallowed and return
+ * safe defaults. Rate-limit 403s are always re-thrown.
+ *
+ * @module
+ */
 import type { Octokit } from '@octokit/rest';
 import type { CachedFetcher, RepoRef } from '../types/index.ts';
 
+/** SPDX licence information from repository metadata. */
 export type RepoLicense = {
 	spdxId: string | null;
 };
 
+/** Secret scanning feature status. */
 export type SecretScanningStatus = {
 	status?: string;
 };
 
+/** Security and analysis feature flags from the repo API. */
 export type SecurityAndAnalysis = {
 	secretScanning?: SecretScanningStatus;
 	secretScanningPushProtection?: SecretScanningStatus;
 };
 
+/** Repository visibility level. */
 export type RepoVisibility = 'public' | 'private' | 'internal';
 
+/** Core repository metadata fetched from the repos API. */
 export type RepoMetadata = {
 	'defaultBranch': string;
 	'license': RepoLicense | null;
@@ -29,6 +46,7 @@ export type RepoMetadata = {
 	'topics': string[];
 };
 
+/** Branch protection settings for a specific branch. */
 export type BranchProtection = {
 	exists: boolean;
 	requiredPullRequest: boolean;
@@ -43,11 +61,13 @@ export type BranchProtection = {
 	requireSignedCommits: boolean;
 };
 
+/** CODEOWNERS validation result. */
 export type CodeownersErrors = {
 	checked: boolean;
 	errorCount: number;
 };
 
+/** Summary of a repository ruleset. */
 export type RepoRulesetSummary = {
 	id: number;
 	name: string;
@@ -55,31 +75,38 @@ export type RepoRulesetSummary = {
 	target: string;
 };
 
+/** A custom property value assigned to a repository. */
 export type CustomPropertyValue = {
 	propertyName: string;
 	value: string | string[] | null;
 };
 
+/** Organisation-level custom property definition. */
 export type CustomPropertyDefinition = {
 	propertyName: string;
 	required: boolean;
 };
 
+/** Whether the repository has code scanning analyses. */
 export type CodeScanningStatus = {
 	hasAnalyses: boolean;
 };
 
+/** Whether a SECURITY.md file exists in the repository. */
 export type SecurityPolicyStatus = {
 	present: boolean;
 };
 
+/** Normalised collaborator permission level. */
 export type CollaboratorPermission = 'admin' | 'maintain' | 'write' | 'triage' | 'read';
 
+/** A repository collaborator with their permission level. */
 export type Collaborator = {
 	login: string;
 	permission: CollaboratorPermission;
 };
 
+/** Summary of a deployment environment's protection settings. */
 export type EnvironmentSummary = {
 	name: string;
 	hasReviewers: boolean;
@@ -87,64 +114,76 @@ export type EnvironmentSummary = {
 	hasWaitTimer: boolean;
 };
 
+/** Result of listing deployment environments. */
 export type EnvironmentInventory = {
 	checked: boolean;
 	environments: EnvironmentSummary[];
 };
 
+/** Metadata for a repository secret (no value is exposed). */
 export type SecretMetadata = {
 	name: string;
 	createdAt: string;
 	updatedAt: string;
 };
 
+/** Which secret store a secret belongs to. */
 export type SecretStore = 'actions' | 'dependabot' | 'codespaces';
 
+/** Result of listing secrets from one store. */
 export type SecretInventory = {
 	store: SecretStore;
 	checked: boolean;
 	secrets: SecretMetadata[];
 };
 
+/** Private vulnerability reporting status. */
 export type PrivateVulnerabilityReporting = {
 	checked: boolean;
 	enabled: boolean;
 };
 
+/** Summary of a self-hosted runner. */
 export type RunnerSummary = {
 	id: number;
 	name: string;
 	labels: string[];
 };
 
+/** Result of listing self-hosted runners. */
 export type RunnerInventory = {
 	checked: boolean;
 	runners: RunnerSummary[];
 };
 
+/** Summary of a repository webhook. */
 export type WebhookSummary = {
 	id: number;
 	url: string;
 	insecureSsl: boolean;
 };
 
+/** Summary of a deploy key. */
 export type DeployKeySummary = {
 	id: number;
 	title: string;
 	readOnly: boolean;
 };
 
+/** Summary of a team with access to the repository. */
 export type RepoTeamSummary = {
 	slug: string;
 	name: string;
 	permission: string;
 };
 
+/** Result of listing teams with repository access. */
 export type RepoTeamsResult = {
 	checked: boolean;
 	teams: RepoTeamSummary[];
 };
 
+/** Fetch core repository metadata (default branch, visibility, topics, etc.). */
 export function getRepoMetadata(
 	octokit: Octokit,
 	cache: CachedFetcher,
@@ -156,6 +195,7 @@ export function getRepoMetadata(
 	);
 }
 
+/** Fetch branch protection rules. Returns an "all off" default on 404/403. */
 export function getBranchProtection(
 	octokit: Octokit,
 	cache: CachedFetcher,
@@ -168,6 +208,7 @@ export function getBranchProtection(
 	);
 }
 
+/** Check whether the repository has any code scanning analyses. */
 export function getCodeScanningStatus(
 	octokit: Octokit,
 	cache: CachedFetcher,
@@ -179,6 +220,7 @@ export function getCodeScanningStatus(
 	);
 }
 
+/** Check for SECURITY.md in root, `.github/`, or `docs/`. */
 export function getSecurityPolicyStatus(
 	octokit: Octokit,
 	cache: CachedFetcher,
@@ -190,6 +232,7 @@ export function getSecurityPolicyStatus(
 	);
 }
 
+/** Fetch CODEOWNERS validation errors. Returns `checked: false` if no file exists. */
 export function getCodeownersErrors(
 	octokit: Octokit,
 	cache: CachedFetcher,
@@ -201,6 +244,7 @@ export function getCodeownersErrors(
 	);
 }
 
+/** Check for a CODEOWNERS file in root, `.github/`, or `docs/`. */
 export function getCodeownersFilePresent(
 	octokit: Octokit,
 	cache: CachedFetcher,
@@ -212,6 +256,7 @@ export function getCodeownersFilePresent(
 	);
 }
 
+/** List repository rulesets. Returns `[]` on 404. */
 export function getRepoRulesets(
 	octokit: Octokit,
 	cache: CachedFetcher,
@@ -223,6 +268,7 @@ export function getRepoRulesets(
 	);
 }
 
+/** Fetch custom property values for a repository. Returns `null` if unavailable. */
 export function getRepoCustomPropertyValues(
 	octokit: Octokit,
 	cache: CachedFetcher,
@@ -234,6 +280,7 @@ export function getRepoCustomPropertyValues(
 	);
 }
 
+/** Fetch the organisation-level custom property definitions. Returns `null` if unavailable. */
 export function getOrgCustomPropertySchema(
 	octokit: Octokit,
 	cache: CachedFetcher,
@@ -245,22 +292,26 @@ export function getOrgCustomPropertySchema(
 	);
 }
 
+/** GitHub Actions permission settings for a repository. */
 export type ActionsPermissions = {
 	enabled: boolean;
 	allowedActions: 'all' | 'local_only' | 'selected' | null;
 };
 
+/** Default GITHUB_TOKEN permissions and PR approval setting. */
 export type DefaultWorkflowPermissions = {
 	defaultPermissions: 'read' | 'write' | null;
 	canApprovePullRequestReviews: boolean;
 };
 
+/** Allowed GitHub Actions configuration when `allowed_actions` is `'selected'`. */
 export type AllowedActionsConfig = {
 	githubOwnedAllowed: boolean;
 	verifiedAllowed: boolean;
 	patternsAllowed: string[];
 };
 
+/** Fetch GitHub Actions permissions for a repository. */
 export function getActionsPermissions(
 	octokit: Octokit,
 	cache: CachedFetcher,
@@ -272,6 +323,7 @@ export function getActionsPermissions(
 	);
 }
 
+/** Fetch default GITHUB_TOKEN permissions for workflows. */
 export function getDefaultWorkflowPermissions(
 	octokit: Octokit,
 	cache: CachedFetcher,
@@ -283,6 +335,7 @@ export function getDefaultWorkflowPermissions(
 	);
 }
 
+/** Fetch allowed-actions configuration. Returns `null` on 404 or 409. */
 export function getAllowedActions(
 	octokit: Octokit,
 	cache: CachedFetcher,
@@ -294,6 +347,7 @@ export function getAllowedActions(
 	);
 }
 
+/** Check whether Dependabot security updates are enabled. */
 export function getAutomatedSecurityFixesEnabled(
 	octokit: Octokit,
 	cache: CachedFetcher,
@@ -305,6 +359,7 @@ export function getAutomatedSecurityFixesEnabled(
 	);
 }
 
+/** List collaborators with direct access to the repository. */
 export function getDirectCollaborators(
 	octokit: Octokit,
 	cache: CachedFetcher,
@@ -316,6 +371,7 @@ export function getDirectCollaborators(
 	);
 }
 
+/** List outside collaborators on the repository. */
 export function getOutsideCollaborators(
 	octokit: Octokit,
 	cache: CachedFetcher,
@@ -327,6 +383,7 @@ export function getOutsideCollaborators(
 	);
 }
 
+/** List deployment environments with their protection settings. */
 export function getEnvironments(
 	octokit: Octokit,
 	cache: CachedFetcher,
@@ -338,6 +395,7 @@ export function getEnvironments(
 	);
 }
 
+/** Count the total number of branches in the repository. */
 export function getBranchCount(
 	octokit: Octokit,
 	cache: CachedFetcher,
@@ -349,6 +407,7 @@ export function getBranchCount(
 	);
 }
 
+/** List GitHub Actions secrets (metadata only, no values). */
 export function getActionsSecrets(
 	octokit: Octokit,
 	cache: CachedFetcher,
@@ -360,6 +419,7 @@ export function getActionsSecrets(
 	);
 }
 
+/** List Dependabot secrets (metadata only, no values). */
 export function getDependabotSecrets(
 	octokit: Octokit,
 	cache: CachedFetcher,
@@ -371,6 +431,7 @@ export function getDependabotSecrets(
 	);
 }
 
+/** List Codespaces secrets (metadata only, no values). */
 export function getCodespacesSecrets(
 	octokit: Octokit,
 	cache: CachedFetcher,
@@ -382,6 +443,7 @@ export function getCodespacesSecrets(
 	);
 }
 
+/** Check whether private vulnerability reporting is enabled. */
 export function getPrivateVulnerabilityReporting(
 	octokit: Octokit,
 	cache: CachedFetcher,
@@ -393,6 +455,7 @@ export function getPrivateVulnerabilityReporting(
 	);
 }
 
+/** List self-hosted runners registered on the repository. */
 export function getRepoRunners(
 	octokit: Octokit,
 	cache: CachedFetcher,
@@ -404,6 +467,7 @@ export function getRepoRunners(
 	);
 }
 
+/** List repository webhooks with URL and SSL verification status. */
 export function getRepoWebhooks(
 	octokit: Octokit,
 	cache: CachedFetcher,
@@ -415,6 +479,7 @@ export function getRepoWebhooks(
 	);
 }
 
+/** List deploy keys with their read-only status. */
 export function getDeployKeys(
 	octokit: Octokit,
 	cache: CachedFetcher,
@@ -426,6 +491,7 @@ export function getDeployKeys(
 	);
 }
 
+/** List teams with access to the repository and their permission levels. */
 export function getRepoTeams(
 	octokit: Octokit,
 	cache: CachedFetcher,

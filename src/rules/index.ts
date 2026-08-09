@@ -54,6 +54,12 @@ import { rule as secretsRotation } from './security/secrets-rotation.ts';
 import { rule as securityPolicyFile } from './security/security-policy-file.ts';
 import type { Rule } from '../types/index.ts';
 
+/**
+ * All 40 built-in audit rules, spanning four categories:
+ * repo-config, security, access, and cicd.
+ *
+ * The array is readonly and in a fixed order.
+ */
 export const allRules: readonly Rule[] = [
 	branchProtectionRequired,
 	requirePullRequest,
@@ -99,6 +105,12 @@ export const allRules: readonly Rule[] = [
 	actionsAllowlist,
 ];
 
+/**
+ * Look up a rule by its ID.
+ *
+ * @param id - The rule ID to search for (e.g. `"repo-config/block-force-push"`).
+ * @returns The matching rule, or `undefined` if not found.
+ */
 export function findRuleById(id: string): Rule | undefined {
 	return allRules.find(byId(id));
 }

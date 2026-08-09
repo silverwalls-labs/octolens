@@ -15,16 +15,41 @@ import type {
 } from '../types/index.ts';
 import { runRule } from './run-rule.ts';
 
+/** Options for {@link scanRepo}. */
 export type ScanRepoOptions = {
+	/** Target repository. */
 	repo: RepoRef;
+
+	/** Rules to evaluate. */
 	rules: Rule[];
+
+	/** Authenticated Octokit client. */
 	octokit: Octokit;
+
+	/** Logger instance. */
 	logger: Logger;
+
+	/** Only findings at or above this severity are included in the result. */
 	threshold: Severity;
+
+	/** User configuration (rule overrides, ignore filters). */
 	config?: OctolensConfig;
+
+	/** Arbitrary key-value bag forwarded into every rule's context. */
 	ruleConfig?: RuleConfigBag;
 };
 
+/**
+ * Run a full scan of a single repository against the provided rules.
+ *
+ * Rules disabled via `config.rules` are filtered out. Archived repos are
+ * skipped by default (controlled by `config.ignore.archived`). Each rule
+ * is executed sequentially; findings below the threshold are excluded
+ * from the result.
+ *
+ * @param options - Scan configuration.
+ * @returns The complete scan result with findings, rule runs, and summary.
+ */
 export async function scanRepo(options: ScanRepoOptions): Promise<ScanResult> {
 	const cache = createCachedFetcher();
 	const skipArchived = options.config?.ignore?.archived !== false;

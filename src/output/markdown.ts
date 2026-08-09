@@ -11,6 +11,15 @@ const SEVERITY_LABEL: Record<Severity, string> = {
 	info: 'Info',
 };
 
+/**
+ * Render a scan result as a Markdown report.
+ *
+ * Produces a heading, severity summary table, findings sorted by severity,
+ * and a checks table showing pass/flagged/skipped/error status for each rule.
+ *
+ * @param result - The scan result to format.
+ * @returns A complete Markdown document with a trailing newline.
+ */
 export function formatMarkdown(result: ScanResult): string {
 	const targetLabel = result.target.type === 'repo' ?
 		`${result.target.owner}/${result.target.name}` :

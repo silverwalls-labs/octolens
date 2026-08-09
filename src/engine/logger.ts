@@ -1,5 +1,10 @@
 import type { Logger } from '../types/index.ts';
 
+/**
+ * Log verbosity level.
+ *
+ * From most to least verbose: `debug`, `info`, `warn`, `error`, `silent`.
+ */
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error' | 'silent';
 
 const LEVEL_RANK: Record<LogLevel, number> = {
@@ -10,6 +15,14 @@ const LEVEL_RANK: Record<LogLevel, number> = {
 	silent: 4,
 };
 
+/**
+ * Create a {@link Logger} that writes to stderr.
+ *
+ * Messages below the given level are suppressed. The `'silent'` level
+ * suppresses all output.
+ *
+ * @param level - Minimum level to emit. Defaults to `'warn'`.
+ */
 export function createLogger(level: LogLevel = 'warn'): Logger {
 	const threshold = LEVEL_RANK[level];
 
