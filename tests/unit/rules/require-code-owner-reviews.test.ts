@@ -24,16 +24,14 @@ const PROTECTION = '/repos/sheplu/Octolens/branches/main/protection';
 beforeEach(disableNet);
 afterEach(restoreNet);
 
-test('does not fire when no CODEOWNERS file is present', noCodeownersCase);
+test('skips when no CODEOWNERS file is present', noCodeownersCase);
 
 async function noCodeownersCase() {
 	nock('https://api.github.com').get(CODEOWNERS_ROOT).reply(404);
 	nock('https://api.github.com').get(CODEOWNERS_GITHUB).reply(404);
 	nock('https://api.github.com').get(CODEOWNERS_DOCS).reply(404);
 
-	const findings = await rule.check(makeContext());
-
-	assert.equal(findings.length, 0);
+	await assert.rejects(rule.check(makeContext()), RuleSkipped);
 }
 
 test('reports no findings when code owner reviews are required', requiredCase);

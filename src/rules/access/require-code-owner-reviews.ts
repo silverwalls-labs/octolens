@@ -30,7 +30,7 @@ export const rule: Rule = {
 		);
 
 		if (!codeownersPresent) {
-			return [];
+			return skip('no CODEOWNERS file present');
 		}
 
 		const meta = await getRepoMetadata(ctx.octokit, ctx.cache, ctx.repo);

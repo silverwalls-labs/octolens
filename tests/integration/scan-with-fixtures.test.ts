@@ -84,17 +84,18 @@ async function findingsCase() {
 	assert.ok(ruleIds.includes('cicd/actions-allowlist'));
 }
 
-test('skips branch-protection-dependent rules', skippedCase);
+test('skips rules whose prerequisites are not met', skippedCase);
 
 async function skippedCase() {
 	const result = await getScanResult();
 
-	assert.equal(result.summary.rulesSkipped, 9);
+	assert.equal(result.summary.rulesSkipped, 10);
 
 	const skippedRuns = result.runs.filter((r) => r.status === 'skipped');
 	const skippedIds = skippedRuns.map((r) => r.ruleId).sort();
 
 	assert.deepEqual(skippedIds, [
+		'access/require-code-owner-reviews',
 		'repo-config/block-force-push',
 		'repo-config/dismiss-stale-reviews',
 		'repo-config/enforce-admins',
@@ -106,9 +107,14 @@ async function skippedCase() {
 		'repo-config/require-status-checks',
 	]);
 
-	for (const run of skippedRuns) {
-		assert.equal(run.skipReason, 'default branch has no protection rule');
-	}
+	const reason = 'default branch has no protection rule';
+	const branchRules = skippedRuns.filter((r) => r.skipReason === reason);
+
+	assert.equal(branchRules.length, 9);
+
+	const codeownerRule = skippedRuns.find((r) => r.ruleId === 'access/require-code-owner-reviews');
+
+	assert.equal(codeownerRule?.skipReason, 'no CODEOWNERS file present');
 }
 
 test('reports zero errored rules', noErrorsCase);

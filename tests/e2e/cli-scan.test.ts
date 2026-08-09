@@ -72,13 +72,13 @@ async function criticalFindingCase() {
 async function skippedRulesCase() {
 	const result = await scanReview();
 
-	assert.ok(result.summary.rulesSkipped >= 9);
+	assert.ok(result.summary.rulesSkipped >= 10);
 
 	const skippedRuns = result.runs.filter((r) => r.status === 'skipped');
+	const reasons = new Set(skippedRuns.map((r) => r.skipReason));
 
-	for (const run of skippedRuns) {
-		assert.equal(run.skipReason, 'default branch has no protection rule');
-	}
+	assert.ok(reasons.has('default branch has no protection rule'));
+	assert.ok(reasons.has('no CODEOWNERS file present'));
 }
 
 async function exitCode1Case() {
