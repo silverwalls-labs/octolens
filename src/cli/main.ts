@@ -1,0 +1,113 @@
+import { writeFileSync } from 'node:fs';
+import { resolveAuth, AuthError } from '../github/auth.ts';
+import { createOctokit } from '../github/client.ts';
+import {
+	createLogger, scanRepo, exitCodeFor,
+} from '../engine/index.ts';
+import { allRules } from '../rules/index.ts';
+import {
+	formatJson, formatMarkdown, formatPretty,
+} from '../output/index.ts';
+import type { ScanResult } from '../types/index.ts';
+import {
+	parseArgs, CliUsageError, type Format, type ScanCommandArgs,
+} from './parse-args.ts';
+import { HELP_TEXT } from './help.ts';
+import { readVersion } from './version.ts';
+
+export async function main(argv: string[]): Promise<number> {
+	let parsed;
+
+	try {
+		parsed = parseArgs(argv);
+	} catch (err) {
+		if (err instanceof CliUsageError) {
+			process.stderr.write(`${err.message}\n\n${HELP_TEXT}`);
+
+			return 2;
+		}
+		throw err;
+	}
+
+	if (parsed.command === 'help') {
+		process.stdout.write(HELP_TEXT);
+
+		return 0;
+	}
+
+	if (parsed.command === 'version') {
+		process.stdout.write(`${readVersion()}\n`);
+
+		return 0;
+	}
+
+	return runScanCommand(parsed);
+}
+
+async function runScanCommand(args: ScanCommandArgs): Promise<number> {
+	const logger = createLogger(args.verbose ?
+		'debug' :
+		'warn');
+
+	let auth;
+
+	try {
+		auth = resolveAuth({ token: args.token });
+	} catch (err) {
+		if (err instanceof AuthError) {
+			process.stderr.write(`${err.message}\n`);
+
+			return 2;
+		}
+		throw err;
+	}
+	logger.debug(`auth source: ${auth.source}`);
+
+	const octokit = createOctokit({
+		token: auth.token,
+		userAgent: `octolens/${readVersion()}`,
+		logger,
+	});
+
+	const result = await scanRepo({
+		repo: args.repo,
+		rules: [ ...allRules ],
+		octokit,
+		logger,
+		threshold: args.severity,
+		config: { ignore: { archived: !args.includeArchived } },
+		ruleConfig: {
+			'access/visibility-private-default': {
+				allowPublic: args.allowPublic,
+				allowInternal: args.allowInternal,
+			},
+		},
+	});
+
+	emitOutput(result, args.formats, args.out);
+
+	return exitCodeFor(result, { failOnIncomplete: args.failOnSkip });
+}
+
+function emitOutput(result: ScanResult, formats: Format[], out: string | undefined): void {
+	for (const format of formats) {
+		const rendered = render(result, format);
+
+		if (out && format === formats[formats.length - 1]) {
+			writeFileSync(out, rendered);
+		} else {
+			process.stdout.write(rendered);
+		}
+	}
+}
+
+function render(result: ScanResult, format: Format): string {
+	switch (format) {
+		case 'json':
+			return formatJson(result);
+		case 'md':
+			return formatMarkdown(result);
+		default:
+			return formatPretty(result);
+	}
+}

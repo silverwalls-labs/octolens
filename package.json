@@ -1,0 +1,72 @@
+{
+	"name": "@sheplu/octolens",
+	"version": "1.0.0-alpha.0",
+	"description": "Configuration and security auditor for GitHub repositories and organizations.",
+	"type": "module",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"default": "./dist/index.js"
+		}
+	},
+	"types": "./dist/index.d.ts",
+	"bin": {
+		"octolens": "./bin/octolens.js"
+	},
+	"files": [
+		"bin",
+		"dist",
+		"README.md",
+		"LICENSE"
+	],
+	"engines": {
+		"node": ">=24.0.0"
+	},
+	"scripts": {
+		"build": "tsc -p tsconfig.json",
+		"clean": "rm -rf dist",
+		"lint": "eslint .",
+		"lint:fix": "eslint . --fix",
+		"test": "node --test --import tsx 'tests/**/*.test.ts'"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/sheplu/Octolens.git"
+	},
+	"keywords": [
+		"github",
+		"audit",
+		"security",
+		"compliance",
+		"cli",
+		"octolens",
+		"repository",
+		"scanning"
+	],
+	"author": "Jean Burellier",
+	"license": "MIT",
+	"bugs": {
+		"url": "https://github.com/sheplu/Octolens/issues"
+	},
+	"homepage": "https://github.com/sheplu/Octolens#readme",
+	"dependencies": {
+		"@octokit/auth-token": "^6.0.0",
+		"@octokit/plugin-retry": "^8.1.1",
+		"@octokit/plugin-throttling": "^11.0.5",
+		"@octokit/rest": "^22.0.1",
+		"picocolors": "^1.1.1"
+	},
+	"devDependencies": {
+		"@eslint/js": "^9.39.1",
+		"@eslint/markdown": "^7.5.1",
+		"@sheplu/eslint-config": "^0.709.0",
+		"@stylistic/eslint-plugin": "^5.6.1",
+		"@types/node": "^24.0.0",
+		"eslint": "^9.39.1",
+		"globals": "^16.5.0",
+		"nock": "^14.0.17",
+		"tsx": "^4.23.10",
+		"typescript": "^6.0.3",
+		"typescript-eslint": "^8.66.0"
+	}
+}
