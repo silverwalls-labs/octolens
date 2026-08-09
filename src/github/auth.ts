@@ -1,14 +1,21 @@
 import { execSync } from 'node:child_process';
 
+/** Options for {@link resolveAuth}. */
 export type AuthOptions = {
+	/** Explicit token value (highest priority). */
 	token?: string;
 };
 
+/** Resolved authentication token and where it came from. */
 export type ResolvedAuth = {
 	token: string;
 	source: 'flag' | 'env' | 'gh-cli';
 };
 
+/**
+ * Thrown by {@link resolveAuth} when no GitHub token can be found
+ * through any of the supported resolution methods.
+ */
 export class AuthError extends Error {
 	constructor(message: string) {
 		super(message);
@@ -16,6 +23,17 @@ export class AuthError extends Error {
 	}
 }
 
+/**
+ * Resolve a GitHub token from multiple sources, in priority order:
+ *
+ * 1. `options.token` (the `--token` flag)
+ * 2. `GITHUB_TOKEN` or `OCTOLENS_TOKEN` environment variable
+ * 3. `gh auth token` CLI fallback (3 s timeout)
+ *
+ * @param options - Optional explicit token.
+ * @returns The resolved token and its source.
+ * @throws {AuthError} If no token can be found.
+ */
 export function resolveAuth(options: AuthOptions = {}): ResolvedAuth {
 	if (options.token && options.token.length > 0) {
 		return { token: options.token, source: 'flag' };

@@ -10,13 +10,30 @@ type ThrottleRequest = {
 	url: string;
 };
 
+/** Options for {@link createOctokit}. */
 export type ClientOptions = {
+	/** GitHub token for authentication. */
 	token: string;
+
+	/** Base URL for GitHub API (defaults to `https://api.github.com`). */
 	baseUrl?: string;
+
+	/** User-Agent header value. Defaults to `'octolens'`. */
 	userAgent?: string;
+
+	/** Logger for rate-limit warnings. */
 	logger?: Logger;
 };
 
+/**
+ * Create a configured Octokit instance with retry and throttling plugins.
+ *
+ * Retries up to 2 times on primary rate limits and 1 time on secondary
+ * (abuse) rate limits, logging a warning on each retry.
+ *
+ * @param options - Client configuration.
+ * @returns An authenticated Octokit instance.
+ */
 export function createOctokit(options: ClientOptions): Octokit {
 	const log = options.logger;
 

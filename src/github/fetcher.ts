@@ -1,5 +1,13 @@
 import type { CachedFetcher } from '../types/index.ts';
 
+/**
+ * Create a new in-memory {@link CachedFetcher}.
+ *
+ * The cache stores promises, so concurrent calls for the same key share a
+ * single in-flight request. If the loader rejects, the entry is evicted so
+ * the next call retries. There is no TTL or size limit — the cache lives
+ * for the lifetime of the returned object (typically one scan).
+ */
 export function createCachedFetcher(): CachedFetcher {
 	const cache = new Map<string, Promise<unknown>>();
 

@@ -1,3 +1,4 @@
+/** Full CLI help/usage text printed by `--help` and on usage errors. */
 export const HELP_TEXT = `Usage:
   octolens scan --repo <owner/name> [options]
 

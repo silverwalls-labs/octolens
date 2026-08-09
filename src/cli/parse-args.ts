@@ -1,5 +1,6 @@
 import { isSeverity, type Severity } from '../types/severity.ts';
 
+/** Supported output format. */
 export type Format = 'pretty' | 'json' | 'md';
 
 export type ScanCommandArgs = {
@@ -21,6 +22,7 @@ export type VersionArgs = { command: 'version'; };
 
 export type ParsedArgs = ScanCommandArgs | HelpArgs | VersionArgs;
 
+/** Thrown on invalid CLI usage (bad flags, missing required options). */
 export class CliUsageError extends Error {
 	constructor(message: string) {
 		super(message);
@@ -28,6 +30,13 @@ export class CliUsageError extends Error {
 	}
 }
 
+/**
+ * Parse raw CLI arguments into a typed command object.
+ *
+ * @param argv - Arguments after the `scan` subcommand.
+ * @returns A discriminated union: `ScanCommandArgs`, `HelpArgs`, or `VersionArgs`.
+ * @throws {CliUsageError} On unrecognised options, missing values, or invalid formats.
+ */
 export function parseArgs(argv: string[]): ParsedArgs {
 	if (argv.length === 0 || argv[0] === '-h' || argv[0] === '--help') {
 		return { command: 'help' };

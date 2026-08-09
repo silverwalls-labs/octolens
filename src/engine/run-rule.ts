@@ -2,6 +2,16 @@ import { RuleSkipped } from '../types/index.ts';
 import type { Rule, RuleContext } from '../types/index.ts';
 import type { RuleRun } from '../types/index.ts';
 
+/**
+ * Execute a single rule and wrap the outcome in a {@link RuleRun}.
+ *
+ * Never throws — all exceptions are caught and encoded into the returned
+ * `RuleRun` as either `'skipped'` (for {@link RuleSkipped}) or `'error'`.
+ *
+ * @param rule - The rule to execute.
+ * @param context - Dependencies injected into the rule's `check()` method.
+ * @returns The execution result including status, findings, and timing.
+ */
 export async function runRule(rule: Rule, context: RuleContext): Promise<RuleRun> {
 	const start = performance.now();
 

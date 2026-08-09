@@ -15,6 +15,15 @@ import {
 import { HELP_TEXT } from './help.ts';
 import { readVersion } from './version.ts';
 
+/**
+ * CLI entry point.
+ *
+ * Parses `argv`, dispatches to the appropriate command (help, version,
+ * or scan), and returns the exit code.
+ *
+ * @param argv - Raw command-line arguments (without `node` and script path).
+ * @returns Exit code: `0` on success, `1` on findings, `2` on usage error.
+ */
 export async function main(argv: string[]): Promise<number> {
 	let parsed;
 

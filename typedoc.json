@@ -1,0 +1,11 @@
+{
+	"$schema": "https://typedoc.org/schema.json",
+	"entryPoints": ["src/index.ts"],
+	"out": "docs",
+	"name": "Octolens",
+	"includeVersion": true,
+	"readme": "README.md",
+	"tsconfig": "tsconfig.json",
+	"excludePrivate": true,
+	"excludeInternal": true
+}

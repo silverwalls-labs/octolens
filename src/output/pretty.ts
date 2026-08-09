@@ -12,10 +12,22 @@ const SEVERITY_COLORS: Record<Severity, (s: string) => string> = {
 	info: (s) => pc.gray(s),
 };
 
+/** Options for {@link formatPretty}. */
 export type PrettyOptions = {
+	/** Enable ANSI colors. Defaults to TTY detection on stdout. */
 	color?: boolean;
 };
 
+/**
+ * Format a scan result as a human-readable, optionally colorized string.
+ *
+ * Findings are sorted most-severe-first. The output includes a header,
+ * individual findings with severity tags, and a summary section with
+ * rule coverage and per-severity counts.
+ *
+ * @param result - The scan result to format.
+ * @param options - Formatting options.
+ */
 export function formatPretty(result: ScanResult, options: PrettyOptions = {}): string {
 	const useColor = options.color ?? process.stdout.isTTY ?? false;
 	const colorize = useColor ?
