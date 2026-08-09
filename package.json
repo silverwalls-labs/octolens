@@ -33,6 +33,7 @@
 		"test:integration": "node --test --import tsx 'tests/integration/**/*.test.ts'",
 		"test:e2e": "node --test --import tsx 'tests/e2e/**/*.test.ts'",
 		"test:smoke": "node --test --import tsx 'tests/smoke/**/*.test.ts'",
+		"docs:build": "typedoc",
 		"fixtures:capture": "tsx scripts/capture-fixtures.ts"
 	},
 	"repository": {
@@ -72,6 +73,7 @@
 		"globals": "^16.5.0",
 		"nock": "^14.0.17",
 		"tsx": "^4.23.10",
+		"typedoc": "^0.28.20",
 		"typescript": "^6.0.3",
 		"typescript-eslint": "^8.66.0"
 	}
