@@ -1,0 +1,156 @@
+import { isSeverity, type Severity } from '../types/severity.ts';
+
+export type Format = 'pretty' | 'json' | 'md';
+
+export type ScanCommandArgs = {
+	command: 'scan';
+	repo: { owner: string; name: string; };
+	token?: string;
+	formats: Format[];
+	out?: string;
+	severity: Severity;
+	verbose: boolean;
+	includeArchived: boolean;
+	allowPublic: string[];
+	allowInternal: string[];
+	failOnSkip: boolean;
+};
+
+export type HelpArgs = { command: 'help'; };
+export type VersionArgs = { command: 'version'; };
+
+export type ParsedArgs = ScanCommandArgs | HelpArgs | VersionArgs;
+
+export class CliUsageError extends Error {
+	constructor(message: string) {
+		super(message);
+		this.name = 'CliUsageError';
+	}
+}
+
+export function parseArgs(argv: string[]): ParsedArgs {
+	if (argv.length === 0 || argv[0] === '-h' || argv[0] === '--help') {
+		return { command: 'help' };
+	}
+	if (argv[0] === '-v' || argv[0] === '--version') {
+		return { command: 'version' };
+	}
+
+	if (argv[0] !== 'scan') {
+		throw new CliUsageError(`Unknown command: ${argv[0]}`);
+	}
+
+	let repoSpec: string | undefined;
+	let token: string | undefined;
+	let out: string | undefined;
+	let severityRaw = 'high';
+	let verbose = false;
+	let includeArchived = false;
+	let failOnSkip = false;
+	const formats: Format[] = [];
+	const allowPublic: string[] = [];
+	const allowInternal: string[] = [];
+
+	for (let i = 1; i < argv.length; i++) {
+		const arg = argv[i];
+
+		switch (arg) {
+			case '--repo':
+				repoSpec = readValue(argv, ++i, arg);
+				break;
+			case '--token':
+				token = readValue(argv, ++i, arg);
+				break;
+			case '--format':
+				formats.push(parseFormat(readValue(argv, ++i, arg)));
+				break;
+			case '--out':
+				out = readValue(argv, ++i, arg);
+				break;
+			case '--severity':
+				severityRaw = readValue(argv, ++i, arg);
+				break;
+			case '--verbose':
+				verbose = true;
+				break;
+			case '--include-archived':
+				includeArchived = true;
+				break;
+			case '--fail-on-skip':
+				failOnSkip = true;
+				break;
+			case '--allow-public':
+				allowPublic.push(parseAllowSpec(readValue(argv, ++i, arg), arg));
+				break;
+			case '--allow-internal':
+				allowInternal.push(parseAllowSpec(readValue(argv, ++i, arg), arg));
+				break;
+			case '-h':
+			case '--help':
+				return { command: 'help' };
+			default:
+				throw new CliUsageError(`Unknown option: ${arg}`);
+		}
+	}
+
+	if (!repoSpec) {
+		throw new CliUsageError('--repo <owner/name> is required.');
+	}
+
+	if (!isSeverity(severityRaw)) {
+		throw new CliUsageError(`Invalid --severity value: ${severityRaw}`);
+	}
+
+	return {
+		command: 'scan',
+		repo: parseRepoSpec(repoSpec),
+		token,
+		formats: formats.length > 0 ?
+			formats :
+			[ 'pretty' ],
+		out,
+		severity: severityRaw,
+		verbose,
+		includeArchived,
+		allowPublic,
+		allowInternal,
+		failOnSkip,
+	};
+}
+
+function readValue(argv: string[], index: number, flag: string): string {
+	const value = argv[index];
+
+	if (value === undefined || value.startsWith('-')) {
+		throw new CliUsageError(`Missing value for ${flag}`);
+	}
+
+	return value;
+}
+
+function parseRepoSpec(spec: string): { owner: string; name: string; } {
+	const slash = spec.indexOf('/');
+
+	if (slash <= 0 || slash === spec.length - 1) {
+		throw new CliUsageError(`Invalid --repo "${spec}". Expected "owner/name".`);
+	}
+
+	return { owner: spec.slice(0, slash), name: spec.slice(slash + 1) };
+}
+
+function parseAllowSpec(spec: string, flag: string): string {
+	const slash = spec.indexOf('/');
+
+	if (slash <= 0 || slash === spec.length - 1) {
+		throw new CliUsageError(`Invalid ${flag} "${spec}". Expected "owner/name".`);
+	}
+
+	return spec.toLowerCase();
+}
+
+function parseFormat(value: string): Format {
+	if (value === 'pretty' || value === 'json' || value === 'md') {
+		return value;
+	}
+	throw new CliUsageError(`Unknown --format "${value}". Supported: pretty, json, md.`);
+}

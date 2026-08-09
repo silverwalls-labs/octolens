@@ -1,0 +1,1249 @@
+import type { Octokit } from '@octokit/rest';
+import type { CachedFetcher, RepoRef } from '../types/index.ts';
+
+export type RepoLicense = {
+	spdxId: string | null;
+};
+
+export type SecretScanningStatus = {
+	status?: string;
+};
+
+export type SecurityAndAnalysis = {
+	secretScanning?: SecretScanningStatus;
+	secretScanningPushProtection?: SecretScanningStatus;
+};
+
+export type RepoVisibility = 'public' | 'private' | 'internal';
+
+export type RepoMetadata = {
+	'defaultBranch': string;
+	'license': RepoLicense | null;
+	'securityAndAnalysis': SecurityAndAnalysis | null;
+	'archived': boolean;
+	'deleteBranchOnMerge': boolean;
+	'private': boolean;
+	'visibility': RepoVisibility;
+	'allowForking': boolean;
+	'description': string | null;
+	'topics': string[];
+};
+
+export type BranchProtection = {
+	exists: boolean;
+	requiredPullRequest: boolean;
+	requiredApprovingReviewCount: number;
+	allowsForcePushes: boolean;
+	requiredStatusCheckContexts: string[];
+	dismissStaleReviews: boolean;
+	requireConversationResolution: boolean;
+	enforceAdmins: boolean;
+	requireLinearHistory: boolean;
+	requireCodeOwnerReviews: boolean;
+	requireSignedCommits: boolean;
+};
+
+export type CodeownersErrors = {
+	checked: boolean;
+	errorCount: number;
+};
+
+export type RepoRulesetSummary = {
+	id: number;
+	name: string;
+	enforcement: string;
+	target: string;
+};
+
+export type CustomPropertyValue = {
+	propertyName: string;
+	value: string | string[] | null;
+};
+
+export type CustomPropertyDefinition = {
+	propertyName: string;
+	required: boolean;
+};
+
+export type CodeScanningStatus = {
+	hasAnalyses: boolean;
+};
+
+export type SecurityPolicyStatus = {
+	present: boolean;
+};
+
+export type CollaboratorPermission = 'admin' | 'maintain' | 'write' | 'triage' | 'read';
+
+export type Collaborator = {
+	login: string;
+	permission: CollaboratorPermission;
+};
+
+export type EnvironmentSummary = {
+	name: string;
+	hasReviewers: boolean;
+	hasBranchPolicy: boolean;
+	hasWaitTimer: boolean;
+};
+
+export type EnvironmentInventory = {
+	checked: boolean;
+	environments: EnvironmentSummary[];
+};
+
+export type SecretMetadata = {
+	name: string;
+	createdAt: string;
+	updatedAt: string;
+};
+
+export type SecretStore = 'actions' | 'dependabot' | 'codespaces';
+
+export type SecretInventory = {
+	store: SecretStore;
+	checked: boolean;
+	secrets: SecretMetadata[];
+};
+
+export type PrivateVulnerabilityReporting = {
+	checked: boolean;
+	enabled: boolean;
+};
+
+export type RunnerSummary = {
+	id: number;
+	name: string;
+	labels: string[];
+};
+
+export type RunnerInventory = {
+	checked: boolean;
+	runners: RunnerSummary[];
+};
+
+export type WebhookSummary = {
+	id: number;
+	url: string;
+	insecureSsl: boolean;
+};
+
+export type DeployKeySummary = {
+	id: number;
+	title: string;
+	readOnly: boolean;
+};
+
+export type RepoTeamSummary = {
+	slug: string;
+	name: string;
+	permission: string;
+};
+
+export type RepoTeamsResult = {
+	checked: boolean;
+	teams: RepoTeamSummary[];
+};
+
+export function getRepoMetadata(
+	octokit: Octokit,
+	cache: CachedFetcher,
+	repo: RepoRef,
+): Promise<RepoMetadata> {
+	return cache.fetch(
+		`repo-metadata:${repo.owner}/${repo.name}`,
+		() => fetchRepoMetadata(octokit, repo),
+	);
+}
+
+export function getBranchProtection(
+	octokit: Octokit,
+	cache: CachedFetcher,
+	repo: RepoRef,
+	branch: string,
+): Promise<BranchProtection> {
+	return cache.fetch(
+		`branch-protection:${repo.owner}/${repo.name}@${branch}`,
+		() => fetchBranchProtection(octokit, repo, branch),
+	);
+}
+
+export function getCodeScanningStatus(
+	octokit: Octokit,
+	cache: CachedFetcher,
+	repo: RepoRef,
+): Promise<CodeScanningStatus> {
+	return cache.fetch(
+		`code-scanning:${repo.owner}/${repo.name}`,
+		() => fetchCodeScanningStatus(octokit, repo),
+	);
+}
+
+export function getSecurityPolicyStatus(
+	octokit: Octokit,
+	cache: CachedFetcher,
+	repo: RepoRef,
+): Promise<SecurityPolicyStatus> {
+	return cache.fetch(
+		`security-policy:${repo.owner}/${repo.name}`,
+		() => fetchSecurityPolicyStatus(octokit, repo),
+	);
+}
+
+export function getCodeownersErrors(
+	octokit: Octokit,
+	cache: CachedFetcher,
+	repo: RepoRef,
+): Promise<CodeownersErrors> {
+	return cache.fetch(
+		`codeowners-errors:${repo.owner}/${repo.name}`,
+		() => fetchCodeownersErrors(octokit, repo),
+	);
+}
+
+export function getCodeownersFilePresent(
+	octokit: Octokit,
+	cache: CachedFetcher,
+	repo: RepoRef,
+): Promise<boolean> {
+	return cache.fetch(
+		`codeowners-present:${repo.owner}/${repo.name}`,
+		() => fetchCodeownersFilePresent(octokit, repo),
+	);
+}
+
+export function getRepoRulesets(
+	octokit: Octokit,
+	cache: CachedFetcher,
+	repo: RepoRef,
+): Promise<RepoRulesetSummary[]> {
+	return cache.fetch(
+		`rulesets:${repo.owner}/${repo.name}`,
+		() => fetchRepoRulesets(octokit, repo),
+	);
+}
+
+export function getRepoCustomPropertyValues(
+	octokit: Octokit,
+	cache: CachedFetcher,
+	repo: RepoRef,
+): Promise<CustomPropertyValue[] | null> {
+	return cache.fetch(
+		`repo-property-values:${repo.owner}/${repo.name}`,
+		() => fetchRepoCustomPropertyValues(octokit, repo),
+	);
+}
+
+export function getOrgCustomPropertySchema(
+	octokit: Octokit,
+	cache: CachedFetcher,
+	org: string,
+): Promise<CustomPropertyDefinition[] | null> {
+	return cache.fetch(
+		`org-property-schema:${org}`,
+		() => fetchOrgCustomPropertySchema(octokit, org),
+	);
+}
+
+export type ActionsPermissions = {
+	enabled: boolean;
+	allowedActions: 'all' | 'local_only' | 'selected' | null;
+};
+
+export type DefaultWorkflowPermissions = {
+	defaultPermissions: 'read' | 'write' | null;
+	canApprovePullRequestReviews: boolean;
+};
+
+export type AllowedActionsConfig = {
+	githubOwnedAllowed: boolean;
+	verifiedAllowed: boolean;
+	patternsAllowed: string[];
+};
+
+export function getActionsPermissions(
+	octokit: Octokit,
+	cache: CachedFetcher,
+	repo: RepoRef,
+): Promise<ActionsPermissions> {
+	return cache.fetch(
+		`actions-permissions:${repo.owner}/${repo.name}`,
+		() => fetchActionsPermissions(octokit, repo),
+	);
+}
+
+export function getDefaultWorkflowPermissions(
+	octokit: Octokit,
+	cache: CachedFetcher,
+	repo: RepoRef,
+): Promise<DefaultWorkflowPermissions> {
+	return cache.fetch(
+		`default-workflow-permissions:${repo.owner}/${repo.name}`,
+		() => fetchDefaultWorkflowPermissions(octokit, repo),
+	);
+}
+
+export function getAllowedActions(
+	octokit: Octokit,
+	cache: CachedFetcher,
+	repo: RepoRef,
+): Promise<AllowedActionsConfig | null> {
+	return cache.fetch(
+		`allowed-actions:${repo.owner}/${repo.name}`,
+		() => fetchAllowedActions(octokit, repo),
+	);
+}
+
+export function getAutomatedSecurityFixesEnabled(
+	octokit: Octokit,
+	cache: CachedFetcher,
+	repo: RepoRef,
+): Promise<boolean> {
+	return cache.fetch(
+		`automated-security-fixes:${repo.owner}/${repo.name}`,
+		() => fetchAutomatedSecurityFixesEnabled(octokit, repo),
+	);
+}
+
+export function getDirectCollaborators(
+	octokit: Octokit,
+	cache: CachedFetcher,
+	repo: RepoRef,
+): Promise<Collaborator[]> {
+	return cache.fetch(
+		`collaborators-direct:${repo.owner}/${repo.name}`,
+		() => fetchCollaborators(octokit, repo, 'direct'),
+	);
+}
+
+export function getOutsideCollaborators(
+	octokit: Octokit,
+	cache: CachedFetcher,
+	repo: RepoRef,
+): Promise<Collaborator[]> {
+	return cache.fetch(
+		`collaborators-outside:${repo.owner}/${repo.name}`,
+		() => fetchCollaborators(octokit, repo, 'outside'),
+	);
+}
+
+export function getEnvironments(
+	octokit: Octokit,
+	cache: CachedFetcher,
+	repo: RepoRef,
+): Promise<EnvironmentInventory> {
+	return cache.fetch(
+		`environments:${repo.owner}/${repo.name}`,
+		() => fetchEnvironments(octokit, repo),
+	);
+}
+
+export function getBranchCount(
+	octokit: Octokit,
+	cache: CachedFetcher,
+	repo: RepoRef,
+): Promise<number> {
+	return cache.fetch(
+		`branch-count:${repo.owner}/${repo.name}`,
+		() => fetchBranchCount(octokit, repo),
+	);
+}
+
+export function getActionsSecrets(
+	octokit: Octokit,
+	cache: CachedFetcher,
+	repo: RepoRef,
+): Promise<SecretInventory> {
+	return cache.fetch(
+		`secrets-actions:${repo.owner}/${repo.name}`,
+		() => fetchActionsSecrets(octokit, repo),
+	);
+}
+
+export function getDependabotSecrets(
+	octokit: Octokit,
+	cache: CachedFetcher,
+	repo: RepoRef,
+): Promise<SecretInventory> {
+	return cache.fetch(
+		`secrets-dependabot:${repo.owner}/${repo.name}`,
+		() => fetchDependabotSecrets(octokit, repo),
+	);
+}
+
+export function getCodespacesSecrets(
+	octokit: Octokit,
+	cache: CachedFetcher,
+	repo: RepoRef,
+): Promise<SecretInventory> {
+	return cache.fetch(
+		`secrets-codespaces:${repo.owner}/${repo.name}`,
+		() => fetchCodespacesSecrets(octokit, repo),
+	);
+}
+
+export function getPrivateVulnerabilityReporting(
+	octokit: Octokit,
+	cache: CachedFetcher,
+	repo: RepoRef,
+): Promise<PrivateVulnerabilityReporting> {
+	return cache.fetch(
+		`pvr:${repo.owner}/${repo.name}`,
+		() => fetchPrivateVulnerabilityReporting(octokit, repo),
+	);
+}
+
+export function getRepoRunners(
+	octokit: Octokit,
+	cache: CachedFetcher,
+	repo: RepoRef,
+): Promise<RunnerInventory> {
+	return cache.fetch(
+		`runners:${repo.owner}/${repo.name}`,
+		() => fetchRepoRunners(octokit, repo),
+	);
+}
+
+export function getRepoWebhooks(
+	octokit: Octokit,
+	cache: CachedFetcher,
+	repo: RepoRef,
+): Promise<WebhookSummary[]> {
+	return cache.fetch(
+		`webhooks:${repo.owner}/${repo.name}`,
+		() => fetchRepoWebhooks(octokit, repo),
+	);
+}
+
+export function getDeployKeys(
+	octokit: Octokit,
+	cache: CachedFetcher,
+	repo: RepoRef,
+): Promise<DeployKeySummary[]> {
+	return cache.fetch(
+		`deploy-keys:${repo.owner}/${repo.name}`,
+		() => fetchDeployKeys(octokit, repo),
+	);
+}
+
+export function getRepoTeams(
+	octokit: Octokit,
+	cache: CachedFetcher,
+	repo: RepoRef,
+): Promise<RepoTeamsResult> {
+	return cache.fetch(
+		`repo-teams:${repo.owner}/${repo.name}`,
+		() => fetchRepoTeams(octokit, repo),
+	);
+}
+
+async function fetchRepoMetadata(octokit: Octokit, repo: RepoRef): Promise<RepoMetadata> {
+	const response = await octokit.rest.repos.get({
+		owner: repo.owner,
+		repo: repo.name,
+	});
+	const data = response.data;
+
+	return {
+		'defaultBranch': data.default_branch,
+		'license': data.license ?
+			{ spdxId: data.license.spdx_id ?? null } :
+			null,
+		'securityAndAnalysis': data.security_and_analysis ?
+			{
+				secretScanning: data.security_and_analysis.secret_scanning ?? undefined,
+				secretScanningPushProtection:
+					data.security_and_analysis.secret_scanning_push_protection ?? undefined,
+			} :
+			null,
+		'archived': data.archived === true,
+		'deleteBranchOnMerge': data.delete_branch_on_merge === true,
+		'private': data.private === true,
+		'visibility': toVisibility(data.visibility, data.private === true),
+		'allowForking': data.allow_forking === true,
+		'description': data.description ?? null,
+		'topics': data.topics ?? [],
+	};
+}
+
+function toVisibility(raw: string | undefined, isPrivate: boolean): RepoVisibility {
+	if (raw === 'public' || raw === 'private' || raw === 'internal') {
+		return raw;
+	}
+
+	return isPrivate ?
+		'private' :
+		'public';
+}
+
+async function fetchBranchProtection(
+	octokit: Octokit,
+	repo: RepoRef,
+	branch: string,
+): Promise<BranchProtection> {
+	try {
+		const response = await octokit.rest.repos.getBranchProtection({
+			owner: repo.owner,
+			repo: repo.name,
+			branch,
+		});
+		const data = response.data;
+		const prReview = data.required_pull_request_reviews;
+		const allowsForce = data.allow_force_pushes?.enabled === true;
+		const checks = data.required_status_checks?.contexts ?? [];
+
+		return {
+			exists: true,
+			requiredPullRequest: Boolean(prReview),
+			requiredApprovingReviewCount: prReview?.required_approving_review_count ?? 0,
+			allowsForcePushes: allowsForce,
+			requiredStatusCheckContexts: checks,
+			dismissStaleReviews: prReview?.dismiss_stale_reviews === true,
+			requireConversationResolution:
+				data.required_conversation_resolution?.enabled === true,
+			enforceAdmins: data.enforce_admins?.enabled === true,
+			requireLinearHistory: data.required_linear_history?.enabled === true,
+			requireCodeOwnerReviews: prReview?.require_code_owner_reviews === true,
+			requireSignedCommits: data.required_signatures?.enabled === true,
+		};
+	} catch (err: unknown) {
+		if (isHttpStatus(err, 404)) {
+			return {
+				exists: false,
+				requiredPullRequest: false,
+				requiredApprovingReviewCount: 0,
+				allowsForcePushes: true,
+				requiredStatusCheckContexts: [],
+				dismissStaleReviews: false,
+				requireConversationResolution: false,
+				enforceAdmins: false,
+				requireLinearHistory: false,
+				requireCodeOwnerReviews: false,
+				requireSignedCommits: false,
+			};
+		}
+		throw err;
+	}
+}
+
+async function fetchCodeownersErrors(
+	octokit: Octokit,
+	repo: RepoRef,
+): Promise<CodeownersErrors> {
+	try {
+		const response = await octokit.rest.repos.codeownersErrors({
+			owner: repo.owner,
+			repo: repo.name,
+		});
+
+		return {
+			checked: true,
+			errorCount: response.data.errors.length,
+		};
+	} catch (err: unknown) {
+		if (isHttpStatus(err, 404)) {
+			return { checked: false, errorCount: 0 };
+		}
+		throw err;
+	}
+}
+
+async function fetchCodeownersFilePresent(
+	octokit: Octokit,
+	repo: RepoRef,
+): Promise<boolean> {
+	const candidates = [
+		'CODEOWNERS',
+		'.github/CODEOWNERS',
+		'docs/CODEOWNERS',
+	];
+
+	for (const path of candidates) {
+		const found = await getContentExists(octokit, repo, path);
+
+		if (found) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+async function fetchRepoRulesets(
+	octokit: Octokit,
+	repo: RepoRef,
+): Promise<RepoRulesetSummary[]> {
+	try {
+		const response = await octokit.rest.repos.getRepoRulesets({
+			owner: repo.owner,
+			repo: repo.name,
+		});
+
+		return response.data.map(toRulesetSummary);
+	} catch (err: unknown) {
+		if (isHttpStatus(err, 404)) {
+			return [];
+		}
+		throw err;
+	}
+}
+
+async function fetchRepoCustomPropertyValues(
+	octokit: Octokit,
+	repo: RepoRef,
+): Promise<CustomPropertyValue[] | null> {
+	try {
+		const response = await octokit.rest.repos.customPropertiesForReposGetRepositoryValues({
+			owner: repo.owner,
+			repo: repo.name,
+		});
+
+		return response.data.map(toPropertyValue);
+	} catch (err: unknown) {
+		if (isHttpStatus(err, 404) || isForbiddenNotRateLimited(err)) {
+			return null;
+		}
+		throw err;
+	}
+}
+
+async function fetchOrgCustomPropertySchema(
+	octokit: Octokit,
+	org: string,
+): Promise<CustomPropertyDefinition[] | null> {
+	try {
+		const orgsApi = octokit.rest.orgs;
+		const response = await orgsApi.customPropertiesForReposGetOrganizationDefinitions({ org });
+
+		return response.data.map(toPropertyDefinition);
+	} catch (err: unknown) {
+		if (isHttpStatus(err, 404) || isForbiddenNotRateLimited(err)) {
+			return null;
+		}
+		throw err;
+	}
+}
+
+async function fetchCodeScanningStatus(
+	octokit: Octokit,
+	repo: RepoRef,
+): Promise<CodeScanningStatus> {
+	try {
+		const response = await octokit.rest.codeScanning.listRecentAnalyses({
+			owner: repo.owner,
+			repo: repo.name,
+			per_page: 1,
+		});
+
+		return { hasAnalyses: response.data.length > 0 };
+	} catch (err: unknown) {
+		if (isHttpStatus(err, 404)) {
+			return { hasAnalyses: false };
+		}
+		throw err;
+	}
+}
+
+async function fetchSecurityPolicyStatus(
+	octokit: Octokit,
+	repo: RepoRef,
+): Promise<SecurityPolicyStatus> {
+	const candidates = [
+		'SECURITY.md',
+		'.github/SECURITY.md',
+		'docs/SECURITY.md',
+	];
+
+	for (const path of candidates) {
+		const found = await getContentExists(octokit, repo, path);
+
+		if (found) {
+			return { present: true };
+		}
+	}
+
+	return { present: false };
+}
+
+async function getContentExists(octokit: Octokit, repo: RepoRef, path: string): Promise<boolean> {
+	try {
+		await octokit.rest.repos.getContent({
+			owner: repo.owner,
+			repo: repo.name,
+			path,
+		});
+
+		return true;
+	} catch (err: unknown) {
+		if (isHttpStatus(err, 404)) {
+			return false;
+		}
+		throw err;
+	}
+}
+
+async function fetchActionsPermissions(
+	octokit: Octokit,
+	repo: RepoRef,
+): Promise<ActionsPermissions> {
+	try {
+		const response = await octokit.rest.actions.getGithubActionsPermissionsRepository({
+			owner: repo.owner,
+			repo: repo.name,
+		});
+
+		return {
+			enabled: response.data.enabled === true,
+			allowedActions: response.data.allowed_actions ?? null,
+		};
+	} catch (err: unknown) {
+		if (isHttpStatus(err, 404)) {
+			return { enabled: false, allowedActions: null };
+		}
+		throw err;
+	}
+}
+
+async function fetchDefaultWorkflowPermissions(
+	octokit: Octokit,
+	repo: RepoRef,
+): Promise<DefaultWorkflowPermissions> {
+	const actionsApi = octokit.rest.actions;
+	const response = await actionsApi.getGithubActionsDefaultWorkflowPermissionsRepository({
+		owner: repo.owner,
+		repo: repo.name,
+	});
+
+	return {
+		defaultPermissions: response.data.default_workflow_permissions ?? null,
+		canApprovePullRequestReviews: response.data.can_approve_pull_request_reviews === true,
+	};
+}
+
+async function fetchAllowedActions(
+	octokit: Octokit,
+	repo: RepoRef,
+): Promise<AllowedActionsConfig | null> {
+	try {
+		const response = await octokit.rest.actions.getAllowedActionsRepository({
+			owner: repo.owner,
+			repo: repo.name,
+		});
+
+		return {
+			githubOwnedAllowed: response.data.github_owned_allowed === true,
+			verifiedAllowed: response.data.verified_allowed === true,
+			patternsAllowed: response.data.patterns_allowed ?? [],
+		};
+	} catch (err: unknown) {
+		if (isHttpStatus(err, 404) || isHttpStatus(err, 409)) {
+			return null;
+		}
+		throw err;
+	}
+}
+
+async function fetchAutomatedSecurityFixesEnabled(
+	octokit: Octokit,
+	repo: RepoRef,
+): Promise<boolean> {
+	try {
+		const response = await octokit.rest.repos.checkAutomatedSecurityFixes({
+			owner: repo.owner,
+			repo: repo.name,
+		});
+
+		return response.data.enabled === true;
+	} catch (err: unknown) {
+		if (isHttpStatus(err, 404)) {
+			return false;
+		}
+		throw err;
+	}
+}
+
+async function fetchCollaborators(
+	octokit: Octokit,
+	repo: RepoRef,
+	affiliation: 'direct' | 'outside',
+): Promise<Collaborator[]> {
+	try {
+		const data = await octokit.paginate(octokit.rest.repos.listCollaborators, {
+			owner: repo.owner,
+			repo: repo.name,
+			affiliation,
+			per_page: 100,
+		});
+
+		return data.map(toCollaborator);
+	} catch (err: unknown) {
+		if (isHttpStatus(err, 404) || isForbiddenNotRateLimited(err)) {
+			return [];
+		}
+		throw err;
+	}
+}
+
+async function fetchEnvironments(
+	octokit: Octokit,
+	repo: RepoRef,
+): Promise<EnvironmentInventory> {
+	try {
+		const response = await octokit.rest.repos.getAllEnvironments({
+			owner: repo.owner,
+			repo: repo.name,
+			per_page: 100,
+		});
+		const list = response.data.environments ?? [];
+
+		return {
+			checked: true,
+			environments: list.map(toEnvironmentSummary),
+		};
+	} catch (err: unknown) {
+		if (isHttpStatus(err, 404) || isForbiddenNotRateLimited(err)) {
+			return { checked: false, environments: [] };
+		}
+		throw err;
+	}
+}
+
+async function fetchBranchCount(octokit: Octokit, repo: RepoRef): Promise<number> {
+	const data = await octokit.paginate(octokit.rest.repos.listBranches, {
+		owner: repo.owner,
+		repo: repo.name,
+		per_page: 100,
+	});
+
+	return data.length;
+}
+
+async function fetchActionsSecrets(octokit: Octokit, repo: RepoRef): Promise<SecretInventory> {
+	try {
+		const data = await octokit.paginate(octokit.rest.actions.listRepoSecrets, {
+			owner: repo.owner,
+			repo: repo.name,
+			per_page: 100,
+		});
+
+		return {
+			store: 'actions',
+			checked: true,
+			secrets: data.map(toSecretMetadata),
+		};
+	} catch (err: unknown) {
+		if (isHttpStatus(err, 404) || isForbiddenNotRateLimited(err)) {
+			return {
+				store: 'actions',
+				checked: false,
+				secrets: [],
+			};
+		}
+		throw err;
+	}
+}
+
+async function fetchDependabotSecrets(octokit: Octokit, repo: RepoRef): Promise<SecretInventory> {
+	try {
+		const data = await octokit.paginate(octokit.rest.dependabot.listRepoSecrets, {
+			owner: repo.owner,
+			repo: repo.name,
+			per_page: 100,
+		});
+
+		return {
+			store: 'dependabot',
+			checked: true,
+			secrets: data.map(toSecretMetadata),
+		};
+	} catch (err: unknown) {
+		if (isHttpStatus(err, 404) || isForbiddenNotRateLimited(err)) {
+			return {
+				store: 'dependabot',
+				checked: false,
+				secrets: [],
+			};
+		}
+		throw err;
+	}
+}
+
+async function fetchCodespacesSecrets(octokit: Octokit, repo: RepoRef): Promise<SecretInventory> {
+	try {
+		const data = await octokit.paginate(octokit.rest.codespaces.listRepoSecrets, {
+			owner: repo.owner,
+			repo: repo.name,
+			per_page: 100,
+		});
+
+		return {
+			store: 'codespaces',
+			checked: true,
+			secrets: data.map(toSecretMetadata),
+		};
+	} catch (err: unknown) {
+		if (isHttpStatus(err, 404) || isForbiddenNotRateLimited(err)) {
+			return {
+				store: 'codespaces',
+				checked: false,
+				secrets: [],
+			};
+		}
+		throw err;
+	}
+}
+
+type RawSecret = {
+	name: string;
+	created_at: string;
+	updated_at: string;
+};
+
+function toSecretMetadata(raw: RawSecret): SecretMetadata {
+	return {
+		name: raw.name,
+		createdAt: raw.created_at,
+		updatedAt: raw.updated_at,
+	};
+}
+
+async function fetchPrivateVulnerabilityReporting(
+	octokit: Octokit,
+	repo: RepoRef,
+): Promise<PrivateVulnerabilityReporting> {
+	try {
+		const response = await octokit.request(
+			'GET /repos/{owner}/{repo}/private-vulnerability-reporting',
+			{ owner: repo.owner, repo: repo.name },
+		);
+		const data = response.data as { enabled?: boolean; };
+
+		return { checked: true, enabled: data.enabled === true };
+	} catch (err: unknown) {
+		if (isHttpStatus(err, 404) || isForbiddenNotRateLimited(err)) {
+			return { checked: false, enabled: false };
+		}
+		throw err;
+	}
+}
+
+async function fetchRepoRunners(octokit: Octokit, repo: RepoRef): Promise<RunnerInventory> {
+	try {
+		const data = await octokit.paginate(octokit.rest.actions.listSelfHostedRunnersForRepo, {
+			owner: repo.owner,
+			repo: repo.name,
+			per_page: 100,
+		});
+
+		return { checked: true, runners: data.map(toRunnerSummary) };
+	} catch (err: unknown) {
+		if (isHttpStatus(err, 404) || isForbiddenNotRateLimited(err)) {
+			return { checked: false, runners: [] };
+		}
+		throw err;
+	}
+}
+
+async function fetchRepoWebhooks(octokit: Octokit, repo: RepoRef): Promise<WebhookSummary[]> {
+	try {
+		const data = await octokit.paginate(octokit.rest.repos.listWebhooks, {
+			owner: repo.owner,
+			repo: repo.name,
+			per_page: 100,
+		});
+
+		return data.map(toWebhookSummary);
+	} catch (err: unknown) {
+		if (isHttpStatus(err, 404) || isForbiddenNotRateLimited(err)) {
+			return [];
+		}
+		throw err;
+	}
+}
+
+async function fetchDeployKeys(octokit: Octokit, repo: RepoRef): Promise<DeployKeySummary[]> {
+	try {
+		const data = await octokit.paginate(octokit.rest.repos.listDeployKeys, {
+			owner: repo.owner,
+			repo: repo.name,
+			per_page: 100,
+		});
+
+		return data.map(toDeployKeySummary);
+	} catch (err: unknown) {
+		if (isHttpStatus(err, 404) || isForbiddenNotRateLimited(err)) {
+			return [];
+		}
+		throw err;
+	}
+}
+
+async function fetchRepoTeams(octokit: Octokit, repo: RepoRef): Promise<RepoTeamsResult> {
+	try {
+		const data = await octokit.paginate(octokit.rest.repos.listTeams, {
+			owner: repo.owner,
+			repo: repo.name,
+			per_page: 100,
+		});
+
+		return { checked: true, teams: data.map(toRepoTeamSummary) };
+	} catch (err: unknown) {
+		if (isHttpStatus(err, 404) || isForbiddenNotRateLimited(err)) {
+			return { checked: false, teams: [] };
+		}
+		throw err;
+	}
+}
+
+type RawRunner = {
+	id: number;
+	name: string;
+	labels?: { name: string; }[];
+};
+
+function toRunnerSummary(raw: RawRunner): RunnerSummary {
+	return {
+		id: raw.id,
+		name: raw.name,
+		labels: (raw.labels ?? []).map(labelName),
+	};
+}
+
+function labelName(label: { name: string; }): string {
+	return label.name;
+}
+
+type RawWebhook = {
+	id: number;
+	config?: {
+		url?: string;
+		insecure_ssl?: string | number;
+	};
+};
+
+function toWebhookSummary(raw: RawWebhook): WebhookSummary {
+	const cfg = raw.config ?? {};
+
+	return {
+		id: raw.id,
+		url: cfg.url ?? '',
+		insecureSsl: parseInsecureSsl(cfg.insecure_ssl),
+	};
+}
+
+function parseInsecureSsl(value: string | number | undefined): boolean {
+	if (typeof value === 'string') {
+		return value === '1' || value.toLowerCase() === 'true';
+	}
+
+	return value === 1;
+}
+
+type RawDeployKey = {
+	id: number;
+	title: string;
+	read_only?: boolean;
+};
+
+function toDeployKeySummary(raw: RawDeployKey): DeployKeySummary {
+	return {
+		id: raw.id,
+		title: raw.title,
+		readOnly: raw.read_only === true,
+	};
+}
+
+type RawRepoTeam = {
+	slug: string;
+	name: string;
+	permission?: string;
+};
+
+function toRepoTeamSummary(raw: RawRepoTeam): RepoTeamSummary {
+	return {
+		slug: raw.slug,
+		name: raw.name,
+		permission: raw.permission ?? 'pull',
+	};
+}
+
+type RawRuleset = {
+	id: number;
+	name: string;
+	enforcement: string;
+	target?: string;
+};
+
+function toRulesetSummary(raw: RawRuleset): RepoRulesetSummary {
+	return {
+		id: raw.id,
+		name: raw.name,
+		enforcement: raw.enforcement,
+		target: raw.target ?? 'branch',
+	};
+}
+
+type RawPropertyValue = {
+	property_name: string;
+	value: string | string[] | null;
+};
+
+function toPropertyValue(raw: RawPropertyValue): CustomPropertyValue {
+	return {
+		propertyName: raw.property_name,
+		value: raw.value,
+	};
+}
+
+type RawPropertyDefinition = {
+	property_name: string;
+	required?: boolean | null;
+};
+
+function toPropertyDefinition(raw: RawPropertyDefinition): CustomPropertyDefinition {
+	return {
+		propertyName: raw.property_name,
+		required: raw.required === true,
+	};
+}
+
+type RawCollaborator = {
+	login: string;
+	role_name?: string;
+	permissions?: {
+		admin?: boolean;
+		maintain?: boolean;
+		push?: boolean;
+		triage?: boolean;
+		pull?: boolean;
+	};
+};
+
+function toCollaborator(raw: RawCollaborator): Collaborator {
+	return {
+		login: raw.login,
+		permission: derivePermission(raw),
+	};
+}
+
+function derivePermission(raw: RawCollaborator): CollaboratorPermission {
+	const role = raw.role_name?.toLowerCase();
+
+	if (role === 'admin' || role === 'maintain' || role === 'triage' || role === 'read') {
+		return role;
+	}
+
+	if (role === 'write') {
+		return 'write';
+	}
+
+	const perms = raw.permissions ?? {};
+
+	if (perms.admin) {
+		return 'admin';
+	}
+	if (perms.maintain) {
+		return 'maintain';
+	}
+	if (perms.push) {
+		return 'write';
+	}
+	if (perms.triage) {
+		return 'triage';
+	}
+
+	return 'read';
+}
+
+type RawProtectionRule = {
+	type: string;
+	reviewers?: unknown;
+	wait_timer?: number;
+};
+
+type RawEnvironment = {
+	name: string;
+	protection_rules?: RawProtectionRule[];
+	deployment_branch_policy?: unknown;
+};
+
+function toEnvironmentSummary(raw: RawEnvironment): EnvironmentSummary {
+	const rules = raw.protection_rules ?? [];
+
+	return {
+		name: raw.name,
+		hasReviewers: rules.some(isReviewerRule),
+		hasWaitTimer: rules.some(isWaitTimerRule),
+		hasBranchPolicy: raw.deployment_branch_policy !== null &&
+			raw.deployment_branch_policy !== undefined,
+	};
+}
+
+function isReviewerRule(rule: { type: string; }): boolean {
+	return rule.type === 'required_reviewers';
+}
+
+function isWaitTimerRule(rule: { type: string; wait_timer?: number; }): boolean {
+	return rule.type === 'wait_timer' && (rule.wait_timer ?? 0) > 0;
+}
+
+type WithStatus = {
+	status: unknown;
+};
+
+function isHttpStatus(err: unknown, status: number): boolean {
+	return typeof err === 'object' &&
+		err !== null &&
+		'status' in err &&
+		(err as WithStatus).status === status;
+}
+
+type ErrorResponse = {
+	response?: {
+		headers?: Record<string, string | undefined>;
+	};
+	message?: unknown;
+};
+
+/*
+ * A 403 can mean two very different things: the token lacks permission (a
+ * benign "not configured" we swallow), or we have been rate-limited (which we
+ * must NOT swallow — that would silently turn a throttled request into a clean
+ * pass and hide a finding). Distinguish them by the rate-limit signals GitHub
+ * attaches to the response.
+ */
+function isRateLimited(err: unknown): boolean {
+	if (isHttpStatus(err, 429)) {
+		return true;
+	}
+	if (!isHttpStatus(err, 403)) {
+		return false;
+	}
+
+	const headers = (err as ErrorResponse).response?.headers ?? {};
+	const remaining = headers['x-ratelimit-remaining'];
+
+	if (remaining === '0' || headers['retry-after'] !== undefined) {
+		return true;
+	}
+
+	const message = (err as ErrorResponse).message;
+
+	if (typeof message !== 'string') {
+		return false;
+	}
+
+	const lower = message.toLowerCase();
+
+	return lower.includes('rate limit') ||
+		lower.includes('secondary rate') ||
+		lower.includes('abuse');
+}
+
+/*
+ * True only for a genuine permission-denied 403 — a rate-limit 403 returns
+ * false here so it propagates as a visible error instead of a silent skip.
+ */
+function isForbiddenNotRateLimited(err: unknown): boolean {
+	return isHttpStatus(err, 403) && !isRateLimited(err);
+}
