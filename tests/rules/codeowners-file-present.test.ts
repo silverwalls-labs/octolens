@@ -67,3 +67,13 @@ async function missingCase() {
 	assert.equal(findings[0]?.ruleId, 'access/codeowners-file-present');
 	assert.equal(findings[0]?.severity, 'medium');
 }
+
+test('propagates server errors from the API', serverErrorCase);
+
+async function serverErrorCase() {
+	nock('https://api.github.com')
+		.get('/repos/sheplu/Octolens/contents/CODEOWNERS')
+		.reply(500, { message: 'Internal Server Error' });
+
+	await assert.rejects(rule.check(makeContext()));
+}

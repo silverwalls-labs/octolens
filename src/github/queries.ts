@@ -507,7 +507,7 @@ async function fetchBranchProtection(
 			requireSignedCommits: data.required_signatures?.enabled === true,
 		};
 	} catch (err: unknown) {
-		if (isHttpStatus(err, 404)) {
+		if (isHttpStatus(err, 404) || isForbiddenNotRateLimited(err)) {
 			return {
 				exists: false,
 				requiredPullRequest: false,
@@ -637,7 +637,7 @@ async function fetchCodeScanningStatus(
 
 		return { hasAnalyses: response.data.length > 0 };
 	} catch (err: unknown) {
-		if (isHttpStatus(err, 404)) {
+		if (isHttpStatus(err, 404) || isForbiddenNotRateLimited(err)) {
 			return { hasAnalyses: false };
 		}
 		throw err;

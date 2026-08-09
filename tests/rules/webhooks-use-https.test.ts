@@ -76,3 +76,14 @@ async function insecureCase() {
 	assert.match(findings[0]?.detail ?? '', /#2.*ssl verification disabled/);
 	assert.doesNotMatch(findings[0]?.detail ?? '', /#3/);
 }
+
+test('propagates server errors from the API', serverErrorCase);
+
+async function serverErrorCase() {
+	nock('https://api.github.com')
+		.get(ENDPOINT)
+		.query({ per_page: '100' })
+		.reply(500, { message: 'Internal Server Error' });
+
+	await assert.rejects(rule.check(makeContext()));
+}

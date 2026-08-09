@@ -73,3 +73,13 @@ function mockMeta(opts: {
 			allowForking: opts.allowForking,
 		}));
 }
+
+test('propagates server errors from the API', serverErrorCase);
+
+async function serverErrorCase() {
+	nock('https://api.github.com')
+		.get(REPO)
+		.reply(500, { message: 'Internal Server Error' });
+
+	await assert.rejects(rule.check(makeContext()));
+}

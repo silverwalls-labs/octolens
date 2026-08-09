@@ -71,3 +71,14 @@ async function writableCase() {
 	assert.match(findings[0]?.detail ?? '', /old-write-key/);
 	assert.doesNotMatch(findings[0]?.detail ?? '', /safe-key/);
 }
+
+test('propagates server errors from the API', serverErrorCase);
+
+async function serverErrorCase() {
+	nock('https://api.github.com')
+		.get(ENDPOINT)
+		.query({ per_page: '100' })
+		.reply(500, { message: 'Internal Server Error' });
+
+	await assert.rejects(rule.check(makeContext()));
+}

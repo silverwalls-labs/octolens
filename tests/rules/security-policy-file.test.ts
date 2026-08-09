@@ -67,3 +67,13 @@ async function missingSecurityCase() {
 	assert.equal(findings[0]?.ruleId, 'security/security-policy-file');
 	assert.equal(findings[0]?.severity, 'medium');
 }
+
+test('propagates server errors from the API', serverErrorCase);
+
+async function serverErrorCase() {
+	nock('https://api.github.com')
+		.get('/repos/sheplu/Octolens/contents/SECURITY.md')
+		.reply(500, { message: 'Internal Server Error' });
+
+	await assert.rejects(rule.check(makeContext()));
+}

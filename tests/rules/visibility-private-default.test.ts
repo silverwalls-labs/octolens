@@ -107,3 +107,13 @@ function mockMeta(opts: { visibility: 'public' | 'private' | 'internal'; }) {
 		.get('/repos/sheplu/Octolens')
 		.reply(200, makeRepoResponse({ visibility: opts.visibility }));
 }
+
+test('propagates server errors from the API', serverErrorCase);
+
+async function serverErrorCase() {
+	nock('https://api.github.com')
+		.get('/repos/sheplu/Octolens')
+		.reply(500, { message: 'Internal Server Error' });
+
+	await assert.rejects(rule.check(makeContext()));
+}

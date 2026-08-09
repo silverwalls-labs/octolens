@@ -69,3 +69,14 @@ async function emptyCase() {
 
 	assert.equal(findings.length, 0);
 }
+
+test('propagates server errors from the API', serverErrorCase);
+
+async function serverErrorCase() {
+	nock('https://api.github.com')
+		.get(ENDPOINT)
+		.query({ per_page: '100' })
+		.reply(500, { message: 'Internal Server Error' });
+
+	await assert.rejects(rule.check(makeContext()));
+}

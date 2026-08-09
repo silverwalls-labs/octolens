@@ -60,3 +60,13 @@ async function missingCase() {
 
 	assert.equal(findings.length, 0);
 }
+
+test('propagates server errors from the API', serverErrorCase);
+
+async function serverErrorCase() {
+	nock('https://api.github.com')
+		.get(ENDPOINT)
+		.reply(500, { message: 'Internal Server Error' });
+
+	await assert.rejects(rule.check(makeContext()));
+}

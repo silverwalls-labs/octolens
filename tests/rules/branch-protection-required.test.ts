@@ -49,15 +49,28 @@ async function unprotectedCase() {
 	assert.equal(findings[0]?.severity, 'critical');
 }
 
-test('propagates non-404 errors from the protection endpoint', protectionErrorCase);
+test('reports a critical finding when protection endpoint returns 403', permissionDeniedCase);
 
-async function protectionErrorCase() {
+async function permissionDeniedCase() {
 	nock('https://api.github.com')
 		.get('/repos/sheplu/Octolens')
 		.reply(200, makeRepoResponse());
 	nock('https://api.github.com')
 		.get('/repos/sheplu/Octolens/branches/main/protection')
 		.reply(403, { message: 'Forbidden' });
+
+	const findings = await rule.check(makeContext());
+
+	assert.equal(findings.length, 1);
+	assert.equal(findings[0]?.severity, 'critical');
+}
+
+test('propagates server errors from the API', serverErrorCase);
+
+async function serverErrorCase() {
+	nock('https://api.github.com')
+		.get('/repos/sheplu/Octolens')
+		.reply(500, { message: 'Internal Server Error' });
 
 	await assert.rejects(rule.check(makeContext()));
 }

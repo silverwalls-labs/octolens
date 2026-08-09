@@ -151,6 +151,28 @@ async function archivedSkipCase() {
 	assert.equal(exitCodeFor(result), 0);
 }
 
+test('repo metadata failure does not crash the scan', metadataErrorCase);
+
+async function metadataErrorCase() {
+	nock('https://api.github.com')
+		.get('/repos/sheplu/Octolens')
+		.reply(500, { message: 'Internal Server Error' });
+	nock('https://api.github.com')
+		.get('/repos/sheplu/Octolens/vulnerability-alerts')
+		.reply(500, { message: 'Internal Server Error' });
+
+	const result = await scanRepo({
+		repo: { owner: 'sheplu', name: 'Octolens' },
+		rules: [ dependabotAlertsEnabled ],
+		octokit: makeOctokit(),
+		logger: silentLogger(),
+		threshold: 'high',
+	});
+
+	assert.equal(result.summary.rulesRun, 1);
+	assert.equal(result.summary.rulesErrored, 1);
+}
+
 test('archived repositories are scanned when archived ignore is disabled', archivedRunCase);
 
 async function archivedRunCase() {

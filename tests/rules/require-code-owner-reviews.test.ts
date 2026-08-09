@@ -89,3 +89,13 @@ async function noProtectionCase() {
 
 	await assert.rejects(rule.check(makeContext()), RuleSkipped);
 }
+
+test('propagates server errors from the API', serverErrorCase);
+
+async function serverErrorCase() {
+	nock('https://api.github.com')
+		.get(CODEOWNERS_ROOT)
+		.reply(500, { message: 'Internal Server Error' });
+
+	await assert.rejects(rule.check(makeContext()));
+}

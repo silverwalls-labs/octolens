@@ -39,3 +39,13 @@ async function noTopicsCase() {
 	assert.equal(findings[0]?.ruleId, 'repo-config/topics-present');
 	assert.equal(findings[0]?.severity, 'info');
 }
+
+test('propagates server errors from the API', serverErrorCase);
+
+async function serverErrorCase() {
+	nock('https://api.github.com')
+		.get('/repos/sheplu/Octolens')
+		.reply(500, { message: 'Internal Server Error' });
+
+	await assert.rejects(rule.check(makeContext()));
+}

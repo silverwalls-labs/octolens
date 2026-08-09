@@ -49,3 +49,13 @@ async function alertsAuthErrorCase() {
 
 	await assert.rejects(rule.check(makeContext()));
 }
+
+test('propagates server errors from the API', serverErrorCase);
+
+async function serverErrorCase() {
+	nock('https://api.github.com')
+		.get('/repos/sheplu/Octolens/vulnerability-alerts')
+		.reply(500, { message: 'Internal Server Error' });
+
+	await assert.rejects(rule.check(makeContext()));
+}

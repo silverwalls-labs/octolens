@@ -113,3 +113,14 @@ async function forbiddenCase() {
 
 	await assert.rejects(rule.check(makeContext()), RuleSkipped);
 }
+
+test('propagates server errors from the API', serverErrorCase);
+
+async function serverErrorCase() {
+	nock(BASE)
+		.get(ACTIONS)
+		.query({ per_page: '100' })
+		.reply(500, { message: 'Internal Server Error' });
+
+	await assert.rejects(rule.check(makeContext()));
+}
