@@ -30,10 +30,14 @@ export async function scanRepo(options: ScanRepoOptions): Promise<ScanResult> {
 	const skipArchived = options.config?.ignore?.archived !== false;
 
 	if (skipArchived) {
-		const meta = await getRepoMetadata(options.octokit, cache, options.repo);
+		try {
+			const meta = await getRepoMetadata(options.octokit, cache, options.repo);
 
-		if (meta.archived) {
-			return buildArchivedSkipResult(options);
+			if (meta.archived) {
+				return buildArchivedSkipResult(options);
+			}
+		} catch {
+			options.logger.warn('could not check archived status; proceeding with scan');
 		}
 	}
 

@@ -1,0 +1,474 @@
+{
+  "capturedAt": "2026-08-09T13:23:15.571Z",
+  "owner": "silverwalls-labs",
+  "repo": "review",
+  "defaultBranch": "main",
+  "entries": [
+    {
+      "method": "GET",
+      "path": "/repos/{owner}/{repo}",
+      "status": 200,
+      "body": {
+        "id": 1328717861,
+        "node_id": "R_kgDOTzKgJQ",
+        "name": "review",
+        "full_name": "silverwalls-labs/review",
+        "private": false,
+        "owner": {
+          "login": "silverwalls-labs",
+          "id": 298564890,
+          "node_id": "O_kgDOEcu9Gg",
+          "avatar_url": "https://avatars.githubusercontent.com/u/298564890?v=4",
+          "gravatar_id": "",
+          "url": "https://api.github.com/users/silverwalls-labs",
+          "html_url": "https://github.com/silverwalls-labs",
+          "followers_url": "https://api.github.com/users/silverwalls-labs/followers",
+          "following_url": "https://api.github.com/users/silverwalls-labs/following{/other_user}",
+          "gists_url": "https://api.github.com/users/silverwalls-labs/gists{/gist_id}",
+          "starred_url": "https://api.github.com/users/silverwalls-labs/starred{/owner}{/repo}",
+          "subscriptions_url": "https://api.github.com/users/silverwalls-labs/subscriptions",
+          "organizations_url": "https://api.github.com/users/silverwalls-labs/orgs",
+          "repos_url": "https://api.github.com/users/silverwalls-labs/repos",
+          "events_url": "https://api.github.com/users/silverwalls-labs/events{/privacy}",
+          "received_events_url": "https://api.github.com/users/silverwalls-labs/received_events",
+          "type": "Organization",
+          "user_view_type": "public",
+          "site_admin": false
+        },
+        "html_url": "https://github.com/silverwalls-labs/review",
+        "description": null,
+        "fork": false,
+        "url": "https://api.github.com/repos/silverwalls-labs/review",
+        "forks_url": "https://api.github.com/repos/silverwalls-labs/review/forks",
+        "keys_url": "https://api.github.com/repos/silverwalls-labs/review/keys{/key_id}",
+        "collaborators_url": "https://api.github.com/repos/silverwalls-labs/review/collaborators{/collaborator}",
+        "teams_url": "https://api.github.com/repos/silverwalls-labs/review/teams",
+        "hooks_url": "https://api.github.com/repos/silverwalls-labs/review/hooks",
+        "issue_events_url": "https://api.github.com/repos/silverwalls-labs/review/issues/events{/number}",
+        "events_url": "https://api.github.com/repos/silverwalls-labs/review/events",
+        "assignees_url": "https://api.github.com/repos/silverwalls-labs/review/assignees{/user}",
+        "branches_url": "https://api.github.com/repos/silverwalls-labs/review/branches{/branch}",
+        "tags_url": "https://api.github.com/repos/silverwalls-labs/review/tags",
+        "blobs_url": "https://api.github.com/repos/silverwalls-labs/review/git/blobs{/sha}",
+        "git_tags_url": "https://api.github.com/repos/silverwalls-labs/review/git/tags{/sha}",
+        "git_refs_url": "https://api.github.com/repos/silverwalls-labs/review/git/refs{/sha}",
+        "trees_url": "https://api.github.com/repos/silverwalls-labs/review/git/trees{/sha}",
+        "statuses_url": "https://api.github.com/repos/silverwalls-labs/review/statuses/{sha}",
+        "languages_url": "https://api.github.com/repos/silverwalls-labs/review/languages",
+        "stargazers_url": "https://api.github.com/repos/silverwalls-labs/review/stargazers",
+        "contributors_url": "https://api.github.com/repos/silverwalls-labs/review/contributors",
+        "subscribers_url": "https://api.github.com/repos/silverwalls-labs/review/subscribers",
+        "subscription_url": "https://api.github.com/repos/silverwalls-labs/review/subscription",
+        "commits_url": "https://api.github.com/repos/silverwalls-labs/review/commits{/sha}",
+        "git_commits_url": "https://api.github.com/repos/silverwalls-labs/review/git/commits{/sha}",
+        "comments_url": "https://api.github.com/repos/silverwalls-labs/review/comments{/number}",
+        "issue_comment_url": "https://api.github.com/repos/silverwalls-labs/review/issues/comments{/number}",
+        "contents_url": "https://api.github.com/repos/silverwalls-labs/review/contents/{+path}",
+        "compare_url": "https://api.github.com/repos/silverwalls-labs/review/compare/{base}...{head}",
+        "merges_url": "https://api.github.com/repos/silverwalls-labs/review/merges",
+        "archive_url": "https://api.github.com/repos/silverwalls-labs/review/{archive_format}{/ref}",
+        "downloads_url": "https://api.github.com/repos/silverwalls-labs/review/downloads",
+        "issues_url": "https://api.github.com/repos/silverwalls-labs/review/issues{/number}",
+        "pulls_url": "https://api.github.com/repos/silverwalls-labs/review/pulls{/number}",
+        "milestones_url": "https://api.github.com/repos/silverwalls-labs/review/milestones{/number}",
+        "notifications_url": "https://api.github.com/repos/silverwalls-labs/review/notifications{?since,all,participating}",
+        "labels_url": "https://api.github.com/repos/silverwalls-labs/review/labels{/name}",
+        "releases_url": "https://api.github.com/repos/silverwalls-labs/review/releases{/id}",
+        "deployments_url": "https://api.github.com/repos/silverwalls-labs/review/deployments",
+        "created_at": "2026-08-09T11:08:04Z",
+        "updated_at": "2026-08-09T11:09:22Z",
+        "pushed_at": "2026-08-09T11:08:05Z",
+        "git_url": "git://github.com/silverwalls-labs/review.git",
+        "ssh_url": "git@github.com:silverwalls-labs/review.git",
+        "clone_url": "https://github.com/silverwalls-labs/review.git",
+        "svn_url": "https://github.com/silverwalls-labs/review",
+        "homepage": null,
+        "size": 0,
+        "stargazers_count": 0,
+        "watchers_count": 0,
+        "language": null,
+        "has_issues": true,
+        "has_projects": true,
+        "has_downloads": false,
+        "has_wiki": true,
+        "has_pages": false,
+        "has_discussions": false,
+        "forks_count": 0,
+        "mirror_url": null,
+        "archived": false,
+        "disabled": false,
+        "open_issues_count": 0,
+        "license": null,
+        "allow_forking": true,
+        "is_template": false,
+        "web_commit_signoff_required": false,
+        "has_pull_requests": true,
+        "pull_request_creation_policy": "all",
+        "topics": [],
+        "visibility": "public",
+        "forks": 0,
+        "open_issues": 0,
+        "watchers": 0,
+        "default_branch": "main",
+        "permissions": {
+          "admin": true,
+          "maintain": true,
+          "push": true,
+          "triage": true,
+          "pull": true
+        },
+        "temp_clone_token": "",
+        "allow_squash_merge": true,
+        "allow_merge_commit": true,
+        "allow_rebase_merge": true,
+        "allow_auto_merge": false,
+        "delete_branch_on_merge": false,
+        "allow_update_branch": false,
+        "use_squash_pr_title_as_default": false,
+        "squash_merge_commit_message": "COMMIT_MESSAGES",
+        "squash_merge_commit_title": "COMMIT_OR_PR_TITLE",
+        "merge_commit_message": "PR_TITLE",
+        "merge_commit_title": "MERGE_MESSAGE",
+        "custom_properties": {},
+        "organization": {
+          "login": "silverwalls-labs",
+          "id": 298564890,
+          "node_id": "O_kgDOEcu9Gg",
+          "avatar_url": "https://avatars.githubusercontent.com/u/298564890?v=4",
+          "gravatar_id": "",
+          "url": "https://api.github.com/users/silverwalls-labs",
+          "html_url": "https://github.com/silverwalls-labs",
+          "followers_url": "https://api.github.com/users/silverwalls-labs/followers",
+          "following_url": "https://api.github.com/users/silverwalls-labs/following{/other_user}",
+          "gists_url": "https://api.github.com/users/silverwalls-labs/gists{/gist_id}",
+          "starred_url": "https://api.github.com/users/silverwalls-labs/starred{/owner}{/repo}",
+          "subscriptions_url": "https://api.github.com/users/silverwalls-labs/subscriptions",
+          "organizations_url": "https://api.github.com/users/silverwalls-labs/orgs",
+          "repos_url": "https://api.github.com/users/silverwalls-labs/repos",
+          "events_url": "https://api.github.com/users/silverwalls-labs/events{/privacy}",
+          "received_events_url": "https://api.github.com/users/silverwalls-labs/received_events",
+          "type": "Organization",
+          "user_view_type": "public",
+          "site_admin": false
+        },
+        "security_and_analysis": {
+          "secret_scanning": {
+            "status": "disabled"
+          },
+          "secret_scanning_push_protection": {
+            "status": "disabled"
+          },
+          "dependabot_security_updates": {
+            "status": "disabled"
+          },
+          "secret_scanning_non_provider_patterns": {
+            "status": "disabled"
+          },
+          "secret_scanning_validity_checks": {
+            "status": "disabled"
+          }
+        },
+        "network_count": 0,
+        "subscribers_count": 0
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/repos/{owner}/{repo}/branches/main/protection",
+      "status": 404,
+      "body": {
+        "message": "Branch not protected",
+        "documentation_url": "https://docs.github.com/rest/branches/branch-protection#get-branch-protection",
+        "status": "404"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/repos/{owner}/{repo}/vulnerability-alerts",
+      "status": 204,
+      "body": ""
+    },
+    {
+      "method": "GET",
+      "path": "/repos/{owner}/{repo}/automated-security-fixes",
+      "status": 200,
+      "body": {
+        "enabled": false,
+        "paused": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/repos/{owner}/{repo}/rulesets",
+      "status": 200,
+      "body": []
+    },
+    {
+      "method": "GET",
+      "path": "/repos/{owner}/{repo}/environments",
+      "query": {
+        "per_page": "100"
+      },
+      "status": 200,
+      "body": {
+        "total_count": 0,
+        "environments": []
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/repos/{owner}/{repo}/branches",
+      "query": {
+        "per_page": "100"
+      },
+      "status": 200,
+      "body": [
+        {
+          "name": "main",
+          "commit": {
+            "sha": "96dbc857d8aa16ceaa299037d67c614ecd2a3286",
+            "url": "https://api.github.com/repos/silverwalls-labs/review/commits/96dbc857d8aa16ceaa299037d67c614ecd2a3286"
+          },
+          "protected": false,
+          "protection": {
+            "enabled": false,
+            "required_status_checks": {
+              "enforcement_level": "off",
+              "contexts": [],
+              "checks": []
+            }
+          },
+          "protection_url": "https://api.github.com/repos/silverwalls-labs/review/branches/main/protection"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/repos/{owner}/{repo}/actions/permissions",
+      "status": 200,
+      "body": {
+        "enabled": true,
+        "allowed_actions": "all",
+        "sha_pinning_required": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/repos/{owner}/{repo}/actions/permissions/workflow",
+      "status": 200,
+      "body": {
+        "default_workflow_permissions": "read",
+        "can_approve_pull_request_reviews": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/repos/{owner}/{repo}/actions/permissions/selected-actions",
+      "status": 409,
+      "body": {
+        "message": "Conflict",
+        "errors": "All actions and workflows are allowed on this repository",
+        "documentation_url": "https://docs.github.com/rest/actions/permissions#get-allowed-actions-and-reusable-workflows-for-a-repository",
+        "status": "409"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/repos/{owner}/{repo}/actions/secrets",
+      "query": {
+        "per_page": "100"
+      },
+      "status": 200,
+      "body": {
+        "total_count": 0,
+        "secrets": []
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/repos/{owner}/{repo}/dependabot/secrets",
+      "query": {
+        "per_page": "100"
+      },
+      "status": 200,
+      "body": {
+        "total_count": 0,
+        "secrets": []
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/repos/{owner}/{repo}/codespaces/secrets",
+      "query": {
+        "per_page": "100"
+      },
+      "status": 200,
+      "body": {
+        "total_count": 0,
+        "secrets": []
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/repos/{owner}/{repo}/code-scanning/analyses",
+      "query": {
+        "per_page": "1"
+      },
+      "status": 404,
+      "body": {
+        "message": "no analysis found",
+        "documentation_url": "https://docs.github.com/rest/code-scanning/code-scanning#list-code-scanning-analyses-for-a-repository",
+        "status": "404"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/repos/{owner}/{repo}/contents/SECURITY.md",
+      "status": 404,
+      "body": {
+        "message": "Not Found",
+        "documentation_url": "https://docs.github.com/rest/repos/contents#get-repository-content",
+        "status": "404"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/repos/{owner}/{repo}/contents/.github/SECURITY.md",
+      "status": 404,
+      "body": {
+        "message": "Not Found",
+        "documentation_url": "https://docs.github.com/rest/repos/contents#get-repository-content",
+        "status": "404"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/repos/{owner}/{repo}/contents/docs/SECURITY.md",
+      "status": 404,
+      "body": {
+        "message": "Not Found",
+        "documentation_url": "https://docs.github.com/rest/repos/contents#get-repository-content",
+        "status": "404"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/repos/{owner}/{repo}/contents/CODEOWNERS",
+      "status": 404,
+      "body": {
+        "message": "Not Found",
+        "documentation_url": "https://docs.github.com/rest/repos/contents#get-repository-content",
+        "status": "404"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/repos/{owner}/{repo}/contents/.github/CODEOWNERS",
+      "status": 404,
+      "body": {
+        "message": "Not Found",
+        "documentation_url": "https://docs.github.com/rest/repos/contents#get-repository-content",
+        "status": "404"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/repos/{owner}/{repo}/contents/docs/CODEOWNERS",
+      "status": 404,
+      "body": {
+        "message": "Not Found",
+        "documentation_url": "https://docs.github.com/rest/repos/contents#get-repository-content",
+        "status": "404"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/repos/{owner}/{repo}/codeowners/errors",
+      "status": 404,
+      "body": {
+        "message": "Not Found",
+        "documentation_url": "https://docs.github.com/rest/repos/repos#list-codeowners-errors",
+        "status": "404"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/repos/{owner}/{repo}/private-vulnerability-reporting",
+      "status": 200,
+      "body": {
+        "enabled": false
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/repos/{owner}/{repo}/collaborators",
+      "query": {
+        "affiliation": "direct",
+        "per_page": "100"
+      },
+      "status": 200,
+      "body": []
+    },
+    {
+      "method": "GET",
+      "path": "/repos/{owner}/{repo}/collaborators",
+      "query": {
+        "affiliation": "outside",
+        "per_page": "100"
+      },
+      "status": 200,
+      "body": []
+    },
+    {
+      "method": "GET",
+      "path": "/repos/{owner}/{repo}/teams",
+      "query": {
+        "per_page": "100"
+      },
+      "status": 200,
+      "body": []
+    },
+    {
+      "method": "GET",
+      "path": "/repos/{owner}/{repo}/hooks",
+      "query": {
+        "per_page": "100"
+      },
+      "status": 200,
+      "body": []
+    },
+    {
+      "method": "GET",
+      "path": "/repos/{owner}/{repo}/keys",
+      "query": {
+        "per_page": "100"
+      },
+      "status": 200,
+      "body": []
+    },
+    {
+      "method": "GET",
+      "path": "/repos/{owner}/{repo}/actions/runners",
+      "query": {
+        "per_page": "100"
+      },
+      "status": 200,
+      "body": {
+        "total_count": 0,
+        "runners": []
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/orgs/{owner}/properties/schema",
+      "status": 200,
+      "body": []
+    },
+    {
+      "method": "GET",
+      "path": "/repos/{owner}/{repo}/properties/values",
+      "status": 200,
+      "body": []
+    }
+  ]
+}

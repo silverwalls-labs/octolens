@@ -2,6 +2,7 @@ import {
 	getBranchProtection,
 	getRepoMetadata,
 } from '../../github/queries.ts';
+import { skip } from '../../types/index.ts';
 import type { Finding, Rule } from '../../types/index.ts';
 
 const RULE_ID = 'repo-config/require-status-checks';
@@ -28,7 +29,7 @@ export const rule: Rule = {
 		);
 
 		if (!protection.exists) {
-			return [];
+			return skip('default branch has no protection rule');
 		}
 
 		if (protection.requiredStatusCheckContexts.length > 0) {
