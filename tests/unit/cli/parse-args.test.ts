@@ -249,6 +249,95 @@ function unknownFormatCall() {
 	]);
 }
 
+test('--org parses an organization scan', testOrg);
+
+function testOrg() {
+	const result = parseArgs([
+		'scan',
+		'--org',
+		'silverwalls-labs',
+	]);
+
+	assert.equal(result.command, 'scan');
+	if (result.command !== 'scan') {
+		return;
+	}
+	assert.equal(result.org, 'silverwalls-labs');
+	assert.equal(result.repo, undefined);
+}
+
+test('--repo and --org together are rejected', testRepoAndOrg);
+
+function testRepoAndOrg() {
+	assert.throws(repoAndOrgCall, CliUsageError);
+}
+
+function repoAndOrgCall() {
+	parseArgs([
+		'scan',
+		'--repo',
+		'a/b',
+		'--org',
+		'c',
+	]);
+}
+
+test('--org with a slash is rejected', testMalformedOrg);
+
+function testMalformedOrg() {
+	assert.throws(malformedOrgCall, CliUsageError);
+}
+
+function malformedOrgCall() {
+	parseArgs([
+		'scan',
+		'--org',
+		'owner/name',
+	]);
+}
+
+test('--org with repo-only flags is rejected', testOrgWithRepoFlags);
+
+function testOrgWithRepoFlags() {
+	assert.throws(orgWithArchivedCall, CliUsageError);
+	assert.throws(orgWithAllowPublicCall, CliUsageError);
+}
+
+function orgWithArchivedCall() {
+	parseArgs([
+		'scan',
+		'--org',
+		'a',
+		'--include-archived',
+	]);
+}
+
+function orgWithAllowPublicCall() {
+	parseArgs([
+		'scan',
+		'--org',
+		'a',
+		'--allow-public',
+		'a/b',
+	]);
+}
+
+test('--org with --fail-on-skip is accepted', testOrgFailOnSkip);
+
+function testOrgFailOnSkip() {
+	const result = parseArgs([
+		'scan',
+		'--org',
+		'a',
+		'--fail-on-skip',
+	]);
+
+	if (result.command !== 'scan') {
+		throw new Error('expected scan');
+	}
+	assert.equal(result.failOnSkip, true);
+}
+
 test('--fail-on-skip defaults to false and is set by the flag', testFailOnSkip);
 
 function testFailOnSkip() {

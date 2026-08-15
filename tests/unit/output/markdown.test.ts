@@ -147,3 +147,22 @@ function orgTargetCase() {
 
 	assert.match(md, /^# Octolens scan — my-org/);
 }
+
+test('renders org findings with the org login as subject label', orgFindingCase);
+
+function orgFindingCase() {
+	const orgFinding: Finding = {
+		ruleId: 'org/two-factor-required',
+		severity: 'high',
+		org: 'my-org',
+		title: 'Two-factor authentication is not required',
+	};
+	const result: ScanResult = {
+		...makeResult([ orgFinding ]),
+		target: { type: 'org', org: 'my-org' },
+	};
+	const md = formatMarkdown(result);
+
+	assert.match(md, /`org\/two-factor-required` · my-org/);
+	assert.doesNotMatch(md, /undefined/);
+}

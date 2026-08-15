@@ -7,6 +7,7 @@ export type {
 } from './finding.ts';
 export type {
 	Rule, RuleCategory, RuleContext, RuleConfigBag, CachedFetcher, Logger,
+	RuleMetadata, OrgRule, OrgRuleContext,
 } from './rule.ts';
 export type { OctolensConfig, RuleSetting } from './config.ts';
 export { RuleSkipped, skip } from './skip.ts';

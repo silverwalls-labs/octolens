@@ -5,7 +5,12 @@ export type Format = 'pretty' | 'json' | 'md';
 
 export type ScanCommandArgs = {
 	command: 'scan';
-	repo: { owner: string; name: string; };
+
+	/** Target repository. Exactly one of `repo` and `org` is set. */
+	repo?: { owner: string; name: string; };
+
+	/** Target organisation. Exactly one of `repo` and `org` is set. */
+	org?: string;
 	token?: string;
 	formats: Format[];
 	out?: string;
@@ -50,6 +55,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
 	}
 
 	let repoSpec: string | undefined;
+	let orgSpec: string | undefined;
 	let token: string | undefined;
 	let out: string | undefined;
 	let severityRaw = 'high';
@@ -66,6 +72,9 @@ export function parseArgs(argv: string[]): ParsedArgs {
 		switch (arg) {
 			case '--repo':
 				repoSpec = readValue(argv, ++i, arg);
+				break;
+			case '--org':
+				orgSpec = readValue(argv, ++i, arg);
 				break;
 			case '--token':
 				token = readValue(argv, ++i, arg);
@@ -102,8 +111,26 @@ export function parseArgs(argv: string[]): ParsedArgs {
 		}
 	}
 
-	if (!repoSpec) {
-		throw new CliUsageError('--repo <owner/name> is required.');
+	if (repoSpec && orgSpec) {
+		throw new CliUsageError('--repo and --org are mutually exclusive.');
+	}
+
+	if (!repoSpec && !orgSpec) {
+		throw new CliUsageError('Either --repo <owner/name> or --org <organization> is required.');
+	}
+
+	if (orgSpec && orgSpec.includes('/')) {
+		const message = `Invalid --org "${orgSpec}". ` +
+			'Expected an organization login without "/".';
+
+		throw new CliUsageError(message);
+	}
+
+	if (orgSpec && (includeArchived || allowPublic.length > 0 || allowInternal.length > 0)) {
+		const message = '--include-archived, --allow-public and --allow-internal ' +
+			'only apply to --repo scans.';
+
+		throw new CliUsageError(message);
 	}
 
 	if (!isSeverity(severityRaw)) {
@@ -112,7 +139,10 @@ export function parseArgs(argv: string[]): ParsedArgs {
 
 	return {
 		command: 'scan',
-		repo: parseRepoSpec(repoSpec),
+		repo: repoSpec ?
+			parseRepoSpec(repoSpec) :
+			undefined,
+		org: orgSpec,
 		token,
 		formats: formats.length > 0 ?
 			formats :

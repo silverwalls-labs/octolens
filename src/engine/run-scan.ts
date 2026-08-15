@@ -6,6 +6,7 @@ import type {
 	Finding,
 	Logger,
 	OctolensConfig,
+	OrgRule,
 	RepoRef,
 	Rule,
 	RuleConfigBag,
@@ -98,6 +99,74 @@ export async function scanRepo(options: ScanRepoOptions): Promise<ScanResult> {
 	};
 }
 
+/** Options for {@link scanOrg}. */
+export type ScanOrgOptions = {
+	/** Target organisation login. */
+	org: string;
+
+	/** Org-scoped rules to evaluate. */
+	rules: OrgRule[];
+
+	/** Authenticated Octokit client. */
+	octokit: Octokit;
+
+	/** Logger instance. */
+	logger: Logger;
+
+	/** Only findings at or above this severity are included in the result. */
+	threshold: Severity;
+
+	/** User configuration (rule overrides). */
+	config?: OctolensConfig;
+
+	/** Arbitrary key-value bag forwarded into every rule's context. */
+	ruleConfig?: RuleConfigBag;
+};
+
+/**
+ * Run a full scan of an organisation's own settings against the provided
+ * org-scoped rules.
+ *
+ * Rules disabled via `config.rules` are filtered out. Each rule is executed
+ * sequentially; findings below the threshold are excluded from the result.
+ * Rules that cannot see admin-only settings (non-owner tokens) record a
+ * `'skipped'` run rather than a false pass.
+ *
+ * @param options - Scan configuration.
+ * @returns The complete scan result with findings, rule runs, and summary.
+ */
+export async function scanOrg(options: ScanOrgOptions): Promise<ScanResult> {
+	const cache = createCachedFetcher();
+	const enabledRules = filterEnabledRules(options.rules, options.config);
+
+	const runs = [];
+
+	for (const rule of enabledRules) {
+		options.logger.debug(`running rule ${rule.id}`);
+		const run = await runRule(rule, {
+			org: options.org,
+			octokit: options.octokit,
+			cache,
+			logger: options.logger,
+			ruleConfig: options.ruleConfig ?? {},
+		});
+
+		runs.push(run);
+	}
+
+	const allFindings = runs.flatMap((r) => r.findings);
+	const findings = allFindings.filter((f) => meetsThreshold(f.severity, options.threshold));
+
+	return {
+		schemaVersion: 1,
+		target: { type: 'org', org: options.org },
+		threshold: options.threshold,
+		runs,
+		findings,
+		summary: buildSummary(runs, findings),
+	};
+}
+
 function buildArchivedSkipResult(options: ScanRepoOptions): ScanResult {
 	const { owner, name } = options.repo;
 
@@ -127,7 +196,7 @@ function buildArchivedSkipResult(options: ScanRepoOptions): ScanResult {
 	};
 }
 
-function filterEnabledRules(rules: Rule[], config?: OctolensConfig): Rule[] {
+function filterEnabledRules<R extends { id: string; }>(rules: R[], config?: OctolensConfig): R[] {
 	const overrides = config?.rules ?? {};
 
 	return rules.filter((r) => overrides[r.id] !== 'off');

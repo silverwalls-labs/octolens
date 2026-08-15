@@ -1,5 +1,7 @@
 import { RuleSkipped } from '../types/index.ts';
-import type { Rule, RuleContext } from '../types/index.ts';
+import type {
+	Finding, OrgRuleContext, RuleContext,
+} from '../types/index.ts';
 import type { RuleRun } from '../types/index.ts';
 
 /**
@@ -8,11 +10,17 @@ import type { RuleRun } from '../types/index.ts';
  * Never throws — all exceptions are caught and encoded into the returned
  * `RuleRun` as either `'skipped'` (for {@link RuleSkipped}) or `'error'`.
  *
+ * Generic over the context type so both repo-scoped ({@link RuleContext})
+ * and org-scoped ({@link OrgRuleContext}) rules run through the same path.
+ *
  * @param rule - The rule to execute.
  * @param context - Dependencies injected into the rule's `check()` method.
  * @returns The execution result including status, findings, and timing.
  */
-export async function runRule(rule: Rule, context: RuleContext): Promise<RuleRun> {
+export async function runRule<C extends RuleContext | OrgRuleContext>(
+	rule: { id: string; check(context: C): Promise<Finding[]>; },
+	context: C,
+): Promise<RuleRun> {
 	const start = performance.now();
 
 	try {
