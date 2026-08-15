@@ -13,9 +13,11 @@ holding pen for follow-up minor releases.
 - **`cosmiconfig` config discovery** — `octolens.config.{ts,js,json,yaml}` +
   `package.json#octolens`, with severity overrides and ignore lists. Today
   rules use their built-in defaults.
-- **`--org <org>` scanning** — first-class peer to `--repo`. Engine already
-  scans one repo at a time; needs an org walker, `--concurrency`, and
-  `ignore.archived` / `ignore.forks` plumbing.
+- **`--org <org>` repo fan-out** — running the per-repo rules across every
+  repository of an org. Engine already scans one repo at a time; needs an
+  org walker, `--concurrency`, and `ignore.archived` / `ignore.forks`
+  plumbing. (`--org` itself shipped with the org-posture rules — see below —
+  so fan-out is now an extension of the existing flag, not a new one.)
 - **GitHub App auth path** — `--app-id` + `--app-private-key`, plus OIDC
   inside Actions. Today only PAT (`--token`, `GITHUB_TOKEN`, `gh auth token`)
   works.
@@ -42,14 +44,39 @@ These came up while building the v1 rule set and were deliberately deferred:
   to verify *each* environment defines the secrets its workflows reference.
   Requires cross-referencing workflow YAML against environment secret lists.
 
-### Org-level rules — out of scope
+### Org-level rules — SHIPPED (supersedes the old "out of scope" call)
 
-Org-posture checks (2FA enforcement, default member permission, members
-creating public repos, outside collaborator invitations, org-level required
-workflows / rulesets, SCIM, audit log retention) belong in a **separate
-dedicated tool**, not Octolens. Octolens stays a per-repo scanner; `--org`
-is fan-out over per-repo rules, nothing more. If a check's subject is the
-org itself rather than a repo inside it, it doesn't go here.
+An earlier version of this note declared org-posture checks out of scope.
+That decision was reversed (issue #6): Octolens now ships a 12-rule `org`
+category behind `scan --org <org>` — 2FA enforcement, base repo permission,
+member repo-creation/forking privileges, security defaults for new repos,
+org-level Actions policy, and org webhooks. Org rules have their own
+`OrgRule`/`OrgRuleContext` contract and `scanOrg` engine path; findings
+carry `org` instead of `repo`. Non-owner tokens make the admin-gated rules
+`skip(...)` (visible coverage gap, never a silent pass).
+
+Org follow-ups deliberately deferred:
+
+- **`org/secure-two-factor-methods-required`** — the "Only allow secure
+  two-factor methods" setting (disallows SMS 2FA) is not exposed by any
+  API today: `GET /orgs/{org}` only returns `two_factor_requirement_enabled`
+  and GraphQL only `requiresTwoFactorAuthentication` (verified live
+  2026-08-15). Add the rule as soon as GitHub exposes the field.
+- **`org/security-managers-assigned`** — the REST endpoint
+  (`orgs.listSecurityManagerTeams`) was removed by GitHub in January 2026;
+  needs the organization-roles API instead.
+- **Runner groups allowing public repos** — `GET
+  /orgs/{org}/actions/runner-groups` is plan-gated (Team/Enterprise) and
+  paginated; skipped for v1 of the org rules.
+- **Migrate the four `*-for-new-repos` rules** off the deprecated
+  `GET /orgs/{org}` fields (`*_enabled_for_new_repositories`, "closing
+  down" upstream) to `codeSecurity.getDefaultConfigurations`. Until then,
+  if GitHub removes the fields the rules degrade to visible skips.
+- **Archived-org gate** — orgs expose `archived_at`; `scanOrg` currently
+  has no equivalent of the repo archived skip.
+- **Org webhook query symmetry** — `getOrgWebhooks` wraps results in
+  `checked` from day one; the repo-level `getRepoWebhooks` still returns
+  `[]` on a permission 403 (a pass, not a skip) and is worth aligning.
 
 ### Sharp edges in shipped rules
 

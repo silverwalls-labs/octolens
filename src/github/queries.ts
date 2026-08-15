@@ -503,6 +503,160 @@ export function getRepoTeams(
 	);
 }
 
+/**
+ * Organisation settings from the orgs API.
+ *
+ * The privileged fields are only returned when the token belongs to an
+ * organisation owner; for other tokens they are `undefined` (never a
+ * default), so rules can skip instead of reporting a false pass/fail.
+ */
+export type OrgMetadata = {
+	login: string;
+	twoFactorRequirementEnabled?: boolean;
+	defaultRepositoryPermission?: string;
+	membersCanCreatePublicRepositories?: boolean;
+	membersCanForkPrivateRepositories?: boolean;
+	membersCanChangeRepoVisibility?: boolean;
+	membersCanDeleteRepositories?: boolean;
+	membersCanInviteOutsideCollaborators?: boolean;
+	membersCanDeleteIssues?: boolean;
+	membersCanCreatePages?: boolean;
+	membersCanCreatePublicPages?: boolean;
+	webCommitSignoffRequired?: boolean;
+	deployKeysEnabledForRepositories?: boolean;
+	dependabotAlertsEnabledForNewRepos?: boolean;
+	dependabotSecurityUpdatesEnabledForNewRepos?: boolean;
+	secretScanningEnabledForNewRepos?: boolean;
+	secretScanningPushProtectionEnabledForNewRepos?: boolean;
+};
+
+/** Organisation-level GitHub Actions permission settings. */
+export type OrgActionsPermissions = {
+	checked: boolean;
+	enabledRepositories: 'all' | 'selected' | 'none' | null;
+	allowedActions: 'all' | 'local_only' | 'selected' | null;
+};
+
+/** Organisation-level default GITHUB_TOKEN permissions and PR approval setting. */
+export type OrgWorkflowPermissions = {
+	checked: boolean;
+	defaultPermissions: 'read' | 'write' | null;
+	canApprovePullRequestReviews: boolean;
+};
+
+/** Result of listing organisation webhooks. */
+export type OrgWebhookInventory = {
+	checked: boolean;
+	hooks: WebhookSummary[];
+};
+
+/** Organisation-level allowed-actions configuration (when `allowed_actions` is `'selected'`). */
+export type OrgAllowedActions = {
+	checked: boolean;
+	githubOwnedAllowed: boolean;
+	verifiedAllowed: boolean;
+	patternsAllowed: string[];
+};
+
+/** Organisation policy for when fork PR workflows require maintainer approval. */
+export type OrgForkPrApproval = {
+	checked: boolean;
+	approvalPolicy: string | null;
+};
+
+/** Organisation settings for fork PR workflows on private repositories. */
+export type OrgPrivateForkPrWorkflows = {
+	checked: boolean;
+	runWorkflowsFromForkPullRequests: boolean;
+	sendWriteTokensToWorkflows: boolean;
+	sendSecretsAndVariables: boolean;
+	requireApprovalForForkPrWorkflows: boolean;
+};
+
+/** Fetch organisation settings (2FA policy, member permissions, security defaults). */
+export function getOrgMetadata(
+	octokit: Octokit,
+	cache: CachedFetcher,
+	org: string,
+): Promise<OrgMetadata> {
+	return cache.fetch(
+		`org-metadata:${org}`,
+		() => fetchOrgMetadata(octokit, org),
+	);
+}
+
+/** Fetch organisation-level GitHub Actions permissions. Returns `checked: false` on 404/403. */
+export function getOrgActionsPermissions(
+	octokit: Octokit,
+	cache: CachedFetcher,
+	org: string,
+): Promise<OrgActionsPermissions> {
+	return cache.fetch(
+		`org-actions-permissions:${org}`,
+		() => fetchOrgActionsPermissions(octokit, org),
+	);
+}
+
+/** Fetch organisation-level default workflow permissions. Returns `checked: false` on 404/403. */
+export function getOrgDefaultWorkflowPermissions(
+	octokit: Octokit,
+	cache: CachedFetcher,
+	org: string,
+): Promise<OrgWorkflowPermissions> {
+	return cache.fetch(
+		`org-default-workflow-permissions:${org}`,
+		() => fetchOrgDefaultWorkflowPermissions(octokit, org),
+	);
+}
+
+/** List organisation webhooks. Returns `checked: false` on 404/403 (admin-only endpoint). */
+export function getOrgWebhooks(
+	octokit: Octokit,
+	cache: CachedFetcher,
+	org: string,
+): Promise<OrgWebhookInventory> {
+	return cache.fetch(
+		`org-webhooks:${org}`,
+		() => fetchOrgWebhooks(octokit, org),
+	);
+}
+
+/** Fetch the organisation allowed-actions configuration. Returns `checked: false` on 404/403/409. */
+export function getOrgAllowedActions(
+	octokit: Octokit,
+	cache: CachedFetcher,
+	org: string,
+): Promise<OrgAllowedActions> {
+	return cache.fetch(
+		`org-allowed-actions:${org}`,
+		() => fetchOrgAllowedActions(octokit, org),
+	);
+}
+
+/** Fetch the fork PR contributor approval policy. Returns `checked: false` on 404/403. */
+export function getOrgForkPrApproval(
+	octokit: Octokit,
+	cache: CachedFetcher,
+	org: string,
+): Promise<OrgForkPrApproval> {
+	return cache.fetch(
+		`org-fork-pr-approval:${org}`,
+		() => fetchOrgForkPrApproval(octokit, org),
+	);
+}
+
+/** Fetch fork PR workflow settings for private repos. Returns `checked: false` on 404/403. */
+export function getOrgPrivateForkPrWorkflows(
+	octokit: Octokit,
+	cache: CachedFetcher,
+	org: string,
+): Promise<OrgPrivateForkPrWorkflows> {
+	return cache.fetch(
+		`org-private-fork-pr-workflows:${org}`,
+		() => fetchOrgPrivateForkPrWorkflows(octokit, org),
+	);
+}
+
 async function fetchRepoMetadata(octokit: Octokit, repo: RepoRef): Promise<RepoMetadata> {
 	const response = await octokit.rest.repos.get({
 		owner: repo.owner,
@@ -685,6 +839,199 @@ async function fetchOrgCustomPropertySchema(
 	} catch (err: unknown) {
 		if (isHttpStatus(err, 404) || isForbiddenNotRateLimited(err)) {
 			return null;
+		}
+		throw err;
+	}
+}
+
+async function fetchOrgMetadata(octokit: Octokit, org: string): Promise<OrgMetadata> {
+	const response = await octokit.rest.orgs.get({ org });
+	const data = response.data;
+
+	return {
+		login: data.login,
+		twoFactorRequirementEnabled: toOptionalBoolean(data.two_factor_requirement_enabled),
+		defaultRepositoryPermission: data.default_repository_permission ?? undefined,
+		membersCanCreatePublicRepositories:
+			toOptionalBoolean(data.members_can_create_public_repositories),
+		membersCanForkPrivateRepositories:
+			toOptionalBoolean(data.members_can_fork_private_repositories),
+		membersCanChangeRepoVisibility:
+			toOptionalBoolean(data.members_can_change_repo_visibility),
+		membersCanDeleteRepositories:
+			toOptionalBoolean(data.members_can_delete_repositories),
+		membersCanInviteOutsideCollaborators:
+			toOptionalBoolean(data.members_can_invite_outside_collaborators),
+		membersCanDeleteIssues: toOptionalBoolean(data.members_can_delete_issues),
+		membersCanCreatePages: toOptionalBoolean(data.members_can_create_pages),
+		membersCanCreatePublicPages: toOptionalBoolean(data.members_can_create_public_pages),
+		webCommitSignoffRequired: toOptionalBoolean(data.web_commit_signoff_required),
+		deployKeysEnabledForRepositories:
+			toOptionalBoolean(data.deploy_keys_enabled_for_repositories),
+		dependabotAlertsEnabledForNewRepos:
+			toOptionalBoolean(data.dependabot_alerts_enabled_for_new_repositories),
+		dependabotSecurityUpdatesEnabledForNewRepos:
+			toOptionalBoolean(data.dependabot_security_updates_enabled_for_new_repositories),
+		secretScanningEnabledForNewRepos:
+			toOptionalBoolean(data.secret_scanning_enabled_for_new_repositories),
+		secretScanningPushProtectionEnabledForNewRepos:
+			toOptionalBoolean(data.secret_scanning_push_protection_enabled_for_new_repositories),
+	};
+}
+
+function toOptionalBoolean(value: boolean | null | undefined): boolean | undefined {
+	return typeof value === 'boolean' ?
+		value :
+		undefined;
+}
+
+async function fetchOrgActionsPermissions(
+	octokit: Octokit,
+	org: string,
+): Promise<OrgActionsPermissions> {
+	try {
+		const actionsApi = octokit.rest.actions;
+		const response = await actionsApi.getGithubActionsPermissionsOrganization({ org });
+
+		return {
+			checked: true,
+			enabledRepositories: response.data.enabled_repositories ?? null,
+			allowedActions: response.data.allowed_actions ?? null,
+		};
+	} catch (err: unknown) {
+		if (isHttpStatus(err, 404) || isForbiddenNotRateLimited(err)) {
+			return {
+				checked: false, enabledRepositories: null, allowedActions: null,
+			};
+		}
+		throw err;
+	}
+}
+
+async function fetchOrgDefaultWorkflowPermissions(
+	octokit: Octokit,
+	org: string,
+): Promise<OrgWorkflowPermissions> {
+	try {
+		const actionsApi = octokit.rest.actions;
+		const response = await actionsApi.getGithubActionsDefaultWorkflowPermissionsOrganization({
+			org,
+		});
+
+		return {
+			checked: true,
+			defaultPermissions: response.data.default_workflow_permissions ?? null,
+			canApprovePullRequestReviews: response.data.can_approve_pull_request_reviews === true,
+		};
+	} catch (err: unknown) {
+		if (isHttpStatus(err, 404) || isForbiddenNotRateLimited(err)) {
+			return {
+				checked: false,
+				defaultPermissions: null,
+				canApprovePullRequestReviews: false,
+			};
+		}
+		throw err;
+	}
+}
+
+async function fetchOrgAllowedActions(
+	octokit: Octokit,
+	org: string,
+): Promise<OrgAllowedActions> {
+	try {
+		const response = await octokit.rest.actions.getAllowedActionsOrganization({ org });
+
+		return {
+			checked: true,
+			githubOwnedAllowed: response.data.github_owned_allowed === true,
+			verifiedAllowed: response.data.verified_allowed === true,
+			patternsAllowed: response.data.patterns_allowed ?? [],
+		};
+	} catch (err: unknown) {
+		// 409: allowed-actions config does not apply (policy is not 'selected').
+		if (isHttpStatus(err, 404) || isHttpStatus(err, 409) || isForbiddenNotRateLimited(err)) {
+			return {
+				checked: false,
+				githubOwnedAllowed: false,
+				verifiedAllowed: false,
+				patternsAllowed: [],
+			};
+		}
+		throw err;
+	}
+}
+
+async function fetchOrgForkPrApproval(
+	octokit: Octokit,
+	org: string,
+): Promise<OrgForkPrApproval> {
+	try {
+		const response = await octokit.request(
+			'GET /orgs/{org}/actions/permissions/fork-pr-contributor-approval',
+			{ org },
+		);
+		const data = response.data as { approval_policy?: string; };
+
+		return { checked: true, approvalPolicy: data.approval_policy ?? null };
+	} catch (err: unknown) {
+		if (isHttpStatus(err, 404) || isForbiddenNotRateLimited(err)) {
+			return { checked: false, approvalPolicy: null };
+		}
+		throw err;
+	}
+}
+
+type RawPrivateForkPrWorkflows = {
+	run_workflows_from_fork_pull_requests?: boolean;
+	send_write_tokens_to_workflows?: boolean;
+	send_secrets_and_variables?: boolean;
+	require_approval_for_fork_pr_workflows?: boolean;
+};
+
+async function fetchOrgPrivateForkPrWorkflows(
+	octokit: Octokit,
+	org: string,
+): Promise<OrgPrivateForkPrWorkflows> {
+	try {
+		const response = await octokit.request(
+			'GET /orgs/{org}/actions/permissions/fork-pr-workflows-private-repos',
+			{ org },
+		);
+		const data = response.data as RawPrivateForkPrWorkflows;
+
+		return {
+			checked: true,
+			runWorkflowsFromForkPullRequests: data.run_workflows_from_fork_pull_requests === true,
+			sendWriteTokensToWorkflows: data.send_write_tokens_to_workflows === true,
+			sendSecretsAndVariables: data.send_secrets_and_variables === true,
+			requireApprovalForForkPrWorkflows: data.require_approval_for_fork_pr_workflows === true,
+		};
+	} catch (err: unknown) {
+		if (isHttpStatus(err, 404) || isForbiddenNotRateLimited(err)) {
+			return {
+				checked: false,
+				runWorkflowsFromForkPullRequests: false,
+				sendWriteTokensToWorkflows: false,
+				sendSecretsAndVariables: false,
+				requireApprovalForForkPrWorkflows: false,
+			};
+		}
+		throw err;
+	}
+}
+
+async function fetchOrgWebhooks(octokit: Octokit, org: string): Promise<OrgWebhookInventory> {
+	try {
+		const data = await octokit.paginate(octokit.rest.orgs.listWebhooks, {
+			org,
+			per_page: 100,
+		});
+
+		return { checked: true, hooks: data.map(toWebhookSummary) };
+	} catch (err: unknown) {
+		if (isHttpStatus(err, 404) || isForbiddenNotRateLimited(err)) {
+			return { checked: false, hooks: [] };
 		}
 		throw err;
 	}

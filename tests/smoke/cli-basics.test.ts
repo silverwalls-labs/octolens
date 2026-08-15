@@ -205,11 +205,57 @@ async function helpContentCase() {
 	const help = stdoutChunks.join('');
 
 	assert.match(help, /--repo/);
+	assert.match(help, /--org/);
 	assert.match(help, /--token/);
 	assert.match(help, /--format/);
 	assert.match(help, /--severity/);
 	assert.match(help, /--verbose/);
 	assert.match(help, /--fail-on-skip/);
+}
+
+test('--repo and --org together exit 2', repoAndOrgCase);
+
+async function repoAndOrgCase() {
+	captureOutput();
+
+	const code = await main([
+		'scan',
+		'--repo',
+		'a/b',
+		'--org',
+		'c',
+	]);
+
+	assert.equal(code, 2);
+}
+
+test('--org with a repo-only flag exits 2', orgWithRepoFlagCase);
+
+async function orgWithRepoFlagCase() {
+	captureOutput();
+
+	const code = await main([
+		'scan',
+		'--org',
+		'a',
+		'--include-archived',
+	]);
+
+	assert.equal(code, 2);
+}
+
+test('malformed --org exits 2', malformedOrgCase);
+
+async function malformedOrgCase() {
+	captureOutput();
+
+	const code = await main([
+		'scan',
+		'--org',
+		'owner/name',
+	]);
+
+	assert.equal(code, 2);
 }
 
 test('missing --token value exits 2', missingTokenValueCase);

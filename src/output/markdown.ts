@@ -2,6 +2,7 @@ import { compareSeverity, SEVERITIES } from '../types/severity.ts';
 import type {
 	Finding, RuleRun, ScanResult, Severity,
 } from '../types/index.ts';
+import { subjectLabel } from './subject.ts';
 
 const SEVERITY_LABEL: Record<Severity, string> = {
 	critical: 'Critical',
@@ -118,11 +119,10 @@ function byRuleId(a: RuleRun, b: RuleRun): number {
 }
 
 function renderFinding(finding: Finding): string {
-	const repoLabel = `${finding.repo.owner}/${finding.repo.name}`;
 	const lines: string[] = [];
 
 	lines.push(`### ${SEVERITY_LABEL[finding.severity]} — ${finding.title}`);
-	lines.push(`\`${finding.ruleId}\` · ${repoLabel}`);
+	lines.push(`\`${finding.ruleId}\` · ${subjectLabel(finding)}`);
 
 	if (finding.detail) {
 		lines.push(finding.detail);

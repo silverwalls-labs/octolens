@@ -134,3 +134,168 @@ export type PropertyValueFixture = {
 export function makeRepoPropertyValues(values: PropertyValueFixture[]): PropertyValueFixture[] {
 	return values;
 }
+
+export type OrgFixtureOptions = {
+	/**
+	 * When `false`, models the non-owner-token view: the privileged fields
+	 * are omitted entirely (not `false`).
+	 */
+	privileged?: boolean;
+	twoFactorRequirementEnabled?: boolean | null;
+	defaultRepositoryPermission?: string | null;
+	membersCanCreatePublicRepositories?: boolean;
+	membersCanForkPrivateRepositories?: boolean | null;
+	membersCanChangeRepoVisibility?: boolean;
+	membersCanDeleteRepositories?: boolean;
+	membersCanInviteOutsideCollaborators?: boolean;
+	membersCanDeleteIssues?: boolean;
+	membersCanCreatePages?: boolean;
+	membersCanCreatePublicPages?: boolean;
+	webCommitSignoffRequired?: boolean;
+	deployKeysEnabledForRepositories?: boolean;
+	dependabotAlertsEnabledForNewRepositories?: boolean;
+	dependabotSecurityUpdatesEnabledForNewRepositories?: boolean;
+	secretScanningEnabledForNewRepositories?: boolean;
+	secretScanningPushProtectionEnabledForNewRepositories?: boolean;
+};
+
+export function makeOrgResponse(options: OrgFixtureOptions = {}): Record<string, unknown> {
+	const body: Record<string, unknown> = {
+		login: 'silverwalls-labs',
+		id: 1,
+		description: 'A test fixture organisation',
+	};
+
+	if (options.privileged === false) {
+		return body;
+	}
+
+	/*
+	 * `?? ` would coerce an explicit `null` (allowed by the API schema) into
+	 * the default, so nullable fields check for `undefined` explicitly.
+	 */
+	return {
+		...body,
+		two_factor_requirement_enabled: orDefault(options.twoFactorRequirementEnabled, true),
+		default_repository_permission: orDefault(options.defaultRepositoryPermission, 'read'),
+		members_can_create_public_repositories:
+			options.membersCanCreatePublicRepositories ?? false,
+		members_can_fork_private_repositories:
+			orDefault(options.membersCanForkPrivateRepositories, false),
+		members_can_change_repo_visibility: options.membersCanChangeRepoVisibility ?? false,
+		members_can_delete_repositories: options.membersCanDeleteRepositories ?? false,
+		members_can_invite_outside_collaborators:
+			options.membersCanInviteOutsideCollaborators ?? false,
+		members_can_delete_issues: options.membersCanDeleteIssues ?? false,
+		members_can_create_pages: options.membersCanCreatePages ?? true,
+		members_can_create_public_pages: options.membersCanCreatePublicPages ?? false,
+		web_commit_signoff_required: options.webCommitSignoffRequired ?? true,
+		deploy_keys_enabled_for_repositories:
+			options.deployKeysEnabledForRepositories ?? false,
+		dependabot_alerts_enabled_for_new_repositories:
+			options.dependabotAlertsEnabledForNewRepositories ?? true,
+		dependabot_security_updates_enabled_for_new_repositories:
+			options.dependabotSecurityUpdatesEnabledForNewRepositories ?? true,
+		secret_scanning_enabled_for_new_repositories:
+			options.secretScanningEnabledForNewRepositories ?? true,
+		secret_scanning_push_protection_enabled_for_new_repositories:
+			options.secretScanningPushProtectionEnabledForNewRepositories ?? true,
+	};
+}
+
+function orDefault<T>(value: T | undefined, fallback: T): T {
+	return value === undefined ?
+		fallback :
+		value;
+}
+
+type OrgBody = Record<string, unknown>;
+
+export type OrgActionsPermissionsFixtureOptions = {
+	enabledRepositories?: 'all' | 'selected' | 'none';
+	allowedActions?: 'all' | 'local_only' | 'selected';
+};
+
+type OrgActionsOpts = OrgActionsPermissionsFixtureOptions;
+
+export function makeOrgActionsPermissionsResponse(options: OrgActionsOpts = {}): OrgBody {
+	return {
+		enabled_repositories: options.enabledRepositories ?? 'all',
+		allowed_actions: options.allowedActions ?? 'selected',
+	};
+}
+
+export type OrgWorkflowPermissionsFixtureOptions = {
+	defaultWorkflowPermissions?: 'read' | 'write';
+	canApprovePullRequestReviews?: boolean;
+};
+
+type OrgWorkflowOpts = OrgWorkflowPermissionsFixtureOptions;
+
+export function makeOrgWorkflowPermissionsResponse(options: OrgWorkflowOpts = {}): OrgBody {
+	return {
+		default_workflow_permissions: options.defaultWorkflowPermissions ?? 'read',
+		can_approve_pull_request_reviews: options.canApprovePullRequestReviews ?? false,
+	};
+}
+
+export type OrgAllowedActionsFixtureOptions = {
+	githubOwnedAllowed?: boolean;
+	verifiedAllowed?: boolean;
+	patternsAllowed?: string[];
+};
+
+type OrgAllowedOpts = OrgAllowedActionsFixtureOptions;
+
+export function makeOrgAllowedActionsResponse(options: OrgAllowedOpts = {}): OrgBody {
+	return {
+		github_owned_allowed: options.githubOwnedAllowed ?? true,
+		verified_allowed: options.verifiedAllowed ?? false,
+		patterns_allowed: options.patternsAllowed ??
+			[ 'actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3' ],
+	};
+}
+
+export function makeOrgForkPrApprovalResponse(policy = 'all_external_contributors'): OrgBody {
+	return { approval_policy: policy };
+}
+
+export type OrgPrivateForkPrFixtureOptions = {
+	runWorkflowsFromForkPullRequests?: boolean;
+	sendWriteTokensToWorkflows?: boolean;
+	sendSecretsAndVariables?: boolean;
+	requireApprovalForForkPrWorkflows?: boolean;
+};
+
+type OrgForkPrOpts = OrgPrivateForkPrFixtureOptions;
+
+export function makeOrgPrivateForkPrResponse(options: OrgForkPrOpts = {}): OrgBody {
+	return {
+		run_workflows_from_fork_pull_requests:
+			options.runWorkflowsFromForkPullRequests ?? false,
+		send_write_tokens_to_workflows: options.sendWriteTokensToWorkflows ?? false,
+		send_secrets_and_variables: options.sendSecretsAndVariables ?? false,
+		require_approval_for_fork_pr_workflows:
+			options.requireApprovalForForkPrWorkflows ?? true,
+	};
+}
+
+export type OrgHookFixture = {
+	id: number;
+	url: string;
+	insecureSsl?: string;
+};
+
+export function makeOrgHooksResponse(hooks: OrgHookFixture[]): Record<string, unknown>[] {
+	return hooks.map(toOrgHook);
+}
+
+function toOrgHook(hook: OrgHookFixture): Record<string, unknown> {
+	return {
+		id: hook.id,
+		config: {
+			url: hook.url,
+			insecure_ssl: hook.insecureSsl ?? '0',
+		},
+	};
+}

@@ -98,6 +98,25 @@ function orgTargetCase() {
 	assert.match(out, /my-org/);
 }
 
+test('renders org findings with the org login as subject label', orgFindingCase);
+
+function orgFindingCase() {
+	const orgFinding: Finding = {
+		ruleId: 'org/two-factor-required',
+		severity: 'high',
+		org: 'my-org',
+		title: 'Two-factor authentication is not required',
+	};
+	const result: ScanResult = {
+		...makeResult([ orgFinding ]),
+		target: { type: 'org', org: 'my-org' },
+	};
+	const out = formatPretty(result, { color: false });
+
+	assert.match(out, /org\/two-factor-required - my-org/);
+	assert.doesNotMatch(out, /undefined/);
+}
+
 test('renders finding detail, remediation, and references', fullFindingCase);
 
 function fullFindingCase() {

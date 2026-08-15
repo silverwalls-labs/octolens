@@ -37,6 +37,64 @@ import { rule as requireSignedCommits } from './repo-config/require-signed-commi
 import { rule as requireStatusChecks } from './repo-config/require-status-checks.ts';
 import { rule as tagProtection } from './repo-config/tag-protection.ts';
 import { rule as topicsPresent } from './repo-config/topics-present.ts';
+import {
+	rule as orgActionsAllowlistPinned,
+} from './org/actions-allowlist-pinned.ts';
+import { rule as orgActionsAllowlist } from './org/actions-allowlist.ts';
+import {
+	rule as orgForkPrApprovalAllContributors,
+} from './org/fork-pr-approval-all-contributors.ts';
+import {
+	rule as orgLimitPrivateForkPrWorkflows,
+} from './org/limit-private-fork-pr-workflows.ts';
+import {
+	rule as orgDefaultRepoPermission,
+} from './org/default-repo-permission.ts';
+import {
+	rule as orgDefaultWorkflowPermissionsRead,
+} from './org/default-workflow-permissions-read.ts';
+import {
+	rule as orgDependabotAlertsForNewRepos,
+} from './org/dependabot-alerts-for-new-repos.ts';
+import {
+	rule as orgDependabotSecurityUpdatesForNewRepos,
+} from './org/dependabot-security-updates-for-new-repos.ts';
+import { rule as orgDeployKeysDisabled } from './org/deploy-keys-disabled.ts';
+import {
+	rule as orgForbidWorkflowPrApproval,
+} from './org/forbid-workflow-pr-approval.ts';
+import {
+	rule as orgMembersCannotChangeRepoVisibility,
+} from './org/members-cannot-change-repo-visibility.ts';
+import {
+	rule as orgMembersCannotCreatePublicPages,
+} from './org/members-cannot-create-public-pages.ts';
+import {
+	rule as orgMembersCannotCreatePublicRepos,
+} from './org/members-cannot-create-public-repos.ts';
+import {
+	rule as orgMembersCannotDeleteIssues,
+} from './org/members-cannot-delete-issues.ts';
+import {
+	rule as orgMembersCannotDeleteRepos,
+} from './org/members-cannot-delete-repos.ts';
+import {
+	rule as orgMembersCannotForkPrivateRepos,
+} from './org/members-cannot-fork-private-repos.ts';
+import {
+	rule as orgMembersCannotInviteOutsideCollaborators,
+} from './org/members-cannot-invite-outside-collaborators.ts';
+import {
+	rule as orgSecretScanningForNewRepos,
+} from './org/secret-scanning-for-new-repos.ts';
+import {
+	rule as orgSecretScanningPushProtectionForNewRepos,
+} from './org/secret-scanning-push-protection-for-new-repos.ts';
+import { rule as orgTwoFactorRequired } from './org/two-factor-required.ts';
+import {
+	rule as orgWebCommitSignoffRequired,
+} from './org/web-commit-signoff-required.ts';
+import { rule as orgWebhooksUseHttps } from './org/webhooks-use-https.ts';
 import { rule as codeScanningEnabled } from './security/code-scanning-enabled.ts';
 import { rule as dependabotAlertsEnabled } from './security/dependabot-alerts-enabled.ts';
 import {
@@ -52,10 +110,10 @@ import {
 } from './security/secret-scanning-push-protection.ts';
 import { rule as secretsRotation } from './security/secrets-rotation.ts';
 import { rule as securityPolicyFile } from './security/security-policy-file.ts';
-import type { Rule } from '../types/index.ts';
+import type { OrgRule, Rule } from '../types/index.ts';
 
 /**
- * All 40 built-in audit rules, spanning four categories:
+ * All built-in repo-scoped audit rules, spanning four categories:
  * repo-config, security, access, and cicd.
  *
  * The array is readonly and in a fixed order.
@@ -106,7 +164,38 @@ export const allRules: readonly Rule[] = [
 ];
 
 /**
- * Look up a rule by its ID.
+ * All built-in org-scoped audit rules (category `org`), auditing the
+ * organisation's own settings rather than a repository inside it.
+ *
+ * The array is readonly and in a fixed order.
+ */
+export const allOrgRules: readonly OrgRule[] = [
+	orgTwoFactorRequired,
+	orgDefaultRepoPermission,
+	orgMembersCannotCreatePublicRepos,
+	orgMembersCannotForkPrivateRepos,
+	orgMembersCannotChangeRepoVisibility,
+	orgMembersCannotDeleteRepos,
+	orgMembersCannotInviteOutsideCollaborators,
+	orgMembersCannotCreatePublicPages,
+	orgMembersCannotDeleteIssues,
+	orgWebCommitSignoffRequired,
+	orgDeployKeysDisabled,
+	orgDependabotAlertsForNewRepos,
+	orgDependabotSecurityUpdatesForNewRepos,
+	orgSecretScanningForNewRepos,
+	orgSecretScanningPushProtectionForNewRepos,
+	orgActionsAllowlist,
+	orgActionsAllowlistPinned,
+	orgDefaultWorkflowPermissionsRead,
+	orgForbidWorkflowPrApproval,
+	orgForkPrApprovalAllContributors,
+	orgLimitPrivateForkPrWorkflows,
+	orgWebhooksUseHttps,
+];
+
+/**
+ * Look up a repo-scoped rule by its ID.
  *
  * @param id - The rule ID to search for (e.g. `"repo-config/block-force-push"`).
  * @returns The matching rule, or `undefined` if not found.
@@ -115,8 +204,18 @@ export function findRuleById(id: string): Rule | undefined {
 	return allRules.find(byId(id));
 }
 
+/**
+ * Look up an org-scoped rule by its ID.
+ *
+ * @param id - The rule ID to search for (e.g. `"org/two-factor-required"`).
+ * @returns The matching rule, or `undefined` if not found.
+ */
+export function findOrgRuleById(id: string): OrgRule | undefined {
+	return allOrgRules.find(byId(id));
+}
+
 function byId(id: string) {
-	return function matches(rule: Rule): boolean {
+	return function matches(rule: { id: string; }): boolean {
 		return rule.id === id;
 	};
 }

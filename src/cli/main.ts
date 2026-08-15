@@ -2,9 +2,9 @@ import { writeFileSync } from 'node:fs';
 import { resolveAuth, AuthError } from '../github/auth.ts';
 import { createOctokit } from '../github/client.ts';
 import {
-	createLogger, scanRepo, exitCodeFor,
+	createLogger, scanRepo, scanOrg, exitCodeFor,
 } from '../engine/index.ts';
-import { allRules } from '../rules/index.ts';
+import { allRules, allOrgRules } from '../rules/index.ts';
 import {
 	formatJson, formatMarkdown, formatPretty,
 } from '../output/index.ts';
@@ -78,20 +78,29 @@ async function runScanCommand(args: ScanCommandArgs): Promise<number> {
 		logger,
 	});
 
-	const result = await scanRepo({
-		repo: args.repo,
-		rules: [ ...allRules ],
-		octokit,
-		logger,
-		threshold: args.severity,
-		config: { ignore: { archived: !args.includeArchived } },
-		ruleConfig: {
-			'access/visibility-private-default': {
-				allowPublic: args.allowPublic,
-				allowInternal: args.allowInternal,
+	const result = args.org !== undefined ?
+		await scanOrg({
+			org: args.org,
+			rules: [ ...allOrgRules ],
+			octokit,
+			logger,
+			threshold: args.severity,
+		}) :
+		await scanRepo({
+			// parseArgs guarantees exactly one of repo/org is set.
+			repo: args.repo as { owner: string; name: string; },
+			rules: [ ...allRules ],
+			octokit,
+			logger,
+			threshold: args.severity,
+			config: { ignore: { archived: !args.includeArchived } },
+			ruleConfig: {
+				'access/visibility-private-default': {
+					allowPublic: args.allowPublic,
+					allowInternal: args.allowInternal,
+				},
 			},
-		},
-	});
+		});
 
 	emitOutput(result, args.formats, args.out);
 

@@ -3,6 +3,7 @@ import { compareSeverity } from '../types/severity.ts';
 import type {
 	Finding, RuleRun, ScanResult, Severity,
 } from '../types/index.ts';
+import { subjectLabel } from './subject.ts';
 
 const SEVERITY_COLORS: Record<Severity, (s: string) => string> = {
 	critical: (s) => pc.bold(pc.red(s)),
@@ -105,8 +106,7 @@ function bySeverityDesc(a: Finding, b: Finding): number {
 function formatFinding(finding: Finding, colorize: (s: string) => string): string {
 	const tag = colorize(SEVERITY_COLORS[finding.severity](`[${finding.severity.toUpperCase()}]`));
 	const head = `${tag} ${colorize(pc.bold(finding.title))}`;
-	const repoLabel = `${finding.repo.owner}/${finding.repo.name}`;
-	const meta = colorize(pc.gray(`  ${finding.ruleId} - ${repoLabel}`));
+	const meta = colorize(pc.gray(`  ${finding.ruleId} - ${subjectLabel(finding)}`));
 
 	const out = [ head, meta ];
 

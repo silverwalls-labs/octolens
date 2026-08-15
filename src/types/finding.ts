@@ -12,7 +12,12 @@ export type Reference = {
 	url: string;
 };
 
-/** A single audit finding produced by a rule. */
+/**
+ * A single audit finding produced by a rule.
+ *
+ * Exactly one subject field is set: repo-scoped rules set {@link repo},
+ * org-scoped rules set {@link org}.
+ */
 export type Finding = {
 	/** ID of the rule that produced this finding. */
 	ruleId: string;
@@ -20,8 +25,11 @@ export type Finding = {
 	/** Severity assigned to this finding. */
 	severity: Severity;
 
-	/** The repository this finding applies to. */
-	repo: RepoRef;
+	/** The repository this finding applies to. Absent on org-rule findings. */
+	repo?: RepoRef;
+
+	/** The organisation this finding applies to. Absent on repo-rule findings. */
+	org?: string;
 
 	/** Short human-readable title. */
 	title: string;
