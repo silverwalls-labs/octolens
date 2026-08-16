@@ -34,3 +34,31 @@ function makeEvictOnError(cache: Map<string, Promise<unknown>>, key: string) {
 		throw err;
 	};
 }
+
+/**
+ * Create a {@link CachedFetcher} layered on top of a parent cache.
+ *
+ * Keys starting with one of `sharedPrefixes` are routed to `parent` so their
+ * entries are shared across scans (e.g. org-scoped data during a fleet
+ * scan); all other keys go to a fresh private cache that is garbage
+ * collected with the returned object.
+ *
+ * @param parent - Cache receiving keys that match a shared prefix.
+ * @param sharedPrefixes - Key prefixes routed to the parent cache.
+ */
+export function createScopedCache(
+	parent: CachedFetcher,
+	sharedPrefixes: readonly string[],
+): CachedFetcher {
+	const local = createCachedFetcher();
+
+	return {
+		fetch<T>(key: string, loader: () => Promise<T>): Promise<T> {
+			const target = sharedPrefixes.some((prefix) => key.startsWith(prefix)) ?
+				parent :
+				local;
+
+			return target.fetch(key, loader);
+		},
+	};
+}

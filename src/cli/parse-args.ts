@@ -11,6 +11,12 @@ export type ScanCommandArgs = {
 
 	/** Target organisation. Exactly one of `repo` and `org` is set. */
 	org?: string;
+
+	/** Also scan every repository of the organisation (requires `org`). */
+	allRepos: boolean;
+
+	/** Repositories scanned concurrently during fan-out (requires `allRepos`). */
+	concurrency?: number;
 	token?: string;
 	formats: Format[];
 	out?: string;
@@ -56,6 +62,8 @@ export function parseArgs(argv: string[]): ParsedArgs {
 
 	let repoSpec: string | undefined;
 	let orgSpec: string | undefined;
+	let allRepos = false;
+	let concurrency: number | undefined;
 	let token: string | undefined;
 	let out: string | undefined;
 	let severityRaw = 'high';
@@ -75,6 +83,12 @@ export function parseArgs(argv: string[]): ParsedArgs {
 				break;
 			case '--org':
 				orgSpec = readValue(argv, ++i, arg);
+				break;
+			case '--all-repos':
+				allRepos = true;
+				break;
+			case '--concurrency':
+				concurrency = parseConcurrency(readValue(argv, ++i, arg));
 				break;
 			case '--token':
 				token = readValue(argv, ++i, arg);
@@ -126,9 +140,18 @@ export function parseArgs(argv: string[]): ParsedArgs {
 		throw new CliUsageError(message);
 	}
 
-	if (orgSpec && (includeArchived || allowPublic.length > 0 || allowInternal.length > 0)) {
+	if (allRepos && !orgSpec) {
+		throw new CliUsageError('--all-repos requires --org.');
+	}
+
+	if (concurrency !== undefined && !allRepos) {
+		throw new CliUsageError('--concurrency requires --all-repos.');
+	}
+
+	if (orgSpec && !allRepos &&
+		(includeArchived || allowPublic.length > 0 || allowInternal.length > 0)) {
 		const message = '--include-archived, --allow-public and --allow-internal ' +
-			'only apply to --repo scans.';
+			'only apply to --repo scans and --org --all-repos scans.';
 
 		throw new CliUsageError(message);
 	}
@@ -143,6 +166,8 @@ export function parseArgs(argv: string[]): ParsedArgs {
 			parseRepoSpec(repoSpec) :
 			undefined,
 		org: orgSpec,
+		allRepos,
+		concurrency,
 		token,
 		formats: formats.length > 0 ?
 			formats :
@@ -185,6 +210,19 @@ function parseAllowSpec(spec: string, flag: string): string {
 	}
 
 	return spec.toLowerCase();
+}
+
+function parseConcurrency(value: string): number {
+	const parsed = Number.parseInt(value, 10);
+
+	if (!Number.isInteger(parsed) || String(parsed) !== value || parsed < 1 || parsed > 32) {
+		const message = `Invalid --concurrency "${value}". ` +
+			'Expected an integer between 1 and 32.';
+
+		throw new CliUsageError(message);
+	}
+
+	return parsed;
 }
 
 function parseFormat(value: string): Format {

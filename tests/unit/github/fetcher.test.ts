@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createCachedFetcher } from '../../../src/github/fetcher.ts';
+import { createCachedFetcher, createScopedCache } from '../../../src/github/fetcher.ts';
 
 test('cached fetcher dedupes by key', testDedupes);
 
@@ -41,5 +41,49 @@ async function testRetriesOnReject() {
 	const value = await cache.fetch('k', loader);
 
 	assert.equal(value, 'ok');
+	assert.equal(calls, 2);
+}
+
+test('scoped cache routes shared prefixes to the parent', testScopedShared);
+
+async function testScopedShared() {
+	const parent = createCachedFetcher();
+	const scopedA = createScopedCache(parent, [ 'org-property-schema:' ]);
+	const scopedB = createScopedCache(parent, [ 'org-property-schema:' ]);
+	let calls = 0;
+
+	async function loader() {
+		calls++;
+
+		return 'schema';
+	}
+
+	const a = await scopedA.fetch('org-property-schema:acme', loader);
+	const b = await scopedB.fetch('org-property-schema:acme', loader);
+
+	assert.equal(a, 'schema');
+	assert.equal(b, 'schema');
+	assert.equal(calls, 1);
+}
+
+test('scoped cache keeps other keys private per scope', testScopedPrivate);
+
+async function testScopedPrivate() {
+	const parent = createCachedFetcher();
+	const scopedA = createScopedCache(parent, [ 'org-property-schema:' ]);
+	const scopedB = createScopedCache(parent, [ 'org-property-schema:' ]);
+	let calls = 0;
+
+	async function loader() {
+		calls++;
+
+		return calls;
+	}
+
+	const a = await scopedA.fetch('repo-metadata:acme/one', loader);
+	const b = await scopedB.fetch('repo-metadata:acme/one', loader);
+
+	assert.equal(a, 1);
+	assert.equal(b, 2);
 	assert.equal(calls, 2);
 }

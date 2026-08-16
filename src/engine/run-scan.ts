@@ -3,6 +3,7 @@ import { createCachedFetcher } from '../github/fetcher.ts';
 import { getRepoMetadata } from '../github/queries.ts';
 import { meetsThreshold } from '../types/severity.ts';
 import type {
+	CachedFetcher,
 	Finding,
 	Logger,
 	OctolensConfig,
@@ -38,6 +39,9 @@ export type ScanRepoOptions = {
 
 	/** Arbitrary key-value bag forwarded into every rule's context. */
 	ruleConfig?: RuleConfigBag;
+
+	/** Query cache to use. Defaults to a fresh per-scan cache. */
+	cache?: CachedFetcher;
 };
 
 /**
@@ -52,7 +56,7 @@ export type ScanRepoOptions = {
  * @returns The complete scan result with findings, rule runs, and summary.
  */
 export async function scanRepo(options: ScanRepoOptions): Promise<ScanResult> {
-	const cache = createCachedFetcher();
+	const cache = options.cache ?? createCachedFetcher();
 	const skipArchived = options.config?.ignore?.archived !== false;
 
 	if (skipArchived) {
@@ -121,6 +125,9 @@ export type ScanOrgOptions = {
 
 	/** Arbitrary key-value bag forwarded into every rule's context. */
 	ruleConfig?: RuleConfigBag;
+
+	/** Query cache to use. Defaults to a fresh per-scan cache. */
+	cache?: CachedFetcher;
 };
 
 /**
@@ -136,7 +143,7 @@ export type ScanOrgOptions = {
  * @returns The complete scan result with findings, rule runs, and summary.
  */
 export async function scanOrg(options: ScanOrgOptions): Promise<ScanResult> {
-	const cache = createCachedFetcher();
+	const cache = options.cache ?? createCachedFetcher();
 	const enabledRules = filterEnabledRules(options.rules, options.config);
 
 	const runs = [];

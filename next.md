@@ -13,11 +13,16 @@ holding pen for follow-up minor releases.
 - **`cosmiconfig` config discovery** — `octolens.config.{ts,js,json,yaml}` +
   `package.json#octolens`, with severity overrides and ignore lists. Today
   rules use their built-in defaults.
-- **`--org <org>` repo fan-out** — running the per-repo rules across every
-  repository of an org. Engine already scans one repo at a time; needs an
-  org walker, `--concurrency`, and `ignore.archived` / `ignore.forks`
-  plumbing. (`--org` itself shipped with the org-posture rules — see below —
-  so fan-out is now an extension of the existing flag, not a new one.)
+- ~~**`--org <org>` repo fan-out**~~ — **SHIPPED** (issue #8) as the opt-in
+  `--org <org> --all-repos` flag: streams the repo listing
+  (`listOrgRepos`), filters archived / forks / `ignore.repos` at zero API
+  cost, and scans repos through a bounded worker pool (`--concurrency`,
+  default 4) paced by a proactive rate budget (`createRateBudget`) that
+  pauses intake until the rate window resets instead of failing on large
+  orgs. Produces an aggregate `OrgScanReport` (`target.type: 'org-fleet'`).
+  Fan-out follow-ups: an `--include-forks`-style CLI flag (fork skipping is
+  config-only until cosmiconfig lands), and resumable/checkpointed scans
+  for orgs too large for one sitting.
 - **GitHub App auth path** — `--app-id` + `--app-private-key`, plus OIDC
   inside Actions. Today only PAT (`--token`, `GITHUB_TOKEN`, `gh auth token`)
   works.
@@ -185,9 +190,11 @@ errored rules visible, which is how the fix was verified.
 3. ~~`--fail-on-skip` / strict mode.~~ **Done.** `exitCodeFor(result,
    { failOnIncomplete })` returns 1 if any rule skipped *or* errored; wired
    to the `--fail-on-skip` CLI flag.
-4. **Throttle our own burst** — the cached fetcher dedupes but does not pace.
-   A small per-scan concurrency cap would reduce how often we trip the
-   secondary limit at all. Lower priority now that throttles surface loudly.
+4. ~~**Throttle our own burst.**~~ **Done for fleet scans** (issue #8):
+   `--all-repos` runs repos through a bounded pool (default 4) and a
+   proactive rate budget that watches `x-ratelimit-remaining` and pauses
+   intake before the limit is exhausted. Single-repo/org scans remain
+   sequential (one rule at a time), so they never burst.
 5. **Some permission-denied fetchers error instead of skip (consistency).**
    The `skip` conversion only covered fetchers that already had a 403-swallow
    branch. Fetchers *without* one — observed live on `octocat/Hello-World`:

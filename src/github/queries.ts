@@ -292,6 +292,13 @@ export function getOrgCustomPropertySchema(
 	);
 }
 
+/**
+ * Cache-key prefixes for org-scoped queries used by repo rules. During a
+ * fleet scan these keys are routed to a shared parent cache so the data is
+ * fetched once for the whole organisation instead of once per repository.
+ */
+export const ORG_SCOPED_CACHE_PREFIXES = [ 'org-property-schema:' ] as const;
+
 /** GitHub Actions permission settings for a repository. */
 export type ActionsPermissions = {
 	enabled: boolean;
@@ -512,6 +519,12 @@ export function getRepoTeams(
  */
 export type OrgMetadata = {
 	login: string;
+
+	/** Public repository count (`null` when absent from the payload). */
+	publicRepos: number | null;
+
+	/** Private repository count visible to the token (`null` when absent). */
+	totalPrivateRepos: number | null;
 	twoFactorRequirementEnabled?: boolean;
 	defaultRepositoryPermission?: string;
 	membersCanCreatePublicRepositories?: boolean;
@@ -655,6 +668,48 @@ export function getOrgPrivateForkPrWorkflows(
 		`org-private-fork-pr-workflows:${org}`,
 		() => fetchOrgPrivateForkPrWorkflows(octokit, org),
 	);
+}
+
+/** Minimal repository entry from the org repository listing. */
+export type OrgRepoListing = {
+	owner: string;
+	name: string;
+	archived: boolean;
+	fork: boolean;
+	visibility: RepoVisibility;
+};
+
+/**
+ * Stream every repository of an organisation, one page at a time.
+ *
+ * Uses `paginate.iterator` so consumers can start scanning before the
+ * full listing is fetched. Not cached — the listing is a one-shot stream.
+ * Errors (including rate limits) propagate to the caller.
+ *
+ * @param octokit - Authenticated Octokit client.
+ * @param org - Organisation login.
+ */
+export async function *listOrgRepos(
+	octokit: Octokit,
+	org: string,
+): AsyncGenerator<OrgRepoListing> {
+	const pages = octokit.paginate.iterator(octokit.rest.repos.listForOrg, {
+		org,
+		per_page: 100,
+		type: 'all',
+	});
+
+	for await (const { data } of pages) {
+		for (const repo of data) {
+			yield {
+				owner: repo.owner?.login ?? org,
+				name: repo.name,
+				archived: repo.archived === true,
+				fork: repo.fork === true,
+				visibility: toVisibility(repo.visibility, repo.private === true),
+			};
+		}
+	}
 }
 
 async function fetchRepoMetadata(octokit: Octokit, repo: RepoRef): Promise<RepoMetadata> {
@@ -850,6 +905,8 @@ async function fetchOrgMetadata(octokit: Octokit, org: string): Promise<OrgMetad
 
 	return {
 		login: data.login,
+		publicRepos: data.public_repos ?? null,
+		totalPrivateRepos: data.total_private_repos ?? null,
 		twoFactorRequirementEnabled: toOptionalBoolean(data.two_factor_requirement_enabled),
 		defaultRepositoryPermission: data.default_repository_permission ?? undefined,
 		membersCanCreatePublicRepositories:

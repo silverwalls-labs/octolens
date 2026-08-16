@@ -14,3 +14,6 @@ export { RuleSkipped, skip } from './skip.ts';
 export type {
 	ScanResult, ScanSummary, RuleRun, RuleRunStatus,
 } from './scan-result.ts';
+export type {
+	OrgScanReport, FleetSummary, SkippedRepo, FailedRepo, RepoSkipReason,
+} from './org-scan-report.ts';

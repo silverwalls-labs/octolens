@@ -338,6 +338,146 @@ function testOrgFailOnSkip() {
 	assert.equal(result.failOnSkip, true);
 }
 
+test('--all-repos parses with --org', testAllRepos);
+
+function testAllRepos() {
+	const withoutFlag = parseArgs([
+		'scan',
+		'--org',
+		'silverwalls-labs',
+	]);
+	const withFlag = parseArgs([
+		'scan',
+		'--org',
+		'silverwalls-labs',
+		'--all-repos',
+	]);
+
+	if (withoutFlag.command !== 'scan' || withFlag.command !== 'scan') {
+		throw new Error('expected scan');
+	}
+	assert.equal(withoutFlag.allRepos, false);
+	assert.equal(withFlag.allRepos, true);
+}
+
+test('--all-repos without --org is rejected', testAllReposWithoutOrg);
+
+function testAllReposWithoutOrg() {
+	assert.throws(allReposAloneCall, CliUsageError);
+	assert.throws(allReposWithRepoCall, CliUsageError);
+}
+
+function allReposAloneCall() {
+	parseArgs([ 'scan', '--all-repos' ]);
+}
+
+function allReposWithRepoCall() {
+	parseArgs([
+		'scan',
+		'--repo',
+		'a/b',
+		'--all-repos',
+	]);
+}
+
+test('--concurrency parses a bounded integer', testConcurrency);
+
+function testConcurrency() {
+	const result = parseArgs([
+		'scan',
+		'--org',
+		'a',
+		'--all-repos',
+		'--concurrency',
+		'8',
+	]);
+
+	if (result.command !== 'scan') {
+		throw new Error('expected scan');
+	}
+	assert.equal(result.concurrency, 8);
+}
+
+test('invalid --concurrency values are rejected', testInvalidConcurrency);
+
+function testInvalidConcurrency() {
+	assert.throws(concurrencyZeroCall, CliUsageError);
+	assert.throws(concurrencyTooHighCall, CliUsageError);
+	assert.throws(concurrencyNonIntegerCall, CliUsageError);
+}
+
+function concurrencyZeroCall() {
+	parseArgs([
+		'scan',
+		'--org',
+		'a',
+		'--all-repos',
+		'--concurrency',
+		'0',
+	]);
+}
+
+function concurrencyTooHighCall() {
+	parseArgs([
+		'scan',
+		'--org',
+		'a',
+		'--all-repos',
+		'--concurrency',
+		'33',
+	]);
+}
+
+function concurrencyNonIntegerCall() {
+	parseArgs([
+		'scan',
+		'--org',
+		'a',
+		'--all-repos',
+		'--concurrency',
+		'2.5',
+	]);
+}
+
+test('--concurrency without --all-repos is rejected', testConcurrencyWithoutAllRepos);
+
+function testConcurrencyWithoutAllRepos() {
+	assert.throws(concurrencyAloneCall, CliUsageError);
+}
+
+function concurrencyAloneCall() {
+	parseArgs([
+		'scan',
+		'--org',
+		'a',
+		'--concurrency',
+		'4',
+	]);
+}
+
+test('--org --all-repos accepts repo-scoped flags', testAllReposWithRepoFlags);
+
+function testAllReposWithRepoFlags() {
+	const result = parseArgs([
+		'scan',
+		'--org',
+		'a',
+		'--all-repos',
+		'--include-archived',
+		'--allow-public',
+		'a/b',
+		'--allow-internal',
+		'a/c',
+	]);
+
+	if (result.command !== 'scan') {
+		throw new Error('expected scan');
+	}
+	assert.equal(result.includeArchived, true);
+	assert.deepEqual(result.allowPublic, [ 'a/b' ]);
+	assert.deepEqual(result.allowInternal, [ 'a/c' ]);
+}
+
 test('--fail-on-skip defaults to false and is set by the flag', testFailOnSkip);
 
 function testFailOnSkip() {
