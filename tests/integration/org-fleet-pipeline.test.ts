@@ -9,6 +9,7 @@ import { Octokit } from '@octokit/rest';
 import {
 	scanOrgAllRepos,
 	exitCodeForReport,
+	createLogger,
 } from '../../src/engine/index.ts';
 import { allRules, allOrgRules } from '../../src/rules/index.ts';
 import {
@@ -222,4 +223,97 @@ async function formattersCase() {
 
 	assert.match(pretty, /Octolens scan — silverwalls-labs \(organization \+ 1 repositories\)/);
 	assert.match(pretty, /Repositories: 1 scanned/);
+}
+
+test('a failing listing truncates the fleet scan but still reports', truncatedListingCase);
+
+async function truncatedListingCase() {
+	mockCompliantOrg();
+	nock(BASE).get(`/orgs/${ORG}/repos`)
+		.query({ per_page: '100', type: 'all' })
+		.reply(500, { message: 'server error' });
+	mockOrgCatchAll();
+
+	const report = await runFleetScan();
+
+	assert.equal(report.summary.listingComplete, false);
+	assert.equal(report.summary.reposDiscovered, 0);
+	assert.equal(report.summary.reposScanned, 0);
+
+	// Truncation is an incomplete result: strict mode fails, default passes.
+	assert.equal(exitCodeForReport(report), 0);
+	assert.equal(exitCodeForReport(report, { failOnIncomplete: true }), 1);
+
+	assert.match(formatMarkdownReport(report), /listing incomplete/i);
+	assert.match(formatPrettyReport(report, { color: false }), /listing incomplete/i);
+	assert.match(formatPrettyReport(report, { color: false }), /No repositories scanned\./);
+}
+
+test('a depleted rate budget pauses intake before the next repository', budgetPauseCase);
+
+async function budgetPauseCase() {
+	mockCompliantOrg();
+	nock(BASE).get(`/orgs/${ORG}/repos`)
+		.query({ per_page: '100', type: 'all' })
+		.reply(200, [
+			{
+				'name': 'app',
+				'owner': { login: ORG },
+				'archived': false,
+				'fork': false,
+				'private': false,
+				'visibility': 'public',
+			},
+		], {
+			'x-ratelimit-remaining': '10',
+			'x-ratelimit-reset': '1700000100',
+			'x-ratelimit-resource': 'core',
+		});
+	mockScannableRepo('app');
+	mockOrgCatchAll();
+
+	const stderrLines: string[] = [];
+	const originalStderr = process.stderr.write.bind(process.stderr);
+
+	process.stderr.write = function spyErr(chunk: string | Uint8Array): boolean {
+		if (typeof chunk !== 'string') {
+			return originalStderr(chunk);
+		}
+		stderrLines.push(chunk);
+
+		return true;
+	};
+
+	const sleeps: number[] = [];
+
+	async function recordSleep(ms: number): Promise<void> {
+		sleeps.push(ms);
+	}
+
+	try {
+		const report = await scanOrgAllRepos({
+			org: ORG,
+			orgRules: [ ...allOrgRules ],
+			repoRules: [ ...allRules ],
+			octokit: makeOctokit(),
+			logger: createLogger('info'),
+			threshold: 'high',
+			concurrency: 2,
+			now: () => 1_700_000_000_000,
+			sleep: recordSleep,
+		});
+
+		assert.equal(report.summary.reposScanned, 1);
+	} finally {
+		process.stderr.write = originalStderr;
+	}
+
+	// 100s until the advertised reset plus the 2s skew margin.
+	assert.deepEqual(sleeps, [ 102_000 ]);
+
+	const stderrText = stderrLines.join('');
+
+	assert.match(stderrText, /rate budget low \(10 remaining/);
+	assert.match(stderrText, /rate budget window reset; resuming/);
+	assert.match(stderrText, /\[info\]|\[warn\]/);
 }
