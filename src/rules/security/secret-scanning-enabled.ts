@@ -9,6 +9,9 @@ const DETAIL = 'Secret scanning is disabled, so leaked credentials in the reposi
 const REMEDIATION = 'Enable secret scanning: ' +
 	'Settings -> Code security -> Secret scanning.';
 
+/**
+ * Flags repositories with secret scanning turned off.
+ */
 export const rule: Rule = {
 	id: RULE_ID,
 	category: 'security',

@@ -10,6 +10,9 @@ const DETAIL = 'This repository has no topics. Topics are how repositories surfa
 const REMEDIATION = 'About panel (right of repo home) -> add 1-5 topics that describe ' +
 	'the repo\'s purpose and stack (e.g. "cli", "typescript", "security-scanner").';
 
+/**
+ * Flags repositories with an empty topic list.
+ */
 export const rule: Rule = {
 	id: RULE_ID,
 	category: 'repo-config',

@@ -13,6 +13,9 @@ const REMEDIATION = 'Organization Settings -> Member privileges -> Repository ' 
 	'repositories for this organization". Deletion and transfer then require ' +
 	'an organisation owner.';
 
+/**
+ * Flags organisations where members can delete or transfer repositories.
+ */
 export const rule: OrgRule = {
 	id: RULE_ID,
 	category: 'org',

@@ -13,6 +13,9 @@ const REMEDIATION = 'Organization Settings -> Member privileges -> Deploy keys: 
 	'disable deploy keys for all repositories. Use short-lived credentials ' +
 	'instead (GitHub App installation tokens or OIDC in Actions).';
 
+/**
+ * Flags organisations that still permit repository deploy keys.
+ */
 export const rule: OrgRule = {
 	id: RULE_ID,
 	category: 'org',

@@ -19,7 +19,7 @@ const SEVERITY_LABEL: Record<Severity, string> = {
  * and a checks table showing pass/flagged/skipped/error status for each rule.
  *
  * @param result - The scan result to format.
- * @returns A complete Markdown document with a trailing newline.
+ * @returns      A complete Markdown document with a trailing newline.
  */
 export function formatMarkdown(result: ScanResult): string {
 	const targetLabel = result.target.type === 'repo' ?
@@ -58,7 +58,7 @@ export function formatMarkdown(result: ScanResult): string {
  * and tables for failed and skipped repositories.
  *
  * @param report - The fleet scan report to format.
- * @returns A complete Markdown document with a trailing newline.
+ * @returns      A complete Markdown document with a trailing newline.
  */
 export function formatMarkdownReport(report: OrgScanReport): string {
 	const sections: string[] = [];
@@ -104,6 +104,12 @@ export function formatMarkdownReport(report: OrgScanReport): string {
 	return `${sections.join('\n\n')}\n`;
 }
 
+/**
+ * Render the fleet-wide summary section with the severity table.
+ *
+ * @param report - Fleet report to inspect.
+ * @returns      The rendered section.
+ */
 function renderFleetSummary(report: OrgScanReport): string {
 	const counts = report.summary.findingsBySeverity;
 	const rows = SEVERITIES.map((s) => `| ${SEVERITY_LABEL[s]} | ${counts[s]} |`);
@@ -122,6 +128,12 @@ function renderFleetSummary(report: OrgScanReport): string {
 	].join('\n');
 }
 
+/**
+ * Render the failed-repositories table.
+ *
+ * @param report - Fleet report to inspect.
+ * @returns      The rendered section.
+ */
 function renderFailures(report: OrgScanReport): string {
 	const rows = report.failures.map((f) => `| \`${f.repo.owner}/${f.repo.name}\` | ${f.error} |`);
 
@@ -134,6 +146,12 @@ function renderFailures(report: OrgScanReport): string {
 	].join('\n');
 }
 
+/**
+ * Render the skipped-repositories table.
+ *
+ * @param report - Fleet report to inspect.
+ * @returns      The rendered section.
+ */
 function renderSkipped(report: OrgScanReport): string {
 	const rows = report.skipped.map((s) => `| \`${s.repo.owner}/${s.repo.name}\` | ${s.reason} |`);
 
@@ -146,6 +164,12 @@ function renderSkipped(report: OrgScanReport): string {
 	].join('\n');
 }
 
+/**
+ * Render the single-repository summary section with the severity table.
+ *
+ * @param result - Scan result to inspect.
+ * @returns      The rendered section.
+ */
 function renderSummaryTable(result: ScanResult): string {
 	const counts = result.summary.findingsBySeverity;
 	const rows = SEVERITIES.map((s) => `| ${SEVERITY_LABEL[s]} | ${counts[s]} |`);
@@ -160,6 +184,12 @@ function renderSummaryTable(result: ScanResult): string {
 	].join('\n');
 }
 
+/**
+ * Render the per-rule checks table with outcome counts.
+ *
+ * @param result - Scan result to inspect.
+ * @returns      The rendered section.
+ */
 function renderChecks(result: ScanResult): string {
 	const sorted = [ ...result.runs ].sort(byRuleId);
 	const rows = sorted.map(toCheckRow);
@@ -179,6 +209,9 @@ function renderChecks(result: ScanResult): string {
 	].join('\n');
 }
 
+/**
+ * Display outcome bucket for a single rule run.
+ */
 type CheckOutcome = 'pass' | 'flagged' | 'skipped' | 'error';
 
 const OUTCOME_LABEL: Record<CheckOutcome, string> = {
@@ -188,6 +221,12 @@ const OUTCOME_LABEL: Record<CheckOutcome, string> = {
 	error: '❌ error',
 };
 
+/**
+ * Map a rule run onto its display outcome.
+ *
+ * @param run - Rule run to inspect.
+ * @returns   The display outcome.
+ */
 function checkOutcome(run: RuleRun): CheckOutcome {
 	if (run.status === 'error') {
 		return 'error';
@@ -201,6 +240,12 @@ function checkOutcome(run: RuleRun): CheckOutcome {
 		'pass';
 }
 
+/**
+ * Render one rule run as a markdown table row.
+ *
+ * @param run - Rule run to inspect.
+ * @returns   The table row.
+ */
 function toCheckRow(run: RuleRun): string {
 	const outcome = checkOutcome(run);
 	const count = run.findings.length > 0 ?
@@ -210,10 +255,23 @@ function toCheckRow(run: RuleRun): string {
 	return `| ${OUTCOME_LABEL[outcome]} | \`${run.ruleId}\` | ${count} |`;
 }
 
+/**
+ * Comparator ordering rule runs by rule ID.
+ *
+ * @param a - First item to compare.
+ * @param b - Second item to compare.
+ * @returns Negative, zero, or positive per comparator contract.
+ */
 function byRuleId(a: RuleRun, b: RuleRun): number {
 	return a.ruleId.localeCompare(b.ruleId);
 }
 
+/**
+ * Render a single finding as a markdown section.
+ *
+ * @param finding - Finding to render.
+ * @returns       The rendered section.
+ */
 function renderFinding(finding: Finding): string {
 	const lines: string[] = [];
 
@@ -235,6 +293,13 @@ function renderFinding(finding: Finding): string {
 	return lines.join('\n\n');
 }
 
+/**
+ * Comparator ordering findings from highest to lowest severity.
+ *
+ * @param a - First item to compare.
+ * @param b - Second item to compare.
+ * @returns Negative, zero, or positive per comparator contract.
+ */
 function bySeverityDesc(a: Finding, b: Finding): number {
 	return compareSeverity(a.severity, b.severity);
 }

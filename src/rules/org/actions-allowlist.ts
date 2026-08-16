@@ -13,6 +13,10 @@ const REMEDIATION = 'Organization Settings -> Actions -> General -> Policies: ' 
 	'and allowlist the actions you trust (GitHub-owned, verified creators, or ' +
 	'pinned patterns).';
 
+/**
+ * Flags organisations that let workflows run arbitrary actions
+ * instead of a restricted selection.
+ */
 export const rule: OrgRule = {
 	id: RULE_ID,
 	category: 'org',

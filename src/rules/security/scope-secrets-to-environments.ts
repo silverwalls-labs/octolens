@@ -13,6 +13,10 @@ const REMEDIATION = 'Move sensitive secrets into an environment ' +
 	'(Settings -> Environments -> <env> -> Add secret) and reference them with ' +
 	'`environment:` in the workflow that needs them.';
 
+/**
+ * Flags sensitive-looking secrets stored at repository level instead
+ * of inside deployment environments.
+ */
 export const rule: Rule = {
 	id: RULE_ID,
 	category: 'security',
@@ -51,6 +55,13 @@ export const rule: Rule = {
 	},
 };
 
+/**
+ * Extract the name from a secret entry.
+ *
+ * @param secret      - Secret to inspect.
+ * @param secret.name - Name of the secret entry.
+ * @returns           The plain string form.
+ */
 function nameOf(secret: { name: string; }): string {
 	return secret.name;
 }

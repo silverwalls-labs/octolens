@@ -28,6 +28,13 @@ export function createCachedFetcher(): CachedFetcher {
 	};
 }
 
+/**
+ * Build the rejection handler that evicts a failed entry so it can be retried.
+ *
+ * @param cache - Underlying promise cache.
+ * @param key   - Cache key to evict on failure.
+ * @returns     Rejection handler that rethrows after evicting.
+ */
 function makeEvictOnError(cache: Map<string, Promise<unknown>>, key: string) {
 	return function evictOnError(err: unknown): never {
 		cache.delete(key);
@@ -43,7 +50,7 @@ function makeEvictOnError(cache: Map<string, Promise<unknown>>, key: string) {
  * scan); all other keys go to a fresh private cache that is garbage
  * collected with the returned object.
  *
- * @param parent - Cache receiving keys that match a shared prefix.
+ * @param parent         - Cache receiving keys that match a shared prefix.
  * @param sharedPrefixes - Key prefixes routed to the parent cache.
  */
 export function createScopedCache(

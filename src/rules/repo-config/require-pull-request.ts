@@ -13,6 +13,9 @@ const DETAIL = 'The default branch does not require pull requests, so commits ca
 const REMEDIATION = 'In the default branch protection rule, enable ' +
 	'"Require a pull request before merging".';
 
+/**
+ * Flags default branches that accept direct pushes without a pull request.
+ */
 export const rule: Rule = {
 	id: RULE_ID,
 	category: 'repo-config',

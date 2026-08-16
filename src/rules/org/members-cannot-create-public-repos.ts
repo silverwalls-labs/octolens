@@ -12,6 +12,10 @@ const REMEDIATION = 'Organization Settings -> Member privileges -> Repository ' 
 	'creation: uncheck "Public". Repositories that must be public can be made ' +
 	'so deliberately by an owner.';
 
+/**
+ * Flags organisations where members can create repositories visible
+ * to the internet.
+ */
 export const rule: OrgRule = {
 	id: RULE_ID,
 	category: 'org',

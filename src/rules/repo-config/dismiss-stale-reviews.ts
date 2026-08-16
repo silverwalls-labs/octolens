@@ -13,6 +13,9 @@ const DETAIL = 'Approving reviews are not dismissed when new commits are pushed,
 const REMEDIATION = 'In the default branch protection rule, enable ' +
 	'"Dismiss stale pull request approvals when new commits are pushed".';
 
+/**
+ * Flags default branches that keep stale approvals when new commits are pushed.
+ */
 export const rule: Rule = {
 	id: RULE_ID,
 	category: 'repo-config',

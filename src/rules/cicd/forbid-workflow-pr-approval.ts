@@ -10,6 +10,10 @@ const DETAIL = 'GitHub Actions workflows are allowed to approve pull requests. '
 const REMEDIATION = 'Settings -> Actions -> General: uncheck ' +
 	'"Allow GitHub Actions to create and approve pull requests".';
 
+/**
+ * Flags repositories where workflows are allowed to approve pull
+ * requests, which can be abused to bypass review.
+ */
 export const rule: Rule = {
 	id: RULE_ID,
 	category: 'cicd',

@@ -26,7 +26,7 @@ export type PrettyOptions = {
  * individual findings with severity tags, and a summary section with
  * rule coverage and per-severity counts.
  *
- * @param result - The scan result to format.
+ * @param result  - The scan result to format.
  * @param options - Formatting options.
  */
 export function formatPretty(result: ScanResult, options: PrettyOptions = {}): string {
@@ -79,7 +79,7 @@ export function formatPretty(result: ScanResult, options: PrettyOptions = {}): s
  * findings (clean repositories are collapsed into a single count), failed
  * and skipped repositories, and an aggregate summary.
  *
- * @param report - The fleet scan report to format.
+ * @param report  - The fleet scan report to format.
  * @param options - Formatting options.
  */
 export function formatPrettyReport(report: OrgScanReport, options: PrettyOptions = {}): string {
@@ -157,6 +157,13 @@ export function formatPrettyReport(report: OrgScanReport, options: PrettyOptions
 	return `${lines.join('\n')}\n`;
 }
 
+/**
+ * Append rendered findings (sorted by severity) to the output lines.
+ *
+ * @param lines    - Output line accumulator (mutated in place).
+ * @param findings - Findings to render.
+ * @param colorize - Applied to highlight severity and metadata segments.
+ */
 function pushFindings(lines: string[], findings: Finding[], colorize: (s: string) => string): void {
 	if (findings.length === 0) {
 		lines.push(colorize(pc.green('  No findings at or above severity threshold.')));
@@ -170,6 +177,12 @@ function pushFindings(lines: string[], findings: Finding[], colorize: (s: string
 	}
 }
 
+/**
+ * Summarise skip entries into per-reason counts.
+ *
+ * @param skipped - Skip entries from the fleet report.
+ * @returns       The per-reason counts joined into one label.
+ */
 function formatSkipCounts(skipped: OrgScanReport['skipped']): string {
 	const byReason = new Map<string, number>();
 
@@ -182,6 +195,13 @@ function formatSkipCounts(skipped: OrgScanReport['skipped']): string {
 		.join(' · ');
 }
 
+/**
+ * Format the passed/flagged/skipped/errored counters for the summary line.
+ *
+ * @param runs     - Rule runs to aggregate.
+ * @param colorize - Applied to highlight severity and metadata segments.
+ * @returns        The formatted counter line.
+ */
 function formatCoverage(runs: RuleRun[], colorize: (s: string) => string): string {
 	const passed = runs.filter(isPass).length;
 	const flagged = runs.filter(isFlagged).length;
@@ -201,18 +221,44 @@ function formatCoverage(runs: RuleRun[], colorize: (s: string) => string): strin
 	return parts.join(' · ');
 }
 
+/**
+ * Check whether a rule run completed with no findings.
+ *
+ * @param run - Rule run to inspect.
+ * @returns   True for a clean pass.
+ */
 function isPass(run: RuleRun): boolean {
 	return run.status === 'ok' && run.findings.length === 0;
 }
 
+/**
+ * Check whether a rule run completed with findings.
+ *
+ * @param run - Rule run to inspect.
+ * @returns   True when findings were produced.
+ */
 function isFlagged(run: RuleRun): boolean {
 	return run.status === 'ok' && run.findings.length > 0;
 }
 
+/**
+ * Comparator ordering findings from highest to lowest severity.
+ *
+ * @param a - First item to compare.
+ * @param b - Second item to compare.
+ * @returns Negative, zero, or positive per comparator contract.
+ */
 function bySeverityDesc(a: Finding, b: Finding): number {
 	return compareSeverity(a.severity, b.severity);
 }
 
+/**
+ * Render a single finding with severity colouring and metadata lines.
+ *
+ * @param finding  - Finding to render.
+ * @param colorize - Applied to highlight severity and metadata segments.
+ * @returns        The rendered finding block.
+ */
 function formatFinding(finding: Finding, colorize: (s: string) => string): string {
 	const tag = colorize(SEVERITY_COLORS[finding.severity](`[${finding.severity.toUpperCase()}]`));
 	const head = `${tag} ${colorize(pc.bold(finding.title))}`;
@@ -235,12 +281,24 @@ function formatFinding(finding: Finding, colorize: (s: string) => string): strin
 	return out.join('\n');
 }
 
+/**
+ * No-op colorizer used when colors are disabled.
+ *
+ * @param s - Input string.
+ * @returns The input, unchanged.
+ */
 function identity(s: string): string {
 	return s;
 }
 
 const ANSI_RE = /\[[0-9;]*m/g;
 
+/**
+ * Remove ANSI escape sequences from a string.
+ *
+ * @param s - Input string.
+ * @returns The string without escape sequences.
+ */
 function stripColor(s: string): string {
 	return s.replace(ANSI_RE, '');
 }

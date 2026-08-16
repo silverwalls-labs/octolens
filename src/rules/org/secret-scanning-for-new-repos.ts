@@ -12,6 +12,10 @@ const REMEDIATION = 'Organization Settings -> Advanced Security -> Global ' +
 	'settings: enable Secret Protection "Automatically enable for new ' +
 	'repositories" (or attach a code security configuration that enables it).';
 
+/**
+ * Flags organisations that do not enable secret scanning
+ * automatically on newly created repositories.
+ */
 export const rule: OrgRule = {
 	id: RULE_ID,
 	category: 'org',

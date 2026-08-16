@@ -11,6 +11,10 @@ const REMEDIATION = 'Settings -> Actions -> General -> Allow actions: select eit
 	'and select non-enterprise, actions and reusable workflows", and pin trusted actions ' +
 	'with full SHAs in the allowlist.';
 
+/**
+ * Flags repositories that allow any action to run instead of
+ * restricting workflows to a vetted allowlist.
+ */
 export const rule: Rule = {
 	id: RULE_ID,
 	category: 'cicd',

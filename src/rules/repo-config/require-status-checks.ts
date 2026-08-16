@@ -12,6 +12,9 @@ const DETAIL = 'No status checks are required to pass before merging to the defa
 const REMEDIATION = 'In the default branch protection rule, enable ' +
 	'"Require status checks to pass" and select the required workflows.';
 
+/**
+ * Flags default branches that merge without any required status check.
+ */
 export const rule: Rule = {
 	id: RULE_ID,
 	category: 'repo-config',

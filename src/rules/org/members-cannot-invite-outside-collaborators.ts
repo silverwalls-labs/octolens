@@ -13,6 +13,10 @@ const REMEDIATION = 'Organization Settings -> Member privileges -> Repository ' 
 	'repositories for this organization". Invitations then require an ' +
 	'organisation owner.';
 
+/**
+ * Flags organisations where members can invite outside collaborators
+ * without owner involvement.
+ */
 export const rule: OrgRule = {
 	id: RULE_ID,
 	category: 'org',

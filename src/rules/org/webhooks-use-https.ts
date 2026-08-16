@@ -13,6 +13,10 @@ const DETAIL = 'One or more organisation webhooks deliver to insecure endpoints 
 const REMEDIATION = 'Organization Settings -> Webhooks -> edit each affected ' +
 	'hook: switch to an https:// URL and uncheck "Disable SSL verification".';
 
+/**
+ * Flags organisation webhooks that deliver over plain HTTP or
+ * disable SSL verification.
+ */
 export const rule: OrgRule = {
 	id: RULE_ID,
 	category: 'org',
@@ -47,10 +51,22 @@ export const rule: OrgRule = {
 	},
 };
 
+/**
+ * Check whether a webhook uses plain HTTP or skips SSL verification.
+ *
+ * @param hook - Webhook to inspect.
+ * @returns    True for insecure delivery settings.
+ */
 function isInsecure(hook: WebhookSummary): boolean {
 	return hook.url.startsWith('http://') || hook.insecureSsl;
 }
 
+/**
+ * Format a webhook for the finding detail.
+ *
+ * @param hook - Webhook to inspect.
+ * @returns    The formatted description.
+ */
 function describe(hook: WebhookSummary): string {
 	const reason = hook.insecureSsl ?
 		'ssl verification disabled' :

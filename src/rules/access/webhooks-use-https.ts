@@ -11,6 +11,9 @@ const DETAIL = 'One or more webhooks deliver to insecure endpoints (plain HTTP) 
 const REMEDIATION = 'Settings -> Webhooks -> edit each affected hook: switch to ' +
 	'an https:// URL and uncheck "Disable SSL verification".';
 
+/**
+ * Flags webhooks that deliver over plain HTTP or disable SSL verification.
+ */
 export const rule: Rule = {
 	id: RULE_ID,
 	category: 'access',
@@ -40,10 +43,22 @@ export const rule: Rule = {
 	},
 };
 
+/**
+ * Check whether a webhook uses plain HTTP or skips SSL verification.
+ *
+ * @param hook - Webhook to inspect.
+ * @returns    True for insecure delivery settings.
+ */
 function isInsecure(hook: WebhookSummary): boolean {
 	return hook.url.startsWith('http://') || hook.insecureSsl;
 }
 
+/**
+ * Format a webhook for the finding detail.
+ *
+ * @param hook - Webhook to inspect.
+ * @returns    The formatted description.
+ */
 function describe(hook: WebhookSummary): string {
 	const reason = hook.insecureSsl ?
 		'ssl verification disabled' :

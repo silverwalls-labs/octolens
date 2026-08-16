@@ -9,6 +9,9 @@ const DETAIL = 'GitHub Actions is disabled for this repository. ' +
 const REMEDIATION = 'If Actions is intentionally disabled, ignore this finding. ' +
 	'Otherwise enable it under Settings -> Actions -> General.';
 
+/**
+ * Flags repositories where GitHub Actions is turned off entirely.
+ */
 export const rule: Rule = {
 	id: RULE_ID,
 	category: 'cicd',

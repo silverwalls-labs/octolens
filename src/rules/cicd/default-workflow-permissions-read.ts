@@ -11,6 +11,9 @@ const REMEDIATION = 'Settings -> Actions -> General -> Workflow permissions: ' +
 	'select "Read repository contents and packages permissions". Grant additional ' +
 	'scopes per-workflow with `permissions:` blocks instead.';
 
+/**
+ * Flags repositories whose default `GITHUB_TOKEN` grants write access to workflows.
+ */
 export const rule: Rule = {
 	id: RULE_ID,
 	category: 'cicd',

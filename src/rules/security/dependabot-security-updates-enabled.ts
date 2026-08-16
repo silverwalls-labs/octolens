@@ -9,6 +9,9 @@ const DETAIL = 'Dependabot security updates are disabled. ' +
 const REMEDIATION = 'Settings -> Code security -> Dependabot security updates: enable. ' +
 	'Requires Dependabot alerts to also be enabled.';
 
+/**
+ * Flags repositories with automated security fixes turned off.
+ */
 export const rule: Rule = {
 	id: RULE_ID,
 	category: 'security',

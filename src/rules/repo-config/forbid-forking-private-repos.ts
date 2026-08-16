@@ -12,6 +12,9 @@ const REMEDIATION = 'Settings -> General -> uncheck "Allow forking". For an org-
 	'default, disable forking of private/internal repositories in the organization ' +
 	'member-privileges settings.';
 
+/**
+ * Flags private or internal repositories that allow forking.
+ */
 export const rule: Rule = {
 	id: RULE_ID,
 	category: 'repo-config',

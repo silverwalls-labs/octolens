@@ -15,6 +15,10 @@ const REMEDIATION = 'Organization Settings -> Actions -> General -> Fork pull ' 
 	'workflows from fork pull requests", and check "Require approval for fork ' +
 	'pull request workflows".';
 
+/**
+ * Flags organisations that hand write tokens or secrets to workflows
+ * triggered from private repository forks.
+ */
 export const rule: OrgRule = {
 	id: RULE_ID,
 	category: 'org',

@@ -12,6 +12,10 @@ const REMEDIATION = 'Organization Settings -> Actions -> General -> Workflow ' +
 	'permissions: uncheck "Allow GitHub Actions to create and approve pull ' +
 	'requests".';
 
+/**
+ * Flags organisations that allow workflows to approve pull requests
+ * anywhere in the organisation.
+ */
 export const rule: OrgRule = {
 	id: RULE_ID,
 	category: 'org',

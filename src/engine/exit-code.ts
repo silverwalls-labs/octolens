@@ -12,7 +12,7 @@ export type ExitCodeOptions = {
  * Returns `1` if there are any findings, or if `failOnIncomplete` is set
  * and the scan has skipped or errored rules. Returns `0` otherwise.
  *
- * @param result - The scan result to evaluate.
+ * @param result  - The scan result to evaluate.
  * @param options - Optional flags.
  */
 export function exitCodeFor(result: ScanResult, options: ExitCodeOptions = {}): 0 | 1 {
@@ -27,6 +27,12 @@ export function exitCodeFor(result: ScanResult, options: ExitCodeOptions = {}): 
 	return 0;
 }
 
+/**
+ * Check whether any rule run was skipped or errored.
+ *
+ * @param result - Scan result to inspect.
+ * @returns      True when coverage is incomplete.
+ */
 function isIncomplete(result: ScanResult): boolean {
 	return result.summary.rulesErrored > 0 || result.summary.rulesSkipped > 0;
 }
@@ -39,7 +45,7 @@ function isIncomplete(result: ScanResult): boolean {
  * errored rules anywhere, repositories whose scan failed, or a truncated
  * repository listing. Returns `0` otherwise.
  *
- * @param report - The fleet scan report to evaluate.
+ * @param report  - The fleet scan report to evaluate.
  * @param options - Optional flags.
  */
 export function exitCodeForReport(report: OrgScanReport, options: ExitCodeOptions = {}): 0 | 1 {
@@ -54,6 +60,13 @@ export function exitCodeForReport(report: OrgScanReport, options: ExitCodeOption
 	return 0;
 }
 
+/**
+ * Check whether fleet coverage is incomplete: skipped or errored rules,
+ * failed repositories, or a truncated listing.
+ *
+ * @param report - Fleet report to inspect.
+ * @returns      True when fleet coverage is incomplete.
+ */
 function isReportIncomplete(report: OrgScanReport): boolean {
 	return report.summary.rulesErrored > 0 ||
 		report.summary.rulesSkipped > 0 ||

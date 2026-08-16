@@ -6,6 +6,10 @@ import type {
 
 const RULE_ID = 'access/visibility-private-default';
 
+/**
+ * Flags public or internal repositories unless the configuration
+ * explicitly approves their visibility.
+ */
 export const rule: Rule = {
 	id: RULE_ID,
 	category: 'access',
@@ -30,11 +34,20 @@ export const rule: Rule = {
 	},
 };
 
+/**
+ * Parsed configuration for the visibility rule.
+ */
 type VisibilityConfig = {
 	allowPublic: string[];
 	allowInternal: string[];
 };
 
+/**
+ * Read the allow-list configuration for this rule.
+ *
+ * @param ctx - Rule execution context with the API client, cache, and target.
+ * @returns   The parsed configuration.
+ */
 function readConfig(ctx: RuleContext): VisibilityConfig {
 	const raw = ctx.ruleConfig[RULE_ID] as Partial<VisibilityConfig> | undefined;
 
@@ -44,6 +57,14 @@ function readConfig(ctx: RuleContext): VisibilityConfig {
 	};
 }
 
+/**
+ * Check whether the visibility is acceptable for this repository.
+ *
+ * @param repo       - Target repository.
+ * @param visibility - Repository visibility level.
+ * @param config     - Optional scan configuration.
+ * @returns          True when the visibility is approved.
+ */
 function isAllowed(repo: RepoRef, visibility: RepoVisibility, config: VisibilityConfig): boolean {
 	const slug = `${repo.owner}/${repo.name}`.toLowerCase();
 
@@ -53,6 +74,13 @@ function isAllowed(repo: RepoRef, visibility: RepoVisibility, config: Visibility
 		config.allowInternal.includes(slug);
 }
 
+/**
+ * Build the finding reported for an unapproved visibility.
+ *
+ * @param repo       - Target repository.
+ * @param visibility - Repository visibility level.
+ * @returns          The constructed finding.
+ */
 function buildFinding(repo: RepoRef, visibility: RepoVisibility): Finding {
 	if (visibility === 'public') {
 		return {

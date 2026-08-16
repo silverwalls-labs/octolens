@@ -9,6 +9,10 @@ const RULE_ID = 'access/required-custom-properties';
 const REMEDIATION = 'Set the property under Settings -> Custom properties, or have ' +
 	'your org admin update the value through the org-level custom properties UI.';
 
+/**
+ * Flags repositories missing a value for any custom property the
+ * organisation marks as required.
+ */
 export const rule: Rule = {
 	id: RULE_ID,
 	category: 'access',
@@ -68,14 +72,29 @@ export const rule: Rule = {
 	},
 };
 
+/**
+ * Subset of a property definition carrying the required flag.
+ */
 type RequiredOnly = {
 	required: boolean;
 };
 
+/**
+ * Check whether a property definition is marked required.
+ *
+ * @param def - Property definition to inspect.
+ * @returns   True when the definition demands a value.
+ */
 function isRequired(def: RequiredOnly): boolean {
 	return def.required === true;
 }
 
+/**
+ * Check whether an assigned value is non-empty.
+ *
+ * @param value - Assigned property value.
+ * @returns     True for a non-empty value.
+ */
 function isPropertyValuePresent(value: string | string[] | null): boolean {
 	if (value === null) {
 		return false;

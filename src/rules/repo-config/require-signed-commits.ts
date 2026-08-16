@@ -14,6 +14,9 @@ const DETAIL = 'The default branch does not require signed commits, so unsigned 
 const REMEDIATION = 'In the default branch protection rule, enable ' +
 	'"Require signed commits".';
 
+/**
+ * Flags default branches that accept unsigned commits.
+ */
 export const rule: Rule = {
 	id: RULE_ID,
 	category: 'repo-config',

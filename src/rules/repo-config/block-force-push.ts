@@ -12,6 +12,9 @@ const DETAIL = 'Force pushes to the default branch are allowed, which can rewrit
 
 const REMEDIATION = 'In the default branch protection rule, disable "Allow force pushes".';
 
+/**
+ * Flags default branches whose protection still permits force pushes.
+ */
 export const rule: Rule = {
 	id: RULE_ID,
 	category: 'repo-config',

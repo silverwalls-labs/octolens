@@ -13,6 +13,9 @@ const REMEDIATION = 'Organization Settings -> Actions -> General -> Workflow ' +
 	'permissions: select "Read repository contents and packages permissions". ' +
 	'Grant additional scopes per-workflow with `permissions:` blocks instead.';
 
+/**
+ * Flags organisations whose default `GITHUB_TOKEN` grants write access to workflows.
+ */
 export const rule: OrgRule = {
 	id: RULE_ID,
 	category: 'org',

@@ -10,6 +10,10 @@ const DETAIL = 'Merged head branches are not deleted automatically. ' +
 const REMEDIATION = 'Settings -> General -> Pull Requests: enable ' +
 	'"Automatically delete head branches".';
 
+/**
+ * Flags repositories that keep merged head branches around instead
+ * of deleting them automatically.
+ */
 export const rule: Rule = {
 	id: RULE_ID,
 	category: 'repo-config',

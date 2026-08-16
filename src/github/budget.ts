@@ -160,6 +160,12 @@ export function createRateBudget(options: RateBudgetOptions): RateBudget {
 	};
 }
 
+/**
+ * Parse a rate-limit header value into a number, or `null` when unusable.
+ *
+ * @param value - Header value to parse.
+ * @returns     The parsed number, or `null`.
+ */
 function toCount(value: unknown): number | null {
 	const parsed = typeof value === 'string' ?
 		Number.parseInt(value, 10) :
@@ -172,6 +178,12 @@ function toCount(value: unknown): number | null {
 		null;
 }
 
+/**
+ * Format a millisecond duration as `Xm Ys` or `Ys`.
+ *
+ * @param ms - Duration in milliseconds.
+ * @returns  The formatted duration.
+ */
 function formatDuration(ms: number): string {
 	const totalSeconds = Math.round(ms / 1000);
 	const minutes = Math.floor(totalSeconds / 60);
@@ -182,6 +194,12 @@ function formatDuration(ms: number): string {
 		`${seconds}s`;
 }
 
+/**
+ * Timer-based sleep used when the caller injects no custom implementation.
+ *
+ * @param ms - Duration in milliseconds.
+ * @returns  Promise resolving after the delay.
+ */
 function defaultSleep(ms: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, ms));
 }

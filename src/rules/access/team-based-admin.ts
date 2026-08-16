@@ -11,6 +11,10 @@ const DETAIL = 'No team has admin access on this repository. Granting admin to '
 const REMEDIATION = 'Create a team in the organization and grant it admin access ' +
 	'to this repo. Manage admin membership through the team rather than per-user.';
 
+/**
+ * Flags repositories where no team holds admin access, encouraging
+ * team-based over individual grants.
+ */
 export const rule: Rule = {
 	id: RULE_ID,
 	category: 'access',
@@ -42,6 +46,12 @@ export const rule: Rule = {
 	},
 };
 
+/**
+ * Check whether a team grants the admin permission.
+ *
+ * @param team - Team to inspect.
+ * @returns    True for teams with admin permission.
+ */
 function isAdminTeam(team: RepoTeamSummary): boolean {
 	return team.permission === 'admin';
 }

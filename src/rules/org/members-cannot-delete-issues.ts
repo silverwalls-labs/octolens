@@ -12,6 +12,9 @@ const REMEDIATION = 'Organization Settings -> Member privileges -> Issue ' +
 	'deletion: uncheck "Allow repository administrators to delete issues for ' +
 	'this organization". Issue deletion then requires an organisation owner.';
 
+/**
+ * Flags organisations where members can permanently delete issues.
+ */
 export const rule: OrgRule = {
 	id: RULE_ID,
 	category: 'org',

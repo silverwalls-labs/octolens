@@ -14,6 +14,10 @@ const REMEDIATION = 'Organization Settings -> Member privileges -> Base ' +
 	'permissions: select "Read" or "No permission". Grant write access ' +
 	'per-repository through teams instead.';
 
+/**
+ * Flags organisations whose base permission grants members write or
+ * admin on every repository.
+ */
 export const rule: OrgRule = {
 	id: RULE_ID,
 	category: 'org',

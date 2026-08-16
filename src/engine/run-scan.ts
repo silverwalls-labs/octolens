@@ -53,7 +53,7 @@ export type ScanRepoOptions = {
  * from the result.
  *
  * @param options - Scan configuration.
- * @returns The complete scan result with findings, rule runs, and summary.
+ * @returns       The complete scan result with findings, rule runs, and summary.
  */
 export async function scanRepo(options: ScanRepoOptions): Promise<ScanResult> {
 	const cache = options.cache ?? createCachedFetcher();
@@ -140,7 +140,7 @@ export type ScanOrgOptions = {
  * `'skipped'` run rather than a false pass.
  *
  * @param options - Scan configuration.
- * @returns The complete scan result with findings, rule runs, and summary.
+ * @returns       The complete scan result with findings, rule runs, and summary.
  */
 export async function scanOrg(options: ScanOrgOptions): Promise<ScanResult> {
 	const cache = options.cache ?? createCachedFetcher();
@@ -174,6 +174,12 @@ export async function scanOrg(options: ScanOrgOptions): Promise<ScanResult> {
 	};
 }
 
+/**
+ * Build the empty all-skipped result reported for archived repositories.
+ *
+ * @param options - Scan options for the archived repository.
+ * @returns       A result with every rule counted as skipped.
+ */
 function buildArchivedSkipResult(options: ScanRepoOptions): ScanResult {
 	const { owner, name } = options.repo;
 
@@ -203,12 +209,27 @@ function buildArchivedSkipResult(options: ScanRepoOptions): ScanResult {
 	};
 }
 
+/**
+ * Drop rules disabled via the configuration's rule overrides.
+ *
+ * @param    rules  - Rules to filter.
+ * @param    config - Optional scan configuration.
+ * @returns         Rules that remain enabled.
+ * @template R      - Rule shape carrying an `id`.
+ */
 function filterEnabledRules<R extends { id: string; }>(rules: R[], config?: OctolensConfig): R[] {
 	const overrides = config?.rules ?? {};
 
 	return rules.filter((r) => overrides[r.id] !== 'off');
 }
 
+/**
+ * Aggregate run statuses and findings into a {@link ScanSummary}.
+ *
+ * @param runs     - Rule runs to aggregate.
+ * @param findings - Findings produced by the runs.
+ * @returns        The aggregated scan summary.
+ */
 function buildSummary(runs: { status: string; }[], findings: Finding[]): ScanSummary {
 	const findingsBySeverity: ScanSummary['findingsBySeverity'] = {
 		critical: 0,

@@ -12,6 +12,10 @@ const REMEDIATION = 'Organization Settings -> Authentication security: enable ' 
 	'"Require two-factor authentication for everyone in your organization". ' +
 	'Members without 2FA are removed from the organisation, so announce it first.';
 
+/**
+ * Flags organisations that do not enforce two-factor authentication
+ * for membership. Skips when the token cannot see the setting.
+ */
 export const rule: OrgRule = {
 	id: RULE_ID,
 	category: 'org',

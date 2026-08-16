@@ -12,6 +12,10 @@ const REMEDIATION = 'Organization Settings -> Member privileges -> Pages ' +
 	'creation: uncheck "Public". Members can still publish private Pages ' +
 	'sites if those remain allowed.';
 
+/**
+ * Flags organisations where members can publish GitHub Pages sites
+ * visible to the internet.
+ */
 export const rule: OrgRule = {
 	id: RULE_ID,
 	category: 'org',

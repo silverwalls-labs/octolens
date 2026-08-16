@@ -12,6 +12,9 @@ const DETAIL = 'The default branch has no protection rule, so anyone with write 
 const REMEDIATION = 'Add a branch protection rule for the default branch under ' +
 	'Settings -> Branches.';
 
+/**
+ * Flags repositories whose default branch has no protection rule at all.
+ */
 export const rule: Rule = {
 	id: RULE_ID,
 	category: 'repo-config',

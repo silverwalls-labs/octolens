@@ -5,6 +5,9 @@ import type { Logger } from '../types/index.ts';
 
 const OctolensOctokit = Octokit.plugin(retry, throttling);
 
+/**
+ * Request descriptor the throttling plugin passes to rate-limit callbacks.
+ */
 type ThrottleRequest = {
 	method: string;
 	url: string;
@@ -32,7 +35,7 @@ export type ClientOptions = {
  * (abuse) rate limits, logging a warning on each retry.
  *
  * @param options - Client configuration.
- * @returns An authenticated Octokit instance.
+ * @returns       An authenticated Octokit instance.
  */
 export function createOctokit(options: ClientOptions): Octokit {
 	const log = options.logger;
@@ -51,7 +54,9 @@ export function createOctokit(options: ClientOptions): Octokit {
 /**
  * Build the primary rate-limit callback handed to the throttling plugin.
  *
- * @internal Exported for direct testing only.
+ * @internal
+ * @param log        - Optional logger for retry warnings.
+ * @param maxRetries - Number of times a throttled request is retried.
  */
 export function makeRateLimitHandler(log: Logger | undefined, maxRetries: number) {
 	return function onRateLimit(
@@ -69,7 +74,9 @@ export function makeRateLimitHandler(log: Logger | undefined, maxRetries: number
 /**
  * Build the secondary (abuse) rate-limit callback handed to the throttling plugin.
  *
- * @internal Exported for direct testing only.
+ * @internal
+ * @param log        - Optional logger for retry warnings.
+ * @param maxRetries - Number of times a throttled request is retried.
  */
 export function makeSecondaryRateLimitHandler(log: Logger | undefined, maxRetries: number) {
 	return function onSecondaryRateLimit(

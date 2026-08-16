@@ -8,6 +8,9 @@ const DETAIL = 'No CODEOWNERS file was found, so GitHub cannot route review requ
 
 const REMEDIATION = 'Add a CODEOWNERS file at the repository root or under .github/.';
 
+/**
+ * Flags repositories without a CODEOWNERS file in any of the standard locations.
+ */
 export const rule: Rule = {
 	id: RULE_ID,
 	category: 'access',

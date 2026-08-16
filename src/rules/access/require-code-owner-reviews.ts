@@ -15,6 +15,10 @@ const DETAIL = 'A CODEOWNERS file is committed to this repository, but the defau
 const REMEDIATION = 'In the default branch protection rule, enable ' +
 	'"Require review from Code Owners" alongside required pull-request reviews.';
 
+/**
+ * Flags repositories that have a CODEOWNERS file but do not enforce
+ * code owner review on the default branch.
+ */
 export const rule: Rule = {
 	id: RULE_ID,
 	category: 'access',
