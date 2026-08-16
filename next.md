@@ -228,3 +228,16 @@ From the original plan §13 — items not yet exercised:
 - `npm pack` tarball consumed from a sibling project — verify `dist/`,
   `bin/`, types, and `exports` resolve correctly.
 - `npx . scan --org <org>` wall-clock budget against a small org.
+
+## Testing follow-ups (issue #10 landed 2026-08-16)
+
+- Include `tests/` and `scripts/` in `npm run typecheck` (tsconfig
+  currently excludes them; test files are only parsed, never
+  type-checked).
+- The global branch/function aggregates in
+  `scripts/coverage-report.ts` are conservative lower bounds because
+  V8 block identifiers differ between suites; revisit if the lcov
+  merge ever gates on branches.
+- The per-category thresholds live in two places by design
+  (package.json `--test-coverage-*` flags enforce, the script's
+  `THRESHOLDS` table displays) — keep them in sync when tuning.

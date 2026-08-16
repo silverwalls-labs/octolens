@@ -151,3 +151,31 @@ OctoLens can be customized with a `octolens.config.json` file in your project ro
   }
 }
 ```
+
+## 🧪 Testing
+
+Tests run on Node's built-in test runner with native TypeScript
+type-stripping — no transpiler in the loop, so coverage maps to true
+source lines. Five categories live under `tests/`:
+
+| Category | Command | What it covers | Coverage thresholds (L/B/F) |
+| --- | --- | --- | --- |
+| Unit | `npm run test:unit` | Every module in isolation (nock-mocked HTTP) | 100 / 98 / 100 |
+| Integration | `npm run test:integration` | Full scan pipelines against mocked APIs | 90 / 85 / 90 |
+| Smoke | `npm run test:smoke` | The CLI end to end, in process | 75 / 70 / 75 |
+| Fuzz | `npm run test:fuzz` | Property-based invariants (fast-check) | reported only |
+| E2E | `npm run test:e2e` | Real GitHub API + the built `bin/` | not gated |
+
+Append `:cov` to a category script (e.g. `npm run test:unit:cov`) to
+enforce its thresholds and write `coverage/<category>.lcov`. After
+running the four `:cov` scripts, `npm run coverage:report` merges them
+into a global report and fails below 98% aggregate line coverage. CI
+runs each category as its own job and posts the merged table as a
+sticky PR comment.
+
+- **E2E**: set `OCTOLENS_E2E_TOKEN` (falls back to `GITHUB_TOKEN` /
+  `OCTOLENS_TOKEN`) to a fine-grained read-only PAT; the suite skips
+  cleanly without it. The bin tests also need `npm run build` first.
+  In CI the token comes from the `OCTOLENS_E2E_TOKEN` repository secret.
+- **Fuzz**: runs are deterministic by default. Set `FUZZ_SEED` to
+  explore new inputs and `FUZZ_ITERS` (default 250) to change depth.
