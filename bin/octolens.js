@@ -5,7 +5,10 @@ import { main } from '../dist/cli/main.js';
 main(process.argv.slice(2)).then(onSuccess, onFailure);
 
 function onSuccess(code) {
-	process.exit(code);
+	// Set the exit code instead of calling process.exit(): exit() kills the
+	// process before stdout drains, truncating large reports (>64KB) piped
+	// to another process or redirected to a file.
+	process.exitCode = code;
 }
 
 function onFailure(err) {
@@ -14,5 +17,5 @@ function onFailure(err) {
 		err;
 
 	console.error(message);
-	process.exit(2);
+	process.exitCode = 2;
 }

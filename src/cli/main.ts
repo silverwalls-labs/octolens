@@ -2,13 +2,13 @@ import { writeFileSync } from 'node:fs';
 import { resolveAuth, AuthError } from '../github/auth.ts';
 import { createOctokit } from '../github/client.ts';
 import {
-	createLogger, scanRepo, scanOrg, exitCodeFor,
+	createLogger, scanRepo, scanOrg, scanOrgAllRepos, exitCodeFor, exitCodeForReport,
 } from '../engine/index.ts';
 import { allRules, allOrgRules } from '../rules/index.ts';
 import {
-	formatJson, formatMarkdown, formatPretty,
+	formatJson, formatMarkdown, formatMarkdownReport, formatPretty, formatPrettyReport,
 } from '../output/index.ts';
-import type { ScanResult } from '../types/index.ts';
+import type { OrgScanReport, ScanResult } from '../types/index.ts';
 import {
 	parseArgs, CliUsageError, type Format, type ScanCommandArgs,
 } from './parse-args.ts';
@@ -54,9 +54,12 @@ export async function main(argv: string[]): Promise<number> {
 }
 
 async function runScanCommand(args: ScanCommandArgs): Promise<number> {
+	// Fleet scans can run for a long time; surface progress by default.
 	const logger = createLogger(args.verbose ?
 		'debug' :
-		'warn');
+		args.allRepos ?
+			'info' :
+			'warn');
 
 	let auth;
 
@@ -78,6 +81,31 @@ async function runScanCommand(args: ScanCommandArgs): Promise<number> {
 		logger,
 	});
 
+	const ruleConfig = {
+		'access/visibility-private-default': {
+			allowPublic: args.allowPublic,
+			allowInternal: args.allowInternal,
+		},
+	};
+
+	if (args.org !== undefined && args.allRepos) {
+		const report = await scanOrgAllRepos({
+			org: args.org,
+			orgRules: [ ...allOrgRules ],
+			repoRules: [ ...allRules ],
+			octokit,
+			logger,
+			threshold: args.severity,
+			config: { ignore: { archived: !args.includeArchived } },
+			ruleConfig,
+			concurrency: args.concurrency,
+		});
+
+		emitOutput(report, args.formats, args.out);
+
+		return exitCodeForReport(report, { failOnIncomplete: args.failOnSkip });
+	}
+
 	const result = args.org !== undefined ?
 		await scanOrg({
 			org: args.org,
@@ -94,12 +122,7 @@ async function runScanCommand(args: ScanCommandArgs): Promise<number> {
 			logger,
 			threshold: args.severity,
 			config: { ignore: { archived: !args.includeArchived } },
-			ruleConfig: {
-				'access/visibility-private-default': {
-					allowPublic: args.allowPublic,
-					allowInternal: args.allowInternal,
-				},
-			},
+			ruleConfig,
 		});
 
 	emitOutput(result, args.formats, args.out);
@@ -107,7 +130,11 @@ async function runScanCommand(args: ScanCommandArgs): Promise<number> {
 	return exitCodeFor(result, { failOnIncomplete: args.failOnSkip });
 }
 
-function emitOutput(result: ScanResult, formats: Format[], out: string | undefined): void {
+function emitOutput(
+	result: ScanResult | OrgScanReport,
+	formats: Format[],
+	out: string | undefined,
+): void {
 	for (const format of formats) {
 		const rendered = render(result, format);
 
@@ -119,7 +146,18 @@ function emitOutput(result: ScanResult, formats: Format[], out: string | undefin
 	}
 }
 
-function render(result: ScanResult, format: Format): string {
+function render(result: ScanResult | OrgScanReport, format: Format): string {
+	if (isFleetReport(result)) {
+		switch (format) {
+			case 'json':
+				return formatJson(result);
+			case 'md':
+				return formatMarkdownReport(result);
+			default:
+				return formatPrettyReport(result);
+		}
+	}
+
 	switch (format) {
 		case 'json':
 			return formatJson(result);
@@ -128,4 +166,8 @@ function render(result: ScanResult, format: Format): string {
 		default:
 			return formatPretty(result);
 	}
+}
+
+function isFleetReport(result: ScanResult | OrgScanReport): result is OrgScanReport {
+	return result.target.type === 'org-fleet';
 }

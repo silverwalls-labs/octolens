@@ -1,6 +1,6 @@
 import { compareSeverity, SEVERITIES } from '../types/severity.ts';
 import type {
-	Finding, RuleRun, ScanResult, Severity,
+	Finding, OrgScanReport, RuleRun, ScanResult, Severity,
 } from '../types/index.ts';
 import { subjectLabel } from './subject.ts';
 
@@ -48,6 +48,102 @@ export function formatMarkdown(result: ScanResult): string {
 	}
 
 	return `${sections.join('\n\n')}\n`;
+}
+
+/**
+ * Render an organisation fleet report as a Markdown document.
+ *
+ * Includes the fleet summary, the org-posture findings, a subsection per
+ * repository with findings (clean repositories are collapsed into a count),
+ * and tables for failed and skipped repositories.
+ *
+ * @param report - The fleet scan report to format.
+ * @returns A complete Markdown document with a trailing newline.
+ */
+export function formatMarkdownReport(report: OrgScanReport): string {
+	const sections: string[] = [];
+
+	sections.push(`# Octolens scan — ${report.target.org} (organization fleet)`);
+	sections.push(renderFleetSummary(report));
+
+	sections.push('## Organization posture');
+	if (report.org.findings.length === 0) {
+		sections.push(`No findings at or above the \`${report.threshold}\` threshold.`);
+	} else {
+		for (const finding of [ ...report.org.findings ].sort(bySeverityDesc)) {
+			sections.push(renderFinding(finding));
+		}
+	}
+
+	const flagged = report.repos.filter((r) => r.findings.length > 0);
+	const cleanCount = report.repos.length - flagged.length;
+	const repoHeading = `## Repositories (${report.summary.reposScanned} scanned, ` +
+		`${report.summary.reposSkipped} skipped, ${report.summary.reposFailed} failed)`;
+
+	sections.push(repoHeading);
+	for (const repo of flagged) {
+		for (const finding of [ ...repo.findings ].sort(bySeverityDesc)) {
+			sections.push(renderFinding(finding));
+		}
+	}
+	if (cleanCount > 0) {
+		sections.push(`${cleanCount} repositories with no findings.`);
+	}
+	if (report.repos.length === 0) {
+		sections.push('No repositories scanned.');
+	}
+
+	if (report.failures.length > 0) {
+		sections.push(renderFailures(report));
+	}
+
+	if (report.skipped.length > 0) {
+		sections.push(renderSkipped(report));
+	}
+
+	return `${sections.join('\n\n')}\n`;
+}
+
+function renderFleetSummary(report: OrgScanReport): string {
+	const counts = report.summary.findingsBySeverity;
+	const rows = SEVERITIES.map((s) => `| ${SEVERITY_LABEL[s]} | ${counts[s]} |`);
+	const listingNote = report.summary.listingComplete ?
+		'' :
+		'\n\n> ⚠️ Repository listing incomplete — some repositories may be missing.';
+
+	return [
+		`Threshold: \`${report.threshold}\` — ${report.summary.rulesRun} rules run across ` +
+		`the organization and ${report.summary.reposScanned} repositories, ` +
+		`${report.summary.findingsTotal} finding(s).${listingNote}`,
+		'',
+		'| Severity | Count |',
+		'| --- | --- |',
+		...rows,
+	].join('\n');
+}
+
+function renderFailures(report: OrgScanReport): string {
+	const rows = report.failures.map((f) => `| \`${f.repo.owner}/${f.repo.name}\` | ${f.error} |`);
+
+	return [
+		`## Failed repositories (${report.failures.length})`,
+		'',
+		'| Repository | Error |',
+		'| --- | --- |',
+		...rows,
+	].join('\n');
+}
+
+function renderSkipped(report: OrgScanReport): string {
+	const rows = report.skipped.map((s) => `| \`${s.repo.owner}/${s.repo.name}\` | ${s.reason} |`);
+
+	return [
+		`## Skipped repositories (${report.skipped.length})`,
+		'',
+		'| Repository | Reason |',
+		'| --- | --- |',
+		...rows,
+	].join('\n');
 }
 
 function renderSummaryTable(result: ScanResult): string {

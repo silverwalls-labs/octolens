@@ -38,6 +38,9 @@ octolens scan --repo owner/name
 # Actions policy, security defaults for new repositories)
 octolens scan --org my-org
 
+# Audit the organization AND every one of its repositories
+octolens scan --org my-org --all-repos
+
 # Machine-readable output, stricter threshold
 octolens scan --org my-org --format json --severity medium
 ```
@@ -46,6 +49,27 @@ octolens scan --org my-org --format json --severity medium
 org **owner** token for full coverage — with a regular member token the
 admin-only checks are reported as skipped, never as silent passes
 (combine with `--fail-on-skip` to treat incomplete coverage as a failure).
+
+### Scanning every repository of an organization (`--all-repos`)
+
+`--org my-org --all-repos` runs the org-posture rules **and** the full
+repo rule set against every repository in the organization:
+
+- The repository listing is streamed, so scanning starts immediately.
+- Archived repositories are skipped by default (`--include-archived` to
+  include them); skipped repos cost zero extra API requests.
+- Repositories are scanned concurrently (`--concurrency <n>`, default 4,
+  max 32).
+- The scan **paces itself against the GitHub API rate limit**: it watches
+  the remaining request budget on every response and, when the budget runs
+  low, pauses until the rate window resets instead of failing. Large
+  organizations complete — they just take longer (progress and pause ETAs
+  are logged on stderr).
+- A repository that fails to scan is recorded in the report and never
+  aborts the rest of the run (`--fail-on-skip` turns any such gap into a
+  non-zero exit).
+- Output is an aggregate report (`target.type: "org-fleet"` in JSON);
+  use `--out report.json` on large organizations.
 
 ## 🔧 Environment Variables
 

@@ -1,7 +1,7 @@
 import pc from 'picocolors';
 import { compareSeverity } from '../types/severity.ts';
 import type {
-	Finding, RuleRun, ScanResult, Severity,
+	Finding, OrgScanReport, RuleRun, ScanResult, Severity,
 } from '../types/index.ts';
 import { subjectLabel } from './subject.ts';
 
@@ -70,6 +70,116 @@ export function formatPretty(result: ScanResult, options: PrettyOptions = {}): s
 	}
 
 	return `${lines.join('\n')}\n`;
+}
+
+/**
+ * Format an organisation fleet report as a human-readable string.
+ *
+ * Shows the org-posture findings, a section per repository that has
+ * findings (clean repositories are collapsed into a single count), failed
+ * and skipped repositories, and an aggregate summary.
+ *
+ * @param report - The fleet scan report to format.
+ * @param options - Formatting options.
+ */
+export function formatPrettyReport(report: OrgScanReport, options: PrettyOptions = {}): string {
+	const useColor = options.color ?? process.stdout.isTTY ?? false;
+	const colorize = useColor ?
+		identity :
+		stripColor;
+
+	const lines: string[] = [];
+	const header = `Octolens scan — ${report.target.org} ` +
+		`(organization + ${report.summary.reposScanned} repositories)`;
+
+	lines.push(colorize(pc.bold(header)));
+	lines.push('');
+
+	lines.push(colorize(pc.bold('Organization posture')));
+	pushFindings(lines, report.org.findings, colorize);
+	lines.push('');
+
+	const flagged = report.repos.filter((r) => r.findings.length > 0);
+	const cleanCount = report.repos.length - flagged.length;
+
+	lines.push(colorize(pc.bold(`Repositories (${report.summary.reposScanned} scanned)`)));
+	for (const repo of flagged) {
+		for (const finding of [ ...repo.findings ].sort(bySeverityDesc)) {
+			lines.push(formatFinding(finding, colorize));
+			lines.push('');
+		}
+	}
+	if (cleanCount > 0) {
+		lines.push(colorize(pc.green(`  ${cleanCount} repositories with no findings.`)));
+	}
+	if (report.repos.length === 0) {
+		lines.push('  No repositories scanned.');
+	}
+	lines.push('');
+
+	if (report.failures.length > 0) {
+		lines.push(colorize(pc.bold(`Failed repositories (${report.failures.length})`)));
+		for (const failure of report.failures) {
+			const label = `${failure.repo.owner}/${failure.repo.name}`;
+
+			lines.push(colorize(pc.yellow(`  ${label}: ${failure.error}`)));
+		}
+		lines.push('');
+	}
+
+	if (report.skipped.length > 0) {
+		lines.push(colorize(pc.gray(`  Skipped: ${formatSkipCounts(report.skipped)}`)));
+		lines.push('');
+	}
+
+	const counts = report.summary.findingsBySeverity;
+	const summaryParts = (Object.keys(counts) as Severity[])
+		.filter((s) => counts[s] > 0)
+		.map((s) => `${colorize(SEVERITY_COLORS[s](s))}: ${counts[s]}`);
+	const allRuns = [ report.org, ...report.repos ].flatMap((r) => r.runs);
+
+	lines.push(colorize(pc.bold('Summary')));
+	lines.push(`  Repositories: ${report.summary.reposScanned} scanned · ` +
+		`${report.summary.reposSkipped} skipped · ${report.summary.reposFailed} failed`);
+	if (!report.summary.listingComplete) {
+		const warning = '  Repository listing incomplete — some repositories may be missing.';
+
+		lines.push(colorize(pc.yellow(warning)));
+	}
+	if (allRuns.length > 0) {
+		lines.push(`  ${formatCoverage(allRuns, colorize)}`);
+	}
+	lines.push(`  Findings (>= ${report.threshold}): ${report.summary.findingsTotal}`);
+	if (summaryParts.length > 0) {
+		lines.push(`  ${summaryParts.join('  ')}`);
+	}
+
+	return `${lines.join('\n')}\n`;
+}
+
+function pushFindings(lines: string[], findings: Finding[], colorize: (s: string) => string): void {
+	if (findings.length === 0) {
+		lines.push(colorize(pc.green('  No findings at or above severity threshold.')));
+
+		return;
+	}
+
+	for (const finding of [ ...findings ].sort(bySeverityDesc)) {
+		lines.push(formatFinding(finding, colorize));
+		lines.push('');
+	}
+}
+
+function formatSkipCounts(skipped: OrgScanReport['skipped']): string {
+	const byReason = new Map<string, number>();
+
+	for (const skip of skipped) {
+		byReason.set(skip.reason, (byReason.get(skip.reason) ?? 0) + 1);
+	}
+
+	return [ ...byReason.entries() ]
+		.map(([ reason, count ]) => `${count} ${reason}`)
+		.join(' · ');
 }
 
 function formatCoverage(runs: RuleRun[], colorize: (s: string) => string): string {
