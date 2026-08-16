@@ -310,6 +310,7 @@ jobs:
       - test-integration
       - test-smoke
       - test-fuzz
+      - test-e2e
     if: ${{ !cancelled() }}
     permissions:
       contents: read
