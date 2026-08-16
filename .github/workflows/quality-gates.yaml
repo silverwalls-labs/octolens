@@ -176,7 +176,7 @@ jobs:
         run: |
           npm ci --prefer-offline
 
-      - name: Unit Tests (Coverage)
+      - name: Unit Tests
         run: |
           npm run test:unit:cov
 
@@ -205,7 +205,7 @@ jobs:
         run: |
           npm ci --prefer-offline
 
-      - name: Integration Tests (Coverage)
+      - name: Integration Tests
         run: |
           npm run test:integration:cov
 
@@ -234,7 +234,7 @@ jobs:
         run: |
           npm ci --prefer-offline
 
-      - name: Smoke Tests (Coverage)
+      - name: Smoke Tests
         run: |
           npm run test:smoke:cov
 
@@ -263,7 +263,7 @@ jobs:
         run: |
           npm ci --prefer-offline
 
-      - name: Fuzz Tests (Coverage)
+      - name: Fuzz Tests
         run: |
           npm run test:fuzz:cov
 
@@ -300,7 +300,14 @@ jobs:
 
       - name: E2E Tests
         run: |
-          npm run test:e2e
+          npm run test:e2e:cov
+
+      - name: Upload Coverage
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: coverage-e2e
+          path: coverage/e2e.lcov
 
   coverage-report:
     name: Coverage Report

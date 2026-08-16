@@ -164,14 +164,15 @@ source lines. Five categories live under `tests/`:
 | Integration | `npm run test:integration` | Full scan pipelines against mocked APIs | 90 / 85 / 90 |
 | Smoke | `npm run test:smoke` | The CLI end to end, in process | 75 / 70 / 75 |
 | Fuzz | `npm run test:fuzz` | Property-based invariants (fast-check) | reported only |
-| E2E | `npm run test:e2e` | Real GitHub API + the built `bin/` | not gated |
+| E2E | `npm run test:e2e` | Real GitHub API + the built `bin/` | reported only |
 
 Append `:cov` to a category script (e.g. `npm run test:unit:cov`) to
-enforce its thresholds and write `coverage/<category>.lcov`. After
-running the four `:cov` scripts, `npm run coverage:report` merges them
-into a global report and fails below 98% aggregate line coverage. CI
-runs each category as its own job and posts the merged table as a
-sticky PR comment.
+write `coverage/<category>.lcov` (and enforce thresholds where they
+exist). `npm run coverage:report` then merges unit+integration+smoke+
+fuzz into a global report and fails below 98% aggregate line coverage;
+e2e coverage is shown as its own row but stays out of the merge. CI
+runs each category as its own job and posts the table as a sticky PR
+comment.
 
 - **E2E**: set `OCTOLENS_E2E_TOKEN` (falls back to `GITHUB_TOKEN` /
   `OCTOLENS_TOKEN`) to a fine-grained read-only PAT; the suite skips

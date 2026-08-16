@@ -8,6 +8,8 @@
  * table (per category plus a merged global row over every src file),
  * and exits non-zero when the global line coverage drops below the
  * gate or when a src file is loaded by no suite at all.
+ * coverage/e2e.lcov gets its own row when present but never joins the
+ * merge (live API, token-dependent).
  *
  * The per-category thresholds shown here are informational — the hard
  * per-category enforcement lives in the --test-coverage-* flags of the
@@ -265,6 +267,22 @@ for (const category of CATEGORIES) {
 		`${thresholdLabel(category)} | ${categoryStatus(category, metrics)} |`);
 }
 
+/*
+ * E2E coverage is reported when its lcov is present, but stays out of the
+ * global merge: the suite depends on a token secret and live GitHub state,
+ * and the gate must stay deterministic.
+ */
+const e2ePath = join('coverage', 'e2e.lcov');
+
+if (existsSync(e2ePath)) {
+	const metrics = computeMetrics(parseLcov(readFileSync(e2ePath, 'utf8')));
+
+	rows.push(`| e2e | ${formatPercent(metrics.lines)} | ` +
+		`${formatPercent(metrics.branches)} | ${formatPercent(metrics.functions)} | — | — |`);
+} else {
+	rows.push('| e2e | — | — | — | — | ⚠️ missing |');
+}
+
 const global = computeMetrics(merged);
 const neverLoaded = listSourceFiles('src').filter((path) => !merged.has(path));
 
@@ -291,9 +309,10 @@ if (neverLoaded.length > 0) {
 }
 
 lines.push('_Per-suite numbers cover only the files that suite loads; the global row ' +
-	'merges every suite over all `src/` files. Global branch/function figures are ' +
-	'conservative lower bounds (V8 block identifiers differ between suites). E2E runs ' +
-	'against the live API and is excluded from aggregation._', '');
+	'merges unit+integration+smoke+fuzz over all `src/` files. Global branch/function ' +
+	'figures are conservative lower bounds (V8 block identifiers differ between ' +
+	'suites). E2E is reported but excluded from the merge: it depends on the ' +
+	'`OCTOLENS_E2E_TOKEN` secret and live GitHub state._', '');
 
 const report = lines.join('\n');
 
