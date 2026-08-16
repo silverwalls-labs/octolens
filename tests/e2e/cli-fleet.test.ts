@@ -6,10 +6,14 @@ import { allRules, allOrgRules } from '../../src/rules/index.ts';
 import { formatJson } from '../../src/output/index.ts';
 import type { OrgScanReport } from '../../src/types/index.ts';
 
-const token = process.env['GITHUB_TOKEN'] ?? process.env['OCTOLENS_TOKEN'];
+const token = process.env['OCTOLENS_E2E_TOKEN'] ??
+	process.env['GITHUB_TOKEN'] ??
+	process.env['OCTOLENS_TOKEN'];
+
+const NO_TOKEN_SKIP = 'no OCTOLENS_E2E_TOKEN (or GITHUB_TOKEN/OCTOLENS_TOKEN)';
 
 if (!token) {
-	test('e2e fleet tests skipped', { skip: 'no GITHUB_TOKEN or OCTOLENS_TOKEN' }, noopTest);
+	test('e2e fleet tests skipped', { skip: NO_TOKEN_SKIP }, noopTest);
 }
 
 function noopTest() {

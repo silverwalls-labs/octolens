@@ -147,3 +147,16 @@ async function serverErrorCase() {
 
 	await assert.rejects(rule.check(makeContext()));
 }
+
+test('unreadable stores are ignored when another store is readable', mixedAccessCase);
+
+async function mixedAccessCase() {
+	mockSecrets(ACTIONS, 403);
+	mockSecrets(DEPENDABOT, 200, secretBody([ { name: 'OLD_TOKEN', ageDays: 200 } ]));
+	mockSecrets(CODESPACES, 200, secretBody([]));
+
+	const findings = await rule.check(makeContext());
+
+	assert.equal(findings.length, 1);
+	assert.match(findings[0]?.detail ?? '', /OLD_TOKEN/);
+}

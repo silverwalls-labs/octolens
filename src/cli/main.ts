@@ -66,12 +66,12 @@ async function runScanCommand(args: ScanCommandArgs): Promise<number> {
 	try {
 		auth = resolveAuth({ token: args.token });
 	} catch (err) {
-		if (err instanceof AuthError) {
-			process.stderr.write(`${err.message}\n`);
+		// resolveAuth only throws AuthError; the guard is defensive.
+		if (!(err instanceof AuthError)) throw err;
 
-			return 2;
-		}
-		throw err;
+		process.stderr.write(`${err.message}\n`);
+
+		return 2;
 	}
 	logger.debug(`auth source: ${auth.source}`);
 

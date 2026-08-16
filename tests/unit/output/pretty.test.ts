@@ -149,3 +149,26 @@ function colorCase() {
 	assert.match(out, /CRITICAL/);
 	assert.match(out, /Default branch is not protected/);
 }
+
+test('colors medium, low, and info findings', lowerSeverityColors);
+
+function lowerSeverityColors() {
+	const findings: Finding[] = [
+		{ ...FINDING, severity: 'low' },
+		{ ...FINDING, severity: 'info' },
+		{ ...FINDING, severity: 'medium' },
+	];
+	const output = formatPretty(makeResult(findings), { color: true });
+
+	assert.match(output, /MEDIUM/);
+	assert.match(output, /LOW/);
+	assert.match(output, /INFO/);
+}
+
+test('color defaults to the terminal capability when unset', colorDefault);
+
+function colorDefault() {
+	const output = formatPretty(makeResult([ FINDING ]));
+
+	assert.match(output, /editorconfig/);
+}

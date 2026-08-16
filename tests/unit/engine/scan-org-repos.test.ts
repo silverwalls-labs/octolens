@@ -255,3 +255,101 @@ async function testSharedOrgCache() {
 	assert.equal(report.summary.rulesErrored, 0);
 	assert.ok(nock.isDone(), 'expected every mocked endpoint to be consumed exactly once');
 }
+
+const RATE_HEADERS = {
+	'x-ratelimit-remaining': '4999',
+	'x-ratelimit-reset': '1700000100',
+	'x-ratelimit-resource': 'core',
+};
+
+test('fleet scan reports expected counts, budget state, and elapsed minutes', testProgressDetails);
+
+async function testProgressDetails() {
+	nock(BASE).get(`/orgs/${ORG}`).reply(200, {
+		...makeOrgResponse({ privileged: false }),
+		public_repos: 1,
+		total_private_repos: 1,
+	});
+	nock(BASE).get(`/orgs/${ORG}/repos`)
+		.query({ per_page: '100', type: 'all' })
+		.reply(200, toListingResponse([
+			makeListingEntry({ name: 'zebra' }),
+			makeListingEntry({ name: 'mango', archived: true }),
+			makeListingEntry({ name: 'apple', archived: true }),
+		]), RATE_HEADERS);
+	nock(BASE).get(`/repos/${ORG}/zebra`).reply(200, makeRepoResponse(), RATE_HEADERS);
+
+	const infos: string[] = [];
+
+	function recordInfo(message: string): void {
+		infos.push(message);
+	}
+
+	const logger: Logger = {
+		debug: noop, info: recordInfo, warn: noop, error: noop,
+	};
+
+	let clock = 1_700_000_000_000;
+
+	function steppingClock(): number {
+		clock += 61_000;
+
+		return clock;
+	}
+
+	const report = await scanOrgAllRepos({
+		org: ORG,
+		orgRules: [],
+		repoRules: [ FLAGGING_RULE ],
+		octokit: makeOctokit(),
+		logger,
+		threshold: 'high',
+		concurrency: 2,
+		now: steppingClock,
+	});
+
+	assert.equal(report.summary.reposScanned, 1);
+	assert.equal(report.summary.reposSkipped, 2);
+
+	// Skips are sorted by repo reference regardless of listing order.
+	assert.deepEqual(report.skipped.map((s) => s.repo.name), [ 'apple', 'mango' ]);
+
+	assert.ok(infos.some((m) => m.includes('expecting ~2 repositories')));
+	assert.ok(infos.some((m) => m.includes('[1/~2]')));
+	assert.ok(infos.some((m) => m.includes('rate budget: 4999 remaining')));
+	assert.ok(infos.some((m) => (/in \d+m \d+s/).test(m)));
+}
+
+test('config concurrency applies and unreadable org metadata is tolerated', testConfigConcurrency);
+
+async function testConfigConcurrency() {
+	nock(BASE).persist().get(`/orgs/${ORG}`)
+		.reply(500);
+	nock(BASE).get(`/orgs/${ORG}/repos`)
+		.query({ per_page: '100', type: 'all' })
+		.reply(200, toListingResponse([ makeListingEntry({ name: 'solo' }) ]));
+	mockRepoMetadata([ 'solo' ]);
+
+	const infos: string[] = [];
+
+	function recordInfo(message: string): void {
+		infos.push(message);
+	}
+
+	const logger: Logger = {
+		debug: noop, info: recordInfo, warn: noop, error: noop,
+	};
+
+	const report = await scanOrgAllRepos({
+		org: ORG,
+		orgRules: [],
+		repoRules: [ FLAGGING_RULE ],
+		octokit: makeOctokit(),
+		logger,
+		threshold: 'high',
+		config: { org: { concurrency: 2 } },
+	});
+
+	assert.equal(report.summary.reposScanned, 1);
+	assert.ok(!infos.some((m) => m.includes('expecting ~')));
+}

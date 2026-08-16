@@ -181,3 +181,32 @@ function jsonReportRoundTrip() {
 	assert.equal(parsed.repos.length, 2);
 	assert.equal(parsed.summary.findingsTotal, 2);
 }
+
+test('markdown report warns when the listing is incomplete', markdownReportTruncated);
+
+function markdownReportTruncated() {
+	const report = makeReport();
+
+	report.summary.listingComplete = false;
+	const output = formatMarkdownReport(report);
+
+	assert.match(output, /listing incomplete/i);
+}
+
+test('reports render a placeholder when no repositories were scanned', emptyFleetReports);
+
+function emptyFleetReports() {
+	const report = makeReport({ repos: [] });
+
+	assert.match(formatMarkdownReport(report), /No repositories scanned\./);
+	assert.match(formatPrettyReport(report, { color: false }), /No repositories scanned\./);
+}
+
+test('markdown report renders a clean org posture section', cleanOrgPosture);
+
+function cleanOrgPosture() {
+	const report = makeReport({ org: makeOrgResult([]) });
+	const output = formatMarkdownReport(report);
+
+	assert.match(output, /No findings at or above|no findings/i);
+}

@@ -178,7 +178,14 @@ jobs:
 
       - name: Unit Tests
         run: |
-          npm run test:unit
+          npm run test:unit:cov
+
+      - name: Upload Coverage
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: coverage-unit
+          path: coverage/unit.lcov
 
   test-integration:
     name: Test (Integration)
@@ -200,7 +207,14 @@ jobs:
 
       - name: Integration Tests
         run: |
-          npm run test:integration
+          npm run test:integration:cov
+
+      - name: Upload Coverage
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: coverage-integration
+          path: coverage/integration.lcov
 
   test-smoke:
     name: Test (Smoke)
@@ -222,7 +236,137 @@ jobs:
 
       - name: Smoke Tests
         run: |
-          npm run test:smoke
+          npm run test:smoke:cov
+
+      - name: Upload Coverage
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: coverage-smoke
+          path: coverage/smoke.lcov
+
+  test-fuzz:
+    name: Test (Fuzz)
+    runs-on: ubuntu-24.04-arm
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install Dependencies
+        run: |
+          npm ci --prefer-offline
+
+      - name: Fuzz Tests
+        run: |
+          npm run test:fuzz:cov
+
+      - name: Upload Coverage
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: coverage-fuzz
+          path: coverage/fuzz.lcov
+
+  test-e2e:
+    name: Test (E2E)
+    runs-on: ubuntu-24.04-arm
+    env:
+      OCTOLENS_E2E_TOKEN: ${{ secrets.OCTOLENS_E2E_TOKEN }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install Dependencies
+        run: |
+          npm ci --prefer-offline
+
+      - name: Build
+        run: |
+          npm run build
+
+      - name: E2E Tests
+        run: |
+          npm run test:e2e:cov
+
+      - name: Upload Coverage
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: coverage-e2e
+          path: coverage/e2e.lcov
+
+  coverage-report:
+    name: Coverage Report
+    runs-on: ubuntu-24.04-arm
+    needs:
+      - test-unit
+      - test-integration
+      - test-smoke
+      - test-fuzz
+      - test-e2e
+    if: ${{ !cancelled() }}
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install Dependencies
+        run: |
+          npm ci --prefer-offline
+
+      - name: Download Coverage Artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: coverage-*
+          merge-multiple: true
+          path: coverage
+
+      - name: Generate Report
+        run: |
+          npm run coverage:report -- --out coverage/report.md
+
+      - name: Post Sticky Comment
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          MARKER='<!-- octolens-coverage-report -->'
+          COMMENT_ID=$( (gh api "repos/${REPO}/issues/${PR}/comments" --paginate \
+            --jq ".[] | select(.body | startswith(\"${MARKER}\")) | .id" || true) | head -n 1)
+          if [ -n "${COMMENT_ID}" ]; then
+            gh api --method PATCH "repos/${REPO}/issues/comments/${COMMENT_ID}" \
+              -F body=@coverage/report.md
+          else
+            gh api --method POST "repos/${REPO}/issues/${PR}/comments" \
+              -F body=@coverage/report.md
+          fi
 
   docs:
     name: Docs

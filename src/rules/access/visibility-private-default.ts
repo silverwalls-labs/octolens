@@ -47,14 +47,10 @@ function readConfig(ctx: RuleContext): VisibilityConfig {
 function isAllowed(repo: RepoRef, visibility: RepoVisibility, config: VisibilityConfig): boolean {
 	const slug = `${repo.owner}/${repo.name}`.toLowerCase();
 
-	if (visibility === 'public') {
-		return config.allowPublic.includes(slug);
-	}
-	if (visibility === 'internal') {
-		return config.allowInternal.includes(slug);
-	}
-
-	return false;
+	// check() returns early for private repos, so only public/internal reach here.
+	return visibility === 'public' ?
+		config.allowPublic.includes(slug) :
+		config.allowInternal.includes(slug);
 }
 
 function buildFinding(repo: RepoRef, visibility: RepoVisibility): Finding {

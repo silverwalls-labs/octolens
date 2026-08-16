@@ -48,7 +48,12 @@ export function createOctokit(options: ClientOptions): Octokit {
 	});
 }
 
-function makeRateLimitHandler(log: Logger | undefined, maxRetries: number) {
+/**
+ * Build the primary rate-limit callback handed to the throttling plugin.
+ *
+ * @internal Exported for direct testing only.
+ */
+export function makeRateLimitHandler(log: Logger | undefined, maxRetries: number) {
 	return function onRateLimit(
 		retryAfter: number,
 		req: ThrottleRequest,
@@ -61,7 +66,12 @@ function makeRateLimitHandler(log: Logger | undefined, maxRetries: number) {
 	};
 }
 
-function makeSecondaryRateLimitHandler(log: Logger | undefined, maxRetries: number) {
+/**
+ * Build the secondary (abuse) rate-limit callback handed to the throttling plugin.
+ *
+ * @internal Exported for direct testing only.
+ */
+export function makeSecondaryRateLimitHandler(log: Logger | undefined, maxRetries: number) {
 	return function onSecondaryRateLimit(
 		retryAfter: number,
 		req: ThrottleRequest,
