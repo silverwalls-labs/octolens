@@ -499,3 +499,50 @@ function testFailOnSkip() {
 	assert.equal(withoutFlag.failOnSkip, false);
 	assert.equal(withFlag.failOnSkip, true);
 }
+
+test('unknown command is rejected', testUnknownCommand);
+
+function testUnknownCommand() {
+	assert.throws(unknownCommandCall, CliUsageError);
+}
+
+function unknownCommandCall() {
+	parseArgs([ 'audit' ]);
+}
+
+test('--help inside a scan invocation wins', testInlineHelp);
+
+function testInlineHelp() {
+	const result = parseArgs([
+		'scan',
+		'--repo',
+		'a/b',
+		'--help',
+	]);
+
+	assert.deepEqual(result, { command: 'help' });
+}
+
+test('a flag at the end without its value is rejected', testMissingTrailingValue);
+
+function testMissingTrailingValue() {
+	assert.throws(missingTrailingValueCall, CliUsageError);
+}
+
+function missingTrailingValueCall() {
+	parseArgs([ 'scan', '--repo' ]);
+}
+
+test('a flag whose value looks like another flag is rejected', testDashValue);
+
+function testDashValue() {
+	assert.throws(dashValueCall, CliUsageError);
+}
+
+function dashValueCall() {
+	parseArgs([
+		'scan',
+		'--repo',
+		'--verbose',
+	]);
+}

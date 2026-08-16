@@ -139,3 +139,34 @@ async function serverErrorCase() {
 
 	await assert.rejects(rule.check(makeContext()));
 }
+
+test('reports no findings when property values are unreadable', unreadableValuesCase);
+
+async function unreadableValuesCase() {
+	nock('https://api.github.com')
+		.get('/orgs/sheplu/properties/schema')
+		.reply(200, makeOrgPropertySchema([ { property_name: 'team', required: true } ]));
+	nock('https://api.github.com')
+		.get('/repos/sheplu/Octolens/properties/values')
+		.reply(404);
+
+	const findings = await rule.check(makeContext());
+
+	assert.equal(findings.length, 0);
+}
+
+test('reports a finding when a required value is explicitly null', nullValueCase);
+
+async function nullValueCase() {
+	nock('https://api.github.com')
+		.get('/orgs/sheplu/properties/schema')
+		.reply(200, makeOrgPropertySchema([ { property_name: 'team', required: true } ]));
+	nock('https://api.github.com')
+		.get('/repos/sheplu/Octolens/properties/values')
+		.reply(200, makeRepoPropertyValues([ { property_name: 'team', value: null } ]));
+
+	const findings = await rule.check(makeContext());
+
+	assert.equal(findings.length, 1);
+	assert.match(findings[0]?.title ?? '', /team/);
+}

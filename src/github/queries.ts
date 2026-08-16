@@ -311,13 +311,6 @@ export type DefaultWorkflowPermissions = {
 	canApprovePullRequestReviews: boolean;
 };
 
-/** Allowed GitHub Actions configuration when `allowed_actions` is `'selected'`. */
-export type AllowedActionsConfig = {
-	githubOwnedAllowed: boolean;
-	verifiedAllowed: boolean;
-	patternsAllowed: string[];
-};
-
 /** Fetch GitHub Actions permissions for a repository. */
 export function getActionsPermissions(
 	octokit: Octokit,
@@ -339,18 +332,6 @@ export function getDefaultWorkflowPermissions(
 	return cache.fetch(
 		`default-workflow-permissions:${repo.owner}/${repo.name}`,
 		() => fetchDefaultWorkflowPermissions(octokit, repo),
-	);
-}
-
-/** Fetch allowed-actions configuration. Returns `null` on 404 or 409. */
-export function getAllowedActions(
-	octokit: Octokit,
-	cache: CachedFetcher,
-	repo: RepoRef,
-): Promise<AllowedActionsConfig | null> {
-	return cache.fetch(
-		`allowed-actions:${repo.owner}/${repo.name}`,
-		() => fetchAllowedActions(octokit, repo),
 	);
 }
 
@@ -1190,29 +1171,6 @@ async function fetchDefaultWorkflowPermissions(
 	};
 }
 
-async function fetchAllowedActions(
-	octokit: Octokit,
-	repo: RepoRef,
-): Promise<AllowedActionsConfig | null> {
-	try {
-		const response = await octokit.rest.actions.getAllowedActionsRepository({
-			owner: repo.owner,
-			repo: repo.name,
-		});
-
-		return {
-			githubOwnedAllowed: response.data.github_owned_allowed === true,
-			verifiedAllowed: response.data.verified_allowed === true,
-			patternsAllowed: response.data.patterns_allowed ?? [],
-		};
-	} catch (err: unknown) {
-		if (isHttpStatus(err, 404) || isHttpStatus(err, 409)) {
-			return null;
-		}
-		throw err;
-	}
-}
-
 async function fetchAutomatedSecurityFixesEnabled(
 	octokit: Octokit,
 	repo: RepoRef,
@@ -1681,8 +1639,10 @@ type ErrorResponse = {
  * must NOT swallow — that would silently turn a throttled request into a clean
  * pass and hide a finding). Distinguish them by the rate-limit signals GitHub
  * attaches to the response.
+ *
+ * @internal Exported for direct testing only.
  */
-function isRateLimited(err: unknown): boolean {
+export function isRateLimited(err: unknown): boolean {
 	if (isHttpStatus(err, 429)) {
 		return true;
 	}

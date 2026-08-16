@@ -26,30 +26,26 @@ const LEVEL_RANK: Record<LogLevel, number> = {
 export function createLogger(level: LogLevel = 'warn'): Logger {
 	const threshold = LEVEL_RANK[level];
 
-	function emit(stream: 'stdout' | 'stderr', tag: string, message: string, data?: unknown): void {
+	function emit(tag: string, message: string, data?: unknown): void {
 		const line = data === undefined ?
 			`[${tag}] ${message}` :
 			`[${tag}] ${message} ${JSON.stringify(data)}`;
 
-		if (stream === 'stdout') {
-			process.stdout.write(`${line}\n`);
-		} else {
-			process.stderr.write(`${line}\n`);
-		}
+		process.stderr.write(`${line}\n`);
 	}
 
 	return {
 		debug(message, data) {
-			if (threshold <= LEVEL_RANK.debug) emit('stderr', 'debug', message, data);
+			if (threshold <= LEVEL_RANK.debug) emit('debug', message, data);
 		},
 		info(message, data) {
-			if (threshold <= LEVEL_RANK.info) emit('stderr', 'info', message, data);
+			if (threshold <= LEVEL_RANK.info) emit('info', message, data);
 		},
 		warn(message, data) {
-			if (threshold <= LEVEL_RANK.warn) emit('stderr', 'warn', message, data);
+			if (threshold <= LEVEL_RANK.warn) emit('warn', message, data);
 		},
 		error(message, data) {
-			if (threshold <= LEVEL_RANK.error) emit('stderr', 'error', message, data);
+			if (threshold <= LEVEL_RANK.error) emit('error', message, data);
 		},
 	};
 }

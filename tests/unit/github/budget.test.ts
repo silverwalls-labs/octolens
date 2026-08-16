@@ -2,6 +2,7 @@ import {
 	test,
 	beforeEach,
 	afterEach,
+	type TestContext,
 } from 'node:test';
 import assert from 'node:assert/strict';
 import nock from 'nock';
@@ -226,4 +227,74 @@ async function testDispose() {
 	await octokit.rest.repos.get({ owner: 'a', repo: 'b' });
 
 	assert.equal(budget.snapshot().remaining, null);
+}
+
+test('a request error without a response leaves the budget unknown', testErrorWithoutResponse);
+
+async function testErrorWithoutResponse() {
+	const recorded = makeRecorded();
+	const octokit = makeOctokit();
+	const budget = createRateBudget({
+		octokit,
+		reserve: 50,
+		logger: recorded.logger,
+		now: () => NOW_MS,
+		sleep: recorded.sleep,
+	});
+
+	// Connection refused by nock: the error carries no response headers.
+	await assert.rejects(octokit.request('GET https://unmocked.example.com/x'));
+
+	await budget.acquire();
+
+	assert.deepEqual(recorded.sleeps, []);
+	assert.deepEqual(budget.snapshot(), { remaining: null, resetAt: null });
+}
+
+test('a low budget without a reset timestamp pauses for the fallback window', testFallbackPause);
+
+async function testFallbackPause() {
+	const recorded = makeRecorded();
+	const octokit = makeOctokit();
+	const budget = createRateBudget({
+		octokit,
+		reserve: 50,
+		logger: recorded.logger,
+		now: () => NOW_MS,
+		sleep: recorded.sleep,
+	});
+
+	nock(BASE).get('/repos/a/b').reply(200, {}, { 'x-ratelimit-remaining': '5' });
+	await octokit.rest.repos.get({ owner: 'a', repo: 'b' });
+
+	await budget.acquire();
+
+	assert.deepEqual(recorded.sleeps, [ 60_000 ]);
+	assert.match(recorded.warnings[0], /~1m 0s/);
+}
+
+test('the default sleep waits on a real timer', testDefaultSleep);
+
+async function testDefaultSleep(t: TestContext) {
+	const recorded = makeRecorded();
+	const octokit = makeOctokit();
+	const budget = createRateBudget({
+		octokit,
+		reserve: 50,
+		logger: recorded.logger,
+
+		// Clock sits exactly at the reset: the pause is only the skew margin.
+		now: () => RESET_EPOCH_S * 1000,
+	});
+
+	nock(BASE).get('/repos/a/b').reply(200, {}, rateHeaders(5));
+	await octokit.rest.repos.get({ owner: 'a', repo: 'b' });
+
+	t.mock.timers.enable({ apis: [ 'setTimeout' ] });
+	const pending = budget.acquire();
+
+	t.mock.timers.tick(2_000);
+	await pending;
+
+	assert.match(recorded.warnings[0], /~2s/);
 }
