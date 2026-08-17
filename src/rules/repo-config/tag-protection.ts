@@ -9,6 +9,9 @@ const DETAIL = 'No active ruleset targets tags, so anyone with write access can 
 const REMEDIATION = 'Add a tag ruleset under Settings -> Rules -> Rulesets, target tags, ' +
 	'and set enforcement to "Active".';
 
+/**
+ * Flags repositories with no active ruleset targeting tags.
+ */
 export const rule: Rule = {
 	id: RULE_ID,
 	category: 'repo-config',
@@ -43,11 +46,20 @@ export const rule: Rule = {
 	},
 };
 
+/**
+ * Subset of a ruleset relevant to tag protection.
+ */
 type RulesetTargeting = {
 	target: string;
 	enforcement: string;
 };
 
+/**
+ * Check whether a ruleset actively targets tags.
+ *
+ * @param ruleset - Ruleset to inspect.
+ * @returns       True for active tag rulesets.
+ */
 function isActiveTagRuleset(ruleset: RulesetTargeting): boolean {
 	return ruleset.target === 'tag' && ruleset.enforcement === 'active';
 }

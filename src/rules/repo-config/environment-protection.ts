@@ -12,6 +12,10 @@ const DETAIL_PREFIX = 'Environment has no protection rules. ' +
 const REMEDIATION = 'Settings -> Environments -> <environment>: add at least one ' +
 	'protection rule (required reviewers, deployment branch policy, or wait timer).';
 
+/**
+ * Flags deployment environments that have neither reviewers nor a
+ * wait timer configured.
+ */
 export const rule: Rule = {
 	id: RULE_ID,
 	category: 'repo-config',
@@ -32,10 +36,25 @@ export const rule: Rule = {
 	},
 };
 
+/**
+ * Check whether an environment has no protection rules.
+ *
+ * @param env - Environment to inspect.
+ * @returns   True when no protection rule exists.
+ */
 function isUnprotected(env: EnvironmentSummary): boolean {
 	return !env.hasReviewers && !env.hasBranchPolicy && !env.hasWaitTimer;
 }
 
+/**
+ * Build the finding reported for unprotected environments.
+ *
+ * @param repo       - Target repository.
+ * @param repo.owner - Repository owner login.
+ * @param repo.name  - Repository name.
+ * @param env        - Environment to inspect.
+ * @returns          The constructed finding.
+ */
 function buildFinding(
 	repo: { owner: string; name: string; },
 	env: EnvironmentSummary,

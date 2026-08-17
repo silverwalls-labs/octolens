@@ -15,6 +15,10 @@ const REMEDIATION = 'Organization Settings -> Actions -> General -> Fork pull ' 
 	'request workflows from outside collaborators: select "Require approval ' +
 	'for all external contributors".';
 
+/**
+ * Flags organisations that only gate first-time contributors instead
+ * of requiring approval for every external fork PR workflow run.
+ */
 export const rule: OrgRule = {
 	id: RULE_ID,
 	category: 'org',

@@ -9,6 +9,9 @@ const DETAIL = 'No SECURITY.md file was found in the repository, so reporters do
 const REMEDIATION = 'Add a SECURITY.md at the repository root or in .github/ describing ' +
 	'how to report vulnerabilities.';
 
+/**
+ * Flags repositories without a security policy in the standard locations.
+ */
 export const rule: Rule = {
 	id: RULE_ID,
 	category: 'security',

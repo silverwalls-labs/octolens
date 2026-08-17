@@ -12,6 +12,9 @@ const REMEDIATION = 'Enable "Automatically delete head branches" in Settings -> 
 	'General -> Pull Requests, and prune merged or stale branches with ' +
 	'`git branch --merged` or a scheduled cleanup job.';
 
+/**
+ * Flags repositories whose branch count exceeds the built-in threshold.
+ */
 export const rule: Rule = {
 	id: RULE_ID,
 	category: 'repo-config',

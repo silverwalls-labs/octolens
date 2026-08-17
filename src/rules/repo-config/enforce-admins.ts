@@ -13,6 +13,9 @@ const DETAIL = 'Admins are exempt from the default branch protection rules, so t
 const REMEDIATION = 'In the default branch protection rule, enable ' +
 	'"Do not allow bypassing the above settings" (a.k.a. "Include administrators").';
 
+/**
+ * Flags default branches whose protection exempts administrators.
+ */
 export const rule: Rule = {
 	id: RULE_ID,
 	category: 'repo-config',

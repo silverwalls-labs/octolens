@@ -23,12 +23,18 @@ const REMEDIATION = 'Rotate the secret at its source (cloud provider, npm, etc.)
 	'OIDC federation where possible (e.g. AWS, GCP, Vault) to remove long-lived ' +
 	'credentials entirely.';
 
+/**
+ * Secret older than the rotation threshold.
+ */
 type StaleSecret = {
 	store: SecretInventory['store'];
 	name: string;
 	ageDays: number;
 };
 
+/**
+ * Flags secrets whose last update is older than the 90-day rotation window.
+ */
 export const rule: Rule = {
 	id: RULE_ID,
 	category: 'security',
@@ -69,6 +75,13 @@ export const rule: Rule = {
 	},
 };
 
+/**
+ * Collect secrets whose last update is beyond the rotation threshold.
+ *
+ * @param inventory - Secret inventory to filter.
+ * @param now       - Current timestamp in milliseconds.
+ * @returns         The stale secrets.
+ */
 function collectStale(inventory: SecretInventory, now: number): StaleSecret[] {
 	if (!inventory.checked) {
 		return [];
@@ -79,6 +92,14 @@ function collectStale(inventory: SecretInventory, now: number): StaleSecret[] {
 		.filter(isStale);
 }
 
+/**
+ * Attach age information to a secret.
+ *
+ * @param store  - Store the secret belongs to.
+ * @param secret - Secret to inspect.
+ * @param now    - Current timestamp in milliseconds.
+ * @returns      The secret with its age attached.
+ */
 function toStale(
 	store: SecretInventory['store'],
 	secret: SecretMetadata,
@@ -96,10 +117,22 @@ function toStale(
 	};
 }
 
+/**
+ * Check whether the secret age exceeds the threshold.
+ *
+ * @param secret - Secret to inspect.
+ * @returns      True beyond the rotation threshold.
+ */
 function isStale(secret: StaleSecret): boolean {
 	return secret.ageDays > ROTATION_THRESHOLD_DAYS;
 }
 
+/**
+ * Format a stale secret for the finding detail.
+ *
+ * @param secret - Secret to inspect.
+ * @returns      The formatted description.
+ */
 function formatStale(secret: StaleSecret): string {
 	return `${secret.store}/${secret.name} (${secret.ageDays}d)`;
 }

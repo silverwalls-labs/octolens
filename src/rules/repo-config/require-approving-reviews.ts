@@ -12,6 +12,9 @@ const DETAIL = 'Pull requests can be merged with zero approvals on the default b
 const REMEDIATION = 'In the default branch protection rule, set ' +
 	'"Require approvals" to at least 1.';
 
+/**
+ * Flags default branches that can merge without an approving review.
+ */
 export const rule: Rule = {
 	id: RULE_ID,
 	category: 'repo-config',

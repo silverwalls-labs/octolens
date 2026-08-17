@@ -9,6 +9,9 @@ const DETAIL = 'GitHub reported errors in the CODEOWNERS file (e.g. unknown user
 const REMEDIATION = 'Open the CODEOWNERS errors view in the repository ' +
 	'(/community or .github/CODEOWNERS) and fix the listed issues.';
 
+/**
+ * Flags repositories whose CODEOWNERS file contains syntax or resolution errors.
+ */
 export const rule: Rule = {
 	id: RULE_ID,
 	category: 'access',

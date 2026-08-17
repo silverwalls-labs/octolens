@@ -9,6 +9,9 @@ const DETAIL = 'GitHub did not detect a license for this repository. Without a l
 const REMEDIATION = 'Add a LICENSE file at the repository root using a standard SPDX ' +
 	'identifier such as MIT or Apache-2.0.';
 
+/**
+ * Flags repositories where GitHub detects no license.
+ */
 export const rule: Rule = {
 	id: RULE_ID,
 	category: 'repo-config',

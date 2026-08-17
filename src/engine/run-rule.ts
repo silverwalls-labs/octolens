@@ -13,9 +13,12 @@ import type { RuleRun } from '../types/index.ts';
  * Generic over the context type so both repo-scoped ({@link RuleContext})
  * and org-scoped ({@link OrgRuleContext}) rules run through the same path.
  *
- * @param rule - The rule to execute.
- * @param context - Dependencies injected into the rule's `check()` method.
- * @returns The execution result including status, findings, and timing.
+ * @param    rule       - The rule to execute.
+ * @param    rule.id    - Unique rule identifier recorded on the run.
+ * @param    rule.check - Callback that performs the actual check.
+ * @param    context    - Dependencies injected into the rule's `check()` method.
+ * @returns             The execution result including status, findings, and timing.
+ * @template C          - Context type accepted by the rule.
  */
 export async function runRule<C extends RuleContext | OrgRuleContext>(
 	rule: { id: string; check(context: C): Promise<Finding[]>; },

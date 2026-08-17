@@ -10,6 +10,9 @@ const DETAIL = 'This repository has no description. Without one, the org repo li
 const REMEDIATION = 'About panel (right of repo home) -> Edit -> add a one-line ' +
 	'description (what this repo is, who owns it, what it produces).';
 
+/**
+ * Flags repositories with an empty description field.
+ */
 export const rule: Rule = {
 	id: RULE_ID,
 	category: 'repo-config',

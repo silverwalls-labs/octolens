@@ -145,3 +145,23 @@ docs
 # Octolens scan output artifacts
 report.json
 report.md
+
+# AI agent / agentic tooling directories
+.claude/
+.codex/
+.vibe/
+.qwen/
+.antigravity/
+.cursor/
+.gemini/
+.windsurf/
+.cline/
+.roo/
+.aider*
+.opencode/
+.goose/
+.continue/
+.copilot/
+.kiro/
+.trae/
+.factory/

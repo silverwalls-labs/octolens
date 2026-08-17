@@ -13,6 +13,9 @@ const DETAIL = 'Pull requests can be merged with unresolved review conversations
 const REMEDIATION = 'In the default branch protection rule, enable ' +
 	'"Require conversation resolution before merging".';
 
+/**
+ * Flags default branches that can merge with unresolved review conversations.
+ */
 export const rule: Rule = {
 	id: RULE_ID,
 	category: 'repo-config',

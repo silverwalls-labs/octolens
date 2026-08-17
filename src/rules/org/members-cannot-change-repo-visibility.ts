@@ -13,6 +13,10 @@ const REMEDIATION = 'Organization Settings -> Member privileges -> Repository ' 
 	'visibilities for this organization". Visibility changes then require an ' +
 	'organisation owner.';
 
+/**
+ * Flags organisations where members can flip repositories between
+ * public and private.
+ */
 export const rule: OrgRule = {
 	id: RULE_ID,
 	category: 'org',

@@ -14,6 +14,10 @@ const REMEDIATION = 'Organization Settings -> Repository -> "Require ' +
 	'contributors to sign off on web-based commits". Commits made in the web ' +
 	'UI then carry a Signed-off-by trailer from the author.';
 
+/**
+ * Flags organisations that accept web-based commits without
+ * contributor sign-off.
+ */
 export const rule: OrgRule = {
 	id: RULE_ID,
 	category: 'org',

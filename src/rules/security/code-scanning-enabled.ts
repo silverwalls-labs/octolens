@@ -9,6 +9,9 @@ const DETAIL = 'No code scanning analyses were found. Static analysis findings w
 const REMEDIATION = 'Set up code scanning: ' +
 	'Security -> Code scanning -> Set up. CodeQL works for most languages out of the box.';
 
+/**
+ * Flags repositories with no code scanning analyses on record.
+ */
 export const rule: Rule = {
 	id: RULE_ID,
 	category: 'security',

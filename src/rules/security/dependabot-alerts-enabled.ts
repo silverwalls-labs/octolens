@@ -11,6 +11,9 @@ const DETAIL = 'GitHub will not surface known vulnerable dependencies ' +
 const REMEDIATION = 'Enable Dependabot alerts: ' +
 	'Settings -> Code security -> Dependabot alerts.';
 
+/**
+ * Flags repositories with vulnerability alerts turned off.
+ */
 export const rule: Rule = {
 	id: RULE_ID,
 	category: 'security',
@@ -47,6 +50,13 @@ export const rule: Rule = {
 	},
 };
 
+/**
+ * Query the vulnerability-alerts endpoint, mapping 404 to disabled.
+ *
+ * @param octokit - Authenticated Octokit client.
+ * @param repo    - Target repository.
+ * @returns       Whether alerts are enabled.
+ */
 async function fetchAlertsEnabled(octokit: Octokit, repo: RepoRef): Promise<boolean> {
 	try {
 		await octokit.rest.repos.checkVulnerabilityAlerts({
@@ -63,10 +73,20 @@ async function fetchAlertsEnabled(octokit: Octokit, repo: RepoRef): Promise<bool
 	}
 }
 
+/**
+ * Error shape carrying an HTTP status code.
+ */
 type WithStatus = {
 	status: unknown;
 };
 
+/**
+ * Check whether an error carries the given HTTP status.
+ *
+ * @param err    - Error thrown by an Octokit request.
+ * @param status - HTTP status to test for.
+ * @returns      True when the status matches.
+ */
 function isHttpStatus(err: unknown, status: number): boolean {
 	return typeof err === 'object' &&
 		err !== null &&

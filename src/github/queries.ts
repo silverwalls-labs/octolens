@@ -8,7 +8,6 @@
  * Error handling: 404s and non-rate-limited 403s are swallowed and return
  * safe defaults. Rate-limit 403s are always re-thrown.
  *
- * @module
  */
 import type { Octokit } from '@octokit/rest';
 import type { CachedFetcher, RepoRef } from '../types/index.ts';
@@ -183,7 +182,13 @@ export type RepoTeamsResult = {
 	teams: RepoTeamSummary[];
 };
 
-/** Fetch core repository metadata (default branch, visibility, topics, etc.). */
+/**
+ * Fetch core repository metadata (default branch, visibility, topics, etc.).
+ *
+ * @param octokit - Authenticated Octokit client.
+ * @param cache   - Per-scan cache that deduplicates GitHub API calls.
+ * @param repo    - Target repository.
+ */
 export function getRepoMetadata(
 	octokit: Octokit,
 	cache: CachedFetcher,
@@ -195,7 +200,14 @@ export function getRepoMetadata(
 	);
 }
 
-/** Fetch branch protection rules. Returns an "all off" default on 404/403. */
+/**
+ * Fetch branch protection rules. Returns an "all off" default on 404/403.
+ *
+ * @param octokit - Authenticated Octokit client.
+ * @param cache   - Per-scan cache that deduplicates GitHub API calls.
+ * @param repo    - Target repository.
+ * @param branch  - Branch to inspect.
+ */
 export function getBranchProtection(
 	octokit: Octokit,
 	cache: CachedFetcher,
@@ -208,7 +220,13 @@ export function getBranchProtection(
 	);
 }
 
-/** Check whether the repository has any code scanning analyses. */
+/**
+ * Check whether the repository has any code scanning analyses.
+ *
+ * @param octokit - Authenticated Octokit client.
+ * @param cache   - Per-scan cache that deduplicates GitHub API calls.
+ * @param repo    - Target repository.
+ */
 export function getCodeScanningStatus(
 	octokit: Octokit,
 	cache: CachedFetcher,
@@ -220,7 +238,13 @@ export function getCodeScanningStatus(
 	);
 }
 
-/** Check for SECURITY.md in root, `.github/`, or `docs/`. */
+/**
+ * Check for SECURITY.md in root, `.github/`, or `docs/`.
+ *
+ * @param octokit - Authenticated Octokit client.
+ * @param cache   - Per-scan cache that deduplicates GitHub API calls.
+ * @param repo    - Target repository.
+ */
 export function getSecurityPolicyStatus(
 	octokit: Octokit,
 	cache: CachedFetcher,
@@ -232,7 +256,13 @@ export function getSecurityPolicyStatus(
 	);
 }
 
-/** Fetch CODEOWNERS validation errors. Returns `checked: false` if no file exists. */
+/**
+ * Fetch CODEOWNERS validation errors. Returns `checked: false` if no file exists.
+ *
+ * @param octokit - Authenticated Octokit client.
+ * @param cache   - Per-scan cache that deduplicates GitHub API calls.
+ * @param repo    - Target repository.
+ */
 export function getCodeownersErrors(
 	octokit: Octokit,
 	cache: CachedFetcher,
@@ -244,7 +274,13 @@ export function getCodeownersErrors(
 	);
 }
 
-/** Check for a CODEOWNERS file in root, `.github/`, or `docs/`. */
+/**
+ * Check for a CODEOWNERS file in root, `.github/`, or `docs/`.
+ *
+ * @param octokit - Authenticated Octokit client.
+ * @param cache   - Per-scan cache that deduplicates GitHub API calls.
+ * @param repo    - Target repository.
+ */
 export function getCodeownersFilePresent(
 	octokit: Octokit,
 	cache: CachedFetcher,
@@ -256,7 +292,13 @@ export function getCodeownersFilePresent(
 	);
 }
 
-/** List repository rulesets. Returns `[]` on 404. */
+/**
+ * List repository rulesets. Returns `[]` on 404.
+ *
+ * @param octokit - Authenticated Octokit client.
+ * @param cache   - Per-scan cache that deduplicates GitHub API calls.
+ * @param repo    - Target repository.
+ */
 export function getRepoRulesets(
 	octokit: Octokit,
 	cache: CachedFetcher,
@@ -268,7 +310,13 @@ export function getRepoRulesets(
 	);
 }
 
-/** Fetch custom property values for a repository. Returns `null` if unavailable. */
+/**
+ * Fetch custom property values for a repository. Returns `null` if unavailable.
+ *
+ * @param octokit - Authenticated Octokit client.
+ * @param cache   - Per-scan cache that deduplicates GitHub API calls.
+ * @param repo    - Target repository.
+ */
 export function getRepoCustomPropertyValues(
 	octokit: Octokit,
 	cache: CachedFetcher,
@@ -280,7 +328,13 @@ export function getRepoCustomPropertyValues(
 	);
 }
 
-/** Fetch the organisation-level custom property definitions. Returns `null` if unavailable. */
+/**
+ * Fetch the organisation-level custom property definitions. Returns `null` if unavailable.
+ *
+ * @param octokit - Authenticated Octokit client.
+ * @param cache   - Per-scan cache that deduplicates GitHub API calls.
+ * @param org     - Organisation login.
+ */
 export function getOrgCustomPropertySchema(
 	octokit: Octokit,
 	cache: CachedFetcher,
@@ -311,7 +365,13 @@ export type DefaultWorkflowPermissions = {
 	canApprovePullRequestReviews: boolean;
 };
 
-/** Fetch GitHub Actions permissions for a repository. */
+/**
+ * Fetch GitHub Actions permissions for a repository.
+ *
+ * @param octokit - Authenticated Octokit client.
+ * @param cache   - Per-scan cache that deduplicates GitHub API calls.
+ * @param repo    - Target repository.
+ */
 export function getActionsPermissions(
 	octokit: Octokit,
 	cache: CachedFetcher,
@@ -323,7 +383,13 @@ export function getActionsPermissions(
 	);
 }
 
-/** Fetch default GITHUB_TOKEN permissions for workflows. */
+/**
+ * Fetch default GITHUB_TOKEN permissions for workflows.
+ *
+ * @param octokit - Authenticated Octokit client.
+ * @param cache   - Per-scan cache that deduplicates GitHub API calls.
+ * @param repo    - Target repository.
+ */
 export function getDefaultWorkflowPermissions(
 	octokit: Octokit,
 	cache: CachedFetcher,
@@ -335,7 +401,13 @@ export function getDefaultWorkflowPermissions(
 	);
 }
 
-/** Check whether Dependabot security updates are enabled. */
+/**
+ * Check whether Dependabot security updates are enabled.
+ *
+ * @param octokit - Authenticated Octokit client.
+ * @param cache   - Per-scan cache that deduplicates GitHub API calls.
+ * @param repo    - Target repository.
+ */
 export function getAutomatedSecurityFixesEnabled(
 	octokit: Octokit,
 	cache: CachedFetcher,
@@ -347,7 +419,13 @@ export function getAutomatedSecurityFixesEnabled(
 	);
 }
 
-/** List collaborators with direct access to the repository. */
+/**
+ * List collaborators with direct access to the repository.
+ *
+ * @param octokit - Authenticated Octokit client.
+ * @param cache   - Per-scan cache that deduplicates GitHub API calls.
+ * @param repo    - Target repository.
+ */
 export function getDirectCollaborators(
 	octokit: Octokit,
 	cache: CachedFetcher,
@@ -359,7 +437,13 @@ export function getDirectCollaborators(
 	);
 }
 
-/** List outside collaborators on the repository. */
+/**
+ * List outside collaborators on the repository.
+ *
+ * @param octokit - Authenticated Octokit client.
+ * @param cache   - Per-scan cache that deduplicates GitHub API calls.
+ * @param repo    - Target repository.
+ */
 export function getOutsideCollaborators(
 	octokit: Octokit,
 	cache: CachedFetcher,
@@ -371,7 +455,13 @@ export function getOutsideCollaborators(
 	);
 }
 
-/** List deployment environments with their protection settings. */
+/**
+ * List deployment environments with their protection settings.
+ *
+ * @param octokit - Authenticated Octokit client.
+ * @param cache   - Per-scan cache that deduplicates GitHub API calls.
+ * @param repo    - Target repository.
+ */
 export function getEnvironments(
 	octokit: Octokit,
 	cache: CachedFetcher,
@@ -383,7 +473,13 @@ export function getEnvironments(
 	);
 }
 
-/** Count the total number of branches in the repository. */
+/**
+ * Count the total number of branches in the repository.
+ *
+ * @param octokit - Authenticated Octokit client.
+ * @param cache   - Per-scan cache that deduplicates GitHub API calls.
+ * @param repo    - Target repository.
+ */
 export function getBranchCount(
 	octokit: Octokit,
 	cache: CachedFetcher,
@@ -395,7 +491,13 @@ export function getBranchCount(
 	);
 }
 
-/** List GitHub Actions secrets (metadata only, no values). */
+/**
+ * List GitHub Actions secrets (metadata only, no values).
+ *
+ * @param octokit - Authenticated Octokit client.
+ * @param cache   - Per-scan cache that deduplicates GitHub API calls.
+ * @param repo    - Target repository.
+ */
 export function getActionsSecrets(
 	octokit: Octokit,
 	cache: CachedFetcher,
@@ -407,7 +509,13 @@ export function getActionsSecrets(
 	);
 }
 
-/** List Dependabot secrets (metadata only, no values). */
+/**
+ * List Dependabot secrets (metadata only, no values).
+ *
+ * @param octokit - Authenticated Octokit client.
+ * @param cache   - Per-scan cache that deduplicates GitHub API calls.
+ * @param repo    - Target repository.
+ */
 export function getDependabotSecrets(
 	octokit: Octokit,
 	cache: CachedFetcher,
@@ -419,7 +527,13 @@ export function getDependabotSecrets(
 	);
 }
 
-/** List Codespaces secrets (metadata only, no values). */
+/**
+ * List Codespaces secrets (metadata only, no values).
+ *
+ * @param octokit - Authenticated Octokit client.
+ * @param cache   - Per-scan cache that deduplicates GitHub API calls.
+ * @param repo    - Target repository.
+ */
 export function getCodespacesSecrets(
 	octokit: Octokit,
 	cache: CachedFetcher,
@@ -431,7 +545,13 @@ export function getCodespacesSecrets(
 	);
 }
 
-/** Check whether private vulnerability reporting is enabled. */
+/**
+ * Check whether private vulnerability reporting is enabled.
+ *
+ * @param octokit - Authenticated Octokit client.
+ * @param cache   - Per-scan cache that deduplicates GitHub API calls.
+ * @param repo    - Target repository.
+ */
 export function getPrivateVulnerabilityReporting(
 	octokit: Octokit,
 	cache: CachedFetcher,
@@ -443,7 +563,13 @@ export function getPrivateVulnerabilityReporting(
 	);
 }
 
-/** List self-hosted runners registered on the repository. */
+/**
+ * List self-hosted runners registered on the repository.
+ *
+ * @param octokit - Authenticated Octokit client.
+ * @param cache   - Per-scan cache that deduplicates GitHub API calls.
+ * @param repo    - Target repository.
+ */
 export function getRepoRunners(
 	octokit: Octokit,
 	cache: CachedFetcher,
@@ -455,7 +581,13 @@ export function getRepoRunners(
 	);
 }
 
-/** List repository webhooks with URL and SSL verification status. */
+/**
+ * List repository webhooks with URL and SSL verification status.
+ *
+ * @param octokit - Authenticated Octokit client.
+ * @param cache   - Per-scan cache that deduplicates GitHub API calls.
+ * @param repo    - Target repository.
+ */
 export function getRepoWebhooks(
 	octokit: Octokit,
 	cache: CachedFetcher,
@@ -467,7 +599,13 @@ export function getRepoWebhooks(
 	);
 }
 
-/** List deploy keys with their read-only status. */
+/**
+ * List deploy keys with their read-only status.
+ *
+ * @param octokit - Authenticated Octokit client.
+ * @param cache   - Per-scan cache that deduplicates GitHub API calls.
+ * @param repo    - Target repository.
+ */
 export function getDeployKeys(
 	octokit: Octokit,
 	cache: CachedFetcher,
@@ -479,7 +617,13 @@ export function getDeployKeys(
 	);
 }
 
-/** List teams with access to the repository and their permission levels. */
+/**
+ * List teams with access to the repository and their permission levels.
+ *
+ * @param octokit - Authenticated Octokit client.
+ * @param cache   - Per-scan cache that deduplicates GitHub API calls.
+ * @param repo    - Target repository.
+ */
 export function getRepoTeams(
 	octokit: Octokit,
 	cache: CachedFetcher,
@@ -567,7 +711,13 @@ export type OrgPrivateForkPrWorkflows = {
 	requireApprovalForForkPrWorkflows: boolean;
 };
 
-/** Fetch organisation settings (2FA policy, member permissions, security defaults). */
+/**
+ * Fetch organisation settings (2FA policy, member permissions, security defaults).
+ *
+ * @param octokit - Authenticated Octokit client.
+ * @param cache   - Per-scan cache that deduplicates GitHub API calls.
+ * @param org     - Organisation login.
+ */
 export function getOrgMetadata(
 	octokit: Octokit,
 	cache: CachedFetcher,
@@ -579,7 +729,13 @@ export function getOrgMetadata(
 	);
 }
 
-/** Fetch organisation-level GitHub Actions permissions. Returns `checked: false` on 404/403. */
+/**
+ * Fetch organisation-level GitHub Actions permissions. Returns `checked: false` on 404/403.
+ *
+ * @param octokit - Authenticated Octokit client.
+ * @param cache   - Per-scan cache that deduplicates GitHub API calls.
+ * @param org     - Organisation login.
+ */
 export function getOrgActionsPermissions(
 	octokit: Octokit,
 	cache: CachedFetcher,
@@ -591,7 +747,13 @@ export function getOrgActionsPermissions(
 	);
 }
 
-/** Fetch organisation-level default workflow permissions. Returns `checked: false` on 404/403. */
+/**
+ * Fetch organisation-level default workflow permissions. Returns `checked: false` on 404/403.
+ *
+ * @param octokit - Authenticated Octokit client.
+ * @param cache   - Per-scan cache that deduplicates GitHub API calls.
+ * @param org     - Organisation login.
+ */
 export function getOrgDefaultWorkflowPermissions(
 	octokit: Octokit,
 	cache: CachedFetcher,
@@ -603,7 +765,13 @@ export function getOrgDefaultWorkflowPermissions(
 	);
 }
 
-/** List organisation webhooks. Returns `checked: false` on 404/403 (admin-only endpoint). */
+/**
+ * List organisation webhooks. Returns `checked: false` on 404/403 (admin-only endpoint).
+ *
+ * @param octokit - Authenticated Octokit client.
+ * @param cache   - Per-scan cache that deduplicates GitHub API calls.
+ * @param org     - Organisation login.
+ */
 export function getOrgWebhooks(
 	octokit: Octokit,
 	cache: CachedFetcher,
@@ -615,7 +783,13 @@ export function getOrgWebhooks(
 	);
 }
 
-/** Fetch the organisation allowed-actions configuration. Returns `checked: false` on 404/403/409. */
+/**
+ * Fetch the organisation allowed-actions configuration. Returns `checked: false` on 404/403/409.
+ *
+ * @param octokit - Authenticated Octokit client.
+ * @param cache   - Per-scan cache that deduplicates GitHub API calls.
+ * @param org     - Organisation login.
+ */
 export function getOrgAllowedActions(
 	octokit: Octokit,
 	cache: CachedFetcher,
@@ -627,7 +801,13 @@ export function getOrgAllowedActions(
 	);
 }
 
-/** Fetch the fork PR contributor approval policy. Returns `checked: false` on 404/403. */
+/**
+ * Fetch the fork PR contributor approval policy. Returns `checked: false` on 404/403.
+ *
+ * @param octokit - Authenticated Octokit client.
+ * @param cache   - Per-scan cache that deduplicates GitHub API calls.
+ * @param org     - Organisation login.
+ */
 export function getOrgForkPrApproval(
 	octokit: Octokit,
 	cache: CachedFetcher,
@@ -639,7 +819,13 @@ export function getOrgForkPrApproval(
 	);
 }
 
-/** Fetch fork PR workflow settings for private repos. Returns `checked: false` on 404/403. */
+/**
+ * Fetch fork PR workflow settings for private repos. Returns `checked: false` on 404/403.
+ *
+ * @param octokit - Authenticated Octokit client.
+ * @param cache   - Per-scan cache that deduplicates GitHub API calls.
+ * @param org     - Organisation login.
+ */
 export function getOrgPrivateForkPrWorkflows(
 	octokit: Octokit,
 	cache: CachedFetcher,
@@ -668,7 +854,7 @@ export type OrgRepoListing = {
  * Errors (including rate limits) propagate to the caller.
  *
  * @param octokit - Authenticated Octokit client.
- * @param org - Organisation login.
+ * @param org     - Organisation login.
  */
 export async function *listOrgRepos(
 	octokit: Octokit,
@@ -693,6 +879,13 @@ export async function *listOrgRepos(
 	}
 }
 
+/**
+ * Fetch repository metadata from the repos API.
+ *
+ * @param octokit - Authenticated Octokit client.
+ * @param repo    - Target repository.
+ * @returns       The normalised repository metadata.
+ */
 async function fetchRepoMetadata(octokit: Octokit, repo: RepoRef): Promise<RepoMetadata> {
 	const response = await octokit.rest.repos.get({
 		owner: repo.owner,
@@ -722,6 +915,13 @@ async function fetchRepoMetadata(octokit: Octokit, repo: RepoRef): Promise<RepoM
 	};
 }
 
+/**
+ * Normalise the API visibility string, falling back to the private flag.
+ *
+ * @param raw       - Raw API object to convert.
+ * @param isPrivate - Whether the repository is private.
+ * @returns         The normalised visibility.
+ */
 function toVisibility(raw: string | undefined, isPrivate: boolean): RepoVisibility {
 	if (raw === 'public' || raw === 'private' || raw === 'internal') {
 		return raw;
@@ -732,6 +932,14 @@ function toVisibility(raw: string | undefined, isPrivate: boolean): RepoVisibili
 		'public';
 }
 
+/**
+ * Fetch branch protection, returning the "all off" default on 404/403.
+ *
+ * @param octokit - Authenticated Octokit client.
+ * @param repo    - Target repository.
+ * @param branch  - Branch to inspect.
+ * @returns       The protection settings, or the default when unavailable.
+ */
 async function fetchBranchProtection(
 	octokit: Octokit,
 	repo: RepoRef,
@@ -782,6 +990,13 @@ async function fetchBranchProtection(
 	}
 }
 
+/**
+ * Fetch CODEOWNERS validation errors from the codeowners API.
+ *
+ * @param octokit - Authenticated Octokit client.
+ * @param repo    - Target repository.
+ * @returns       The validation outcome.
+ */
 async function fetchCodeownersErrors(
 	octokit: Octokit,
 	repo: RepoRef,
@@ -804,6 +1019,13 @@ async function fetchCodeownersErrors(
 	}
 }
 
+/**
+ * Check the standard CODEOWNERS locations for an existing file.
+ *
+ * @param octokit - Authenticated Octokit client.
+ * @param repo    - Target repository.
+ * @returns       Whether a CODEOWNERS file exists.
+ */
 async function fetchCodeownersFilePresent(
 	octokit: Octokit,
 	repo: RepoRef,
@@ -825,6 +1047,13 @@ async function fetchCodeownersFilePresent(
 	return false;
 }
 
+/**
+ * Fetch repository rulesets, tolerating missing access as an empty list.
+ *
+ * @param octokit - Authenticated Octokit client.
+ * @param repo    - Target repository.
+ * @returns       Summaries of the active rulesets.
+ */
 async function fetchRepoRulesets(
 	octokit: Octokit,
 	repo: RepoRef,
@@ -844,6 +1073,13 @@ async function fetchRepoRulesets(
 	}
 }
 
+/**
+ * Fetch custom property values assigned to the repository.
+ *
+ * @param octokit - Authenticated Octokit client.
+ * @param repo    - Target repository.
+ * @returns       The assigned property values.
+ */
 async function fetchRepoCustomPropertyValues(
 	octokit: Octokit,
 	repo: RepoRef,
@@ -863,6 +1099,13 @@ async function fetchRepoCustomPropertyValues(
 	}
 }
 
+/**
+ * Fetch the organisation-level custom property definitions.
+ *
+ * @param octokit - Authenticated Octokit client.
+ * @param org     - Organisation login.
+ * @returns       The property definitions.
+ */
 async function fetchOrgCustomPropertySchema(
 	octokit: Octokit,
 	org: string,
@@ -880,6 +1123,13 @@ async function fetchOrgCustomPropertySchema(
 	}
 }
 
+/**
+ * Fetch organisation settings from the orgs API.
+ *
+ * @param octokit - Authenticated Octokit client.
+ * @param org     - Organisation login.
+ * @returns       The normalised organisation settings.
+ */
 async function fetchOrgMetadata(octokit: Octokit, org: string): Promise<OrgMetadata> {
 	const response = await octokit.rest.orgs.get({ org });
 	const data = response.data;
@@ -917,12 +1167,25 @@ async function fetchOrgMetadata(octokit: Octokit, org: string): Promise<OrgMetad
 	};
 }
 
+/**
+ * Collapse `null` and `undefined` into a single optional boolean.
+ *
+ * @param value - Value to normalise.
+ * @returns     The boolean, or `undefined`.
+ */
 function toOptionalBoolean(value: boolean | null | undefined): boolean | undefined {
 	return typeof value === 'boolean' ?
 		value :
 		undefined;
 }
 
+/**
+ * Fetch organisation-level Actions permission settings.
+ *
+ * @param octokit - Authenticated Octokit client.
+ * @param org     - Organisation login.
+ * @returns       The effective policy for the organisation.
+ */
 async function fetchOrgActionsPermissions(
 	octokit: Octokit,
 	org: string,
@@ -946,6 +1209,13 @@ async function fetchOrgActionsPermissions(
 	}
 }
 
+/**
+ * Fetch the organisation default `GITHUB_TOKEN` workflow permissions.
+ *
+ * @param octokit - Authenticated Octokit client.
+ * @param org     - Organisation login.
+ * @returns       Token defaults reported by the API.
+ */
 async function fetchOrgDefaultWorkflowPermissions(
 	octokit: Octokit,
 	org: string,
@@ -973,6 +1243,13 @@ async function fetchOrgDefaultWorkflowPermissions(
 	}
 }
 
+/**
+ * Fetch the organisation allowed-actions selection.
+ *
+ * @param octokit - Authenticated Octokit client.
+ * @param org     - Organisation login.
+ * @returns       The allowed-actions selection.
+ */
 async function fetchOrgAllowedActions(
 	octokit: Octokit,
 	org: string,
@@ -1000,6 +1277,13 @@ async function fetchOrgAllowedActions(
 	}
 }
 
+/**
+ * Fetch the fork pull request approval policy for the organisation.
+ *
+ * @param octokit - Authenticated Octokit client.
+ * @param org     - Organisation login.
+ * @returns       The approval policy.
+ */
 async function fetchOrgForkPrApproval(
 	octokit: Octokit,
 	org: string,
@@ -1020,6 +1304,9 @@ async function fetchOrgForkPrApproval(
 	}
 }
 
+/**
+ * Raw private-fork workflow settings from the API response.
+ */
 type RawPrivateForkPrWorkflows = {
 	run_workflows_from_fork_pull_requests?: boolean;
 	send_write_tokens_to_workflows?: boolean;
@@ -1027,6 +1314,13 @@ type RawPrivateForkPrWorkflows = {
 	require_approval_for_fork_pr_workflows?: boolean;
 };
 
+/**
+ * Fetch workflow settings for private repository forks.
+ *
+ * @param octokit - Authenticated Octokit client.
+ * @param org     - Organisation login.
+ * @returns       The private-fork workflow settings.
+ */
 async function fetchOrgPrivateForkPrWorkflows(
 	octokit: Octokit,
 	org: string,
@@ -1059,6 +1353,13 @@ async function fetchOrgPrivateForkPrWorkflows(
 	}
 }
 
+/**
+ * Fetch organisation webhooks and summarise their delivery security.
+ *
+ * @param octokit - Authenticated Octokit client.
+ * @param org     - Organisation login.
+ * @returns       The webhook inventory.
+ */
 async function fetchOrgWebhooks(octokit: Octokit, org: string): Promise<OrgWebhookInventory> {
 	try {
 		const data = await octokit.paginate(octokit.rest.orgs.listWebhooks, {
@@ -1075,6 +1376,13 @@ async function fetchOrgWebhooks(octokit: Octokit, org: string): Promise<OrgWebho
 	}
 }
 
+/**
+ * Fetch code scanning analyses, mapping missing access to "not enabled".
+ *
+ * @param octokit - Authenticated Octokit client.
+ * @param repo    - Target repository.
+ * @returns       Whether any analyses were found.
+ */
 async function fetchCodeScanningStatus(
 	octokit: Octokit,
 	repo: RepoRef,
@@ -1095,6 +1403,13 @@ async function fetchCodeScanningStatus(
 	}
 }
 
+/**
+ * Check the standard locations for a security policy file.
+ *
+ * @param octokit - Authenticated Octokit client.
+ * @param repo    - Target repository.
+ * @returns       Whether a policy file was found.
+ */
 async function fetchSecurityPolicyStatus(
 	octokit: Octokit,
 	repo: RepoRef,
@@ -1116,6 +1431,14 @@ async function fetchSecurityPolicyStatus(
 	return { present: false };
 }
 
+/**
+ * Check whether a file exists in the repository via the contents API.
+ *
+ * @param octokit - Authenticated Octokit client.
+ * @param repo    - Target repository.
+ * @param path    - File path within the repository.
+ * @returns       True when the file exists.
+ */
 async function getContentExists(octokit: Octokit, repo: RepoRef, path: string): Promise<boolean> {
 	try {
 		await octokit.rest.repos.getContent({
@@ -1133,6 +1456,13 @@ async function getContentExists(octokit: Octokit, repo: RepoRef, path: string): 
 	}
 }
 
+/**
+ * Fetch repository-level Actions permission settings.
+ *
+ * @param octokit - Authenticated Octokit client.
+ * @param repo    - Target repository.
+ * @returns       The effective policy for the repository.
+ */
 async function fetchActionsPermissions(
 	octokit: Octokit,
 	repo: RepoRef,
@@ -1155,6 +1485,13 @@ async function fetchActionsPermissions(
 	}
 }
 
+/**
+ * Fetch the repository default `GITHUB_TOKEN` workflow permissions.
+ *
+ * @param octokit - Authenticated Octokit client.
+ * @param repo    - Target repository.
+ * @returns       Token defaults reported by the API.
+ */
 async function fetchDefaultWorkflowPermissions(
 	octokit: Octokit,
 	repo: RepoRef,
@@ -1171,6 +1508,13 @@ async function fetchDefaultWorkflowPermissions(
 	};
 }
 
+/**
+ * Check whether Dependabot security updates are enabled.
+ *
+ * @param octokit - Authenticated Octokit client.
+ * @param repo    - Target repository.
+ * @returns       Whether security updates are enabled.
+ */
 async function fetchAutomatedSecurityFixesEnabled(
 	octokit: Octokit,
 	repo: RepoRef,
@@ -1190,6 +1534,14 @@ async function fetchAutomatedSecurityFixesEnabled(
 	}
 }
 
+/**
+ * Fetch direct collaborators with their permission levels.
+ *
+ * @param octokit     - Authenticated Octokit client.
+ * @param repo        - Target repository.
+ * @param affiliation - Affiliation filter passed to the API.
+ * @returns           The direct collaborators.
+ */
 async function fetchCollaborators(
 	octokit: Octokit,
 	repo: RepoRef,
@@ -1212,6 +1564,13 @@ async function fetchCollaborators(
 	}
 }
 
+/**
+ * Fetch deployment environments and their protection rules.
+ *
+ * @param octokit - Authenticated Octokit client.
+ * @param repo    - Target repository.
+ * @returns       The environment summaries.
+ */
 async function fetchEnvironments(
 	octokit: Octokit,
 	repo: RepoRef,
@@ -1236,6 +1595,13 @@ async function fetchEnvironments(
 	}
 }
 
+/**
+ * Count the branches on the repository.
+ *
+ * @param octokit - Authenticated Octokit client.
+ * @param repo    - Target repository.
+ * @returns       The number of branches.
+ */
 async function fetchBranchCount(octokit: Octokit, repo: RepoRef): Promise<number> {
 	const data = await octokit.paginate(octokit.rest.repos.listBranches, {
 		owner: repo.owner,
@@ -1246,6 +1612,13 @@ async function fetchBranchCount(octokit: Octokit, repo: RepoRef): Promise<number
 	return data.length;
 }
 
+/**
+ * Fetch Actions secret metadata for the repository.
+ *
+ * @param octokit - Authenticated Octokit client.
+ * @param repo    - Target repository.
+ * @returns       The secret inventory.
+ */
 async function fetchActionsSecrets(octokit: Octokit, repo: RepoRef): Promise<SecretInventory> {
 	try {
 		const data = await octokit.paginate(octokit.rest.actions.listRepoSecrets, {
@@ -1271,6 +1644,13 @@ async function fetchActionsSecrets(octokit: Octokit, repo: RepoRef): Promise<Sec
 	}
 }
 
+/**
+ * Fetch Dependabot secret metadata for the repository.
+ *
+ * @param octokit - Authenticated Octokit client.
+ * @param repo    - Target repository.
+ * @returns       The secret inventory.
+ */
 async function fetchDependabotSecrets(octokit: Octokit, repo: RepoRef): Promise<SecretInventory> {
 	try {
 		const data = await octokit.paginate(octokit.rest.dependabot.listRepoSecrets, {
@@ -1296,6 +1676,13 @@ async function fetchDependabotSecrets(octokit: Octokit, repo: RepoRef): Promise<
 	}
 }
 
+/**
+ * Fetch Codespaces secret metadata for the repository.
+ *
+ * @param octokit - Authenticated Octokit client.
+ * @param repo    - Target repository.
+ * @returns       The secret inventory.
+ */
 async function fetchCodespacesSecrets(octokit: Octokit, repo: RepoRef): Promise<SecretInventory> {
 	try {
 		const data = await octokit.paginate(octokit.rest.codespaces.listRepoSecrets, {
@@ -1321,12 +1708,19 @@ async function fetchCodespacesSecrets(octokit: Octokit, repo: RepoRef): Promise<
 	}
 }
 
+/** Raw secret entry from the API response. */
 type RawSecret = {
 	name: string;
 	created_at: string;
 	updated_at: string;
 };
 
+/**
+ * Convert a raw secret entry into {@link SecretMetadata}.
+ *
+ * @param raw - Raw API object to convert.
+ * @returns   The converted entry.
+ */
 function toSecretMetadata(raw: RawSecret): SecretMetadata {
 	return {
 		name: raw.name,
@@ -1335,6 +1729,13 @@ function toSecretMetadata(raw: RawSecret): SecretMetadata {
 	};
 }
 
+/**
+ * Check whether private vulnerability reporting is enabled.
+ *
+ * @param octokit - Authenticated Octokit client.
+ * @param repo    - Target repository.
+ * @returns       Whether the feature is enabled.
+ */
 async function fetchPrivateVulnerabilityReporting(
 	octokit: Octokit,
 	repo: RepoRef,
@@ -1355,6 +1756,13 @@ async function fetchPrivateVulnerabilityReporting(
 	}
 }
 
+/**
+ * Fetch self-hosted runners registered on the repository.
+ *
+ * @param octokit - Authenticated Octokit client.
+ * @param repo    - Target repository.
+ * @returns       The runner inventory.
+ */
 async function fetchRepoRunners(octokit: Octokit, repo: RepoRef): Promise<RunnerInventory> {
 	try {
 		const data = await octokit.paginate(octokit.rest.actions.listSelfHostedRunnersForRepo, {
@@ -1372,6 +1780,13 @@ async function fetchRepoRunners(octokit: Octokit, repo: RepoRef): Promise<Runner
 	}
 }
 
+/**
+ * Fetch repository webhooks with their delivery security settings.
+ *
+ * @param octokit - Authenticated Octokit client.
+ * @param repo    - Target repository.
+ * @returns       The webhook summaries.
+ */
 async function fetchRepoWebhooks(octokit: Octokit, repo: RepoRef): Promise<WebhookSummary[]> {
 	try {
 		const data = await octokit.paginate(octokit.rest.repos.listWebhooks, {
@@ -1389,6 +1804,13 @@ async function fetchRepoWebhooks(octokit: Octokit, repo: RepoRef): Promise<Webho
 	}
 }
 
+/**
+ * Fetch deploy keys registered on the repository.
+ *
+ * @param octokit - Authenticated Octokit client.
+ * @param repo    - Target repository.
+ * @returns       The deploy key summaries.
+ */
 async function fetchDeployKeys(octokit: Octokit, repo: RepoRef): Promise<DeployKeySummary[]> {
 	try {
 		const data = await octokit.paginate(octokit.rest.repos.listDeployKeys, {
@@ -1406,6 +1828,13 @@ async function fetchDeployKeys(octokit: Octokit, repo: RepoRef): Promise<DeployK
 	}
 }
 
+/**
+ * Fetch teams granted access to the repository.
+ *
+ * @param octokit - Authenticated Octokit client.
+ * @param repo    - Target repository.
+ * @returns       The team access summary.
+ */
 async function fetchRepoTeams(octokit: Octokit, repo: RepoRef): Promise<RepoTeamsResult> {
 	try {
 		const data = await octokit.paginate(octokit.rest.repos.listTeams, {
@@ -1423,12 +1852,21 @@ async function fetchRepoTeams(octokit: Octokit, repo: RepoRef): Promise<RepoTeam
 	}
 }
 
+/**
+ * Raw self-hosted runner entry from the API response.
+ */
 type RawRunner = {
 	id: number;
 	name: string;
 	labels?: { name: string; }[];
 };
 
+/**
+ * Convert a raw runner entry into a {@link RunnerSummary}.
+ *
+ * @param raw - Raw API object to convert.
+ * @returns   The converted entry.
+ */
 function toRunnerSummary(raw: RawRunner): RunnerSummary {
 	return {
 		id: raw.id,
@@ -1437,10 +1875,20 @@ function toRunnerSummary(raw: RawRunner): RunnerSummary {
 	};
 }
 
+/**
+ * Extract the name from a runner label object.
+ *
+ * @param label      - Runner label object.
+ * @param label.name - Display text of the label.
+ * @returns          The plain string form.
+ */
 function labelName(label: { name: string; }): string {
 	return label.name;
 }
 
+/**
+ * Raw webhook entry from the API response.
+ */
 type RawWebhook = {
 	id: number;
 	config?: {
@@ -1449,6 +1897,12 @@ type RawWebhook = {
 	};
 };
 
+/**
+ * Convert a raw webhook entry into a {@link WebhookSummary}.
+ *
+ * @param raw - Raw API object to convert.
+ * @returns   The converted entry.
+ */
 function toWebhookSummary(raw: RawWebhook): WebhookSummary {
 	const cfg = raw.config ?? {};
 
@@ -1459,6 +1913,12 @@ function toWebhookSummary(raw: RawWebhook): WebhookSummary {
 	};
 }
 
+/**
+ * Interpret the webhook `insecure_ssl` flag, returned as `"0"`/`"1"`.
+ *
+ * @param value - Value to normalise.
+ * @returns     True when SSL verification is disabled.
+ */
 function parseInsecureSsl(value: string | number | undefined): boolean {
 	if (typeof value === 'string') {
 		return value === '1' || value.toLowerCase() === 'true';
@@ -1467,12 +1927,21 @@ function parseInsecureSsl(value: string | number | undefined): boolean {
 	return value === 1;
 }
 
+/**
+ * Raw deploy key entry from the API response.
+ */
 type RawDeployKey = {
 	id: number;
 	title: string;
 	read_only?: boolean;
 };
 
+/**
+ * Convert a raw deploy key entry into a {@link DeployKeySummary}.
+ *
+ * @param raw - Raw API object to convert.
+ * @returns   The converted entry.
+ */
 function toDeployKeySummary(raw: RawDeployKey): DeployKeySummary {
 	return {
 		id: raw.id,
@@ -1481,12 +1950,19 @@ function toDeployKeySummary(raw: RawDeployKey): DeployKeySummary {
 	};
 }
 
+/** Raw team entry from the API response. */
 type RawRepoTeam = {
 	slug: string;
 	name: string;
 	permission?: string;
 };
 
+/**
+ * Convert a raw team entry into a {@link RepoTeamSummary}.
+ *
+ * @param raw - Raw API object to convert.
+ * @returns   The converted entry.
+ */
 function toRepoTeamSummary(raw: RawRepoTeam): RepoTeamSummary {
 	return {
 		slug: raw.slug,
@@ -1495,6 +1971,9 @@ function toRepoTeamSummary(raw: RawRepoTeam): RepoTeamSummary {
 	};
 }
 
+/**
+ * Raw ruleset entry from the API response.
+ */
 type RawRuleset = {
 	id: number;
 	name: string;
@@ -1502,6 +1981,12 @@ type RawRuleset = {
 	target?: string;
 };
 
+/**
+ * Convert a raw ruleset entry into a {@link RepoRulesetSummary}.
+ *
+ * @param raw - Raw API object to convert.
+ * @returns   The converted entry.
+ */
 function toRulesetSummary(raw: RawRuleset): RepoRulesetSummary {
 	return {
 		id: raw.id,
@@ -1511,11 +1996,20 @@ function toRulesetSummary(raw: RawRuleset): RepoRulesetSummary {
 	};
 }
 
+/**
+ * Raw custom property value from the API response.
+ */
 type RawPropertyValue = {
 	property_name: string;
 	value: string | string[] | null;
 };
 
+/**
+ * Convert a raw property value into a {@link CustomPropertyValue}.
+ *
+ * @param raw - Raw API object to convert.
+ * @returns   The converted entry.
+ */
 function toPropertyValue(raw: RawPropertyValue): CustomPropertyValue {
 	return {
 		propertyName: raw.property_name,
@@ -1523,11 +2017,20 @@ function toPropertyValue(raw: RawPropertyValue): CustomPropertyValue {
 	};
 }
 
+/**
+ * Raw custom property definition from the API response.
+ */
 type RawPropertyDefinition = {
 	property_name: string;
 	required?: boolean | null;
 };
 
+/**
+ * Convert a raw definition into a {@link CustomPropertyDefinition}.
+ *
+ * @param raw - Raw API object to convert.
+ * @returns   The converted entry.
+ */
 function toPropertyDefinition(raw: RawPropertyDefinition): CustomPropertyDefinition {
 	return {
 		propertyName: raw.property_name,
@@ -1535,6 +2038,9 @@ function toPropertyDefinition(raw: RawPropertyDefinition): CustomPropertyDefinit
 	};
 }
 
+/**
+ * Raw collaborator entry from the API response.
+ */
 type RawCollaborator = {
 	login: string;
 	role_name?: string;
@@ -1547,6 +2053,12 @@ type RawCollaborator = {
 	};
 };
 
+/**
+ * Convert a raw collaborator entry into a {@link Collaborator}.
+ *
+ * @param raw - Raw API object to convert.
+ * @returns   The converted entry.
+ */
 function toCollaborator(raw: RawCollaborator): Collaborator {
 	return {
 		login: raw.login,
@@ -1554,6 +2066,12 @@ function toCollaborator(raw: RawCollaborator): Collaborator {
 	};
 }
 
+/**
+ * Derive the effective permission level from a raw collaborator entry.
+ *
+ * @param raw - Raw API object to convert.
+ * @returns   The effective permission level.
+ */
 function derivePermission(raw: RawCollaborator): CollaboratorPermission {
 	const role = raw.role_name?.toLowerCase();
 
@@ -1583,18 +2101,30 @@ function derivePermission(raw: RawCollaborator): CollaboratorPermission {
 	return 'read';
 }
 
+/**
+ * Raw environment protection rule from the API response.
+ */
 type RawProtectionRule = {
 	type: string;
 	reviewers?: unknown;
 	wait_timer?: number;
 };
 
+/**
+ * Raw deployment environment entry from the API response.
+ */
 type RawEnvironment = {
 	name: string;
 	protection_rules?: RawProtectionRule[];
 	deployment_branch_policy?: unknown;
 };
 
+/**
+ * Convert a raw environment entry into an {@link EnvironmentSummary}.
+ *
+ * @param raw - Raw API object to convert.
+ * @returns   The converted entry.
+ */
 function toEnvironmentSummary(raw: RawEnvironment): EnvironmentSummary {
 	const rules = raw.protection_rules ?? [];
 
@@ -1607,18 +2137,43 @@ function toEnvironmentSummary(raw: RawEnvironment): EnvironmentSummary {
 	};
 }
 
+/**
+ * Check whether a protection rule requires reviewers.
+ *
+ * @param rule      - Protection rule returned by the API.
+ * @param rule.type - Rule type identifier.
+ * @returns         True for reviewer rules.
+ */
 function isReviewerRule(rule: { type: string; }): boolean {
 	return rule.type === 'required_reviewers';
 }
 
+/**
+ * Check whether a protection rule sets a positive wait timer.
+ *
+ * @param rule            - Protection rule returned by the API.
+ * @param rule.type       - Rule type identifier.
+ * @param rule.wait_timer - Configured wait timer in minutes.
+ * @returns               True for positive wait timers.
+ */
 function isWaitTimerRule(rule: { type: string; wait_timer?: number; }): boolean {
 	return rule.type === 'wait_timer' && (rule.wait_timer ?? 0) > 0;
 }
 
+/**
+ * Error shape carrying an HTTP status code.
+ */
 type WithStatus = {
 	status: unknown;
 };
 
+/**
+ * Check whether an error carries the given HTTP status.
+ *
+ * @param err    - Error thrown by an Octokit request.
+ * @param status - HTTP status to test for.
+ * @returns      True when the status matches.
+ */
 function isHttpStatus(err: unknown, status: number): boolean {
 	return typeof err === 'object' &&
 		err !== null &&
@@ -1626,6 +2181,7 @@ function isHttpStatus(err: unknown, status: number): boolean {
 		(err as WithStatus).status === status;
 }
 
+/** Error shape carrying response headers. */
 type ErrorResponse = {
 	response?: {
 		headers?: Record<string, string | undefined>;
@@ -1633,14 +2189,15 @@ type ErrorResponse = {
 	message?: unknown;
 };
 
-/*
+/**
  * A 403 can mean two very different things: the token lacks permission (a
  * benign "not configured" we swallow), or we have been rate-limited (which we
  * must NOT swallow — that would silently turn a throttled request into a clean
  * pass and hide a finding). Distinguish them by the rate-limit signals GitHub
  * attaches to the response.
  *
- * @internal Exported for direct testing only.
+ * @internal
+ * @param err - Error thrown by an Octokit request.
  */
 export function isRateLimited(err: unknown): boolean {
 	if (isHttpStatus(err, 429)) {
@@ -1670,9 +2227,12 @@ export function isRateLimited(err: unknown): boolean {
 		lower.includes('abuse');
 }
 
-/*
+/**
  * True only for a genuine permission-denied 403 — a rate-limit 403 returns
  * false here so it propagates as a visible error instead of a silent skip.
+ *
+ * @param err - Error thrown by an Octokit request.
+ * @returns   Whether the error is a benign permission failure.
  */
 function isForbiddenNotRateLimited(err: unknown): boolean {
 	return isHttpStatus(err, 403) && !isRateLimited(err);

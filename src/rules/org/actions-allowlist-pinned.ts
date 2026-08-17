@@ -15,6 +15,10 @@ const REMEDIATION = 'Organization Settings -> Actions -> General -> Policies: ' 
 	'replace wildcard and tag patterns with SHA-pinned entries ' +
 	'(`owner/repo@<full-40-character-sha>`).';
 
+/**
+ * Flags organisation allowlist entries that reference actions by tag
+ * or branch instead of a full commit SHA.
+ */
 export const rule: OrgRule = {
 	id: RULE_ID,
 	category: 'org',
@@ -68,6 +72,12 @@ export const rule: OrgRule = {
 	},
 };
 
+/**
+ * Check whether an allowlist pattern lacks a full-length commit SHA.
+ *
+ * @param pattern - Allowlist pattern to inspect.
+ * @returns       True when no full SHA is present.
+ */
 function isUnpinned(pattern: string): boolean {
 	return !SHA_PINNED.test(pattern);
 }

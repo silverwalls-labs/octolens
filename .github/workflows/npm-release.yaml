@@ -37,6 +37,12 @@ jobs:
             echo "Version already set to $VERSION, skipping npm version command"
           fi
 
+      # ignore-scripts=true suppresses prepack/prepublish hooks, so the
+      # published tarball only contains dist/ if we build it explicitly.
+      - name: Build
+        run: |
+          npm run build
+
       - name: publish
         run: |
           npm publish --access public

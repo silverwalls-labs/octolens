@@ -11,6 +11,10 @@ const DETAIL = 'Members can fork private and internal repositories. Forks copy '
 const REMEDIATION = 'Organization Settings -> Member privileges -> Repository ' +
 	'forking: uncheck "Allow forking of private repositories".';
 
+/**
+ * Flags organisations where members can fork private repositories
+ * to personal accounts.
+ */
 export const rule: OrgRule = {
 	id: RULE_ID,
 	category: 'org',

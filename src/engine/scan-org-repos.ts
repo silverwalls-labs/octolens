@@ -85,7 +85,7 @@ export type ScanOrgAllReposOptions = {
  * (`summary.listingComplete: false`) but still returns everything gathered.
  *
  * @param options - Fleet scan configuration.
- * @returns The aggregate report: org result, per-repo results, skips, failures.
+ * @returns       The aggregate report: org result, per-repo results, skips, failures.
  */
 export async function scanOrgAllRepos(options: ScanOrgAllReposOptions): Promise<OrgScanReport> {
 	const now = options.now ?? Date.now;
@@ -209,9 +209,9 @@ export async function scanOrgAllRepos(options: ScanOrgAllReposOptions): Promise<
  * Uses only fields present in the listing payload, so a skipped repository
  * costs zero additional API requests.
  *
- * @param entry - Repository entry from the org listing.
+ * @param entry  - Repository entry from the org listing.
  * @param config - User configuration with `ignore` filters.
- * @returns The skip reason, or `null` when the repository should be scanned.
+ * @returns      The skip reason, or `null` when the repository should be scanned.
  */
 export function repoFilterReason(
 	entry: OrgRepoListing,
@@ -235,6 +235,12 @@ export function repoFilterReason(
 	return null;
 }
 
+/**
+ * Resolve worker concurrency from options, config, or the default, with a floor of 1.
+ *
+ * @param options - Fleet scan options.
+ * @returns       The effective worker count.
+ */
 function resolveConcurrency(options: ScanOrgAllReposOptions): number {
 	const requested = options.concurrency ??
 		options.config?.org?.concurrency ??
@@ -243,6 +249,14 @@ function resolveConcurrency(options: ScanOrgAllReposOptions): number {
 	return Math.max(1, Math.floor(requested));
 }
 
+/**
+ * Estimate the repository count from org metadata for progress reporting,
+ * or `null` when unavailable.
+ *
+ * @param options - Fleet scan options.
+ * @param cache   - Per-scan cache that deduplicates GitHub API calls.
+ * @returns       The expected repository count, or `null`.
+ */
 async function expectedRepoCount(
 	options: ScanOrgAllReposOptions,
 	cache: ReturnType<typeof createCachedFetcher>,
@@ -261,6 +275,19 @@ async function expectedRepoCount(
 	}
 }
 
+/**
+ * Format the progress log line emitted after each repository scan.
+ *
+ * @param repo             - Target repository.
+ * @param repo.owner       - Repository owner login.
+ * @param repo.name        - Repository name.
+ * @param result           - Scan result to inspect.
+ * @param scanned          - Number of repositories scanned so far.
+ * @param expected         - Expected repository count, or `null` when unknown.
+ * @param budget           - Rate budget tracker.
+ * @param budget.remaining - Remaining request budget, or `null` when unknown.
+ * @returns                The formatted progress line.
+ */
 function progressLine(
 	repo: { owner: string; name: string; },
 	result: ScanResult,
@@ -279,6 +306,18 @@ function progressLine(
 		`${result.summary.findingsTotal} finding(s)${rate}`;
 }
 
+/**
+ * Aggregate the org result and per-repository results into a fleet summary.
+ *
+ * @param orgResult              - Result of the org-posture scan.
+ * @param repoResults            - Per-repository scan results.
+ * @param counts                 - Discovery counters from the repository listing.
+ * @param counts.discovered      - Repositories discovered by the listing.
+ * @param counts.skipped         - Repositories skipped before scanning.
+ * @param counts.failed          - Repositories whose scan failed.
+ * @param counts.listingComplete - Whether the listing retrieved every repository.
+ * @returns                      The aggregated fleet summary.
+ */
 function buildFleetSummary(
 	orgResult: ScanResult,
 	repoResults: ScanResult[],
@@ -316,32 +355,75 @@ function buildFleetSummary(
 	};
 }
 
+/**
+ * Sum a numeric field across items.
+ *
+ * @param    items - Items to aggregate.
+ * @param    pick  - Extracts the number to sum from an item.
+ * @returns        The total across all items.
+ * @template T     - Item type being aggregated.
+ */
 function sumOf<T>(items: T[], pick: (item: T) => number): number {
 	return items.reduce((total, item) => total + pick(item), 0);
 }
 
+/**
+ * Comparator ordering scan results by their target label.
+ *
+ * @param a - First item to compare.
+ * @param b - Second item to compare.
+ * @returns Negative, zero, or positive per comparator contract.
+ */
 function byRepoTarget(a: ScanResult, b: ScanResult): number {
 	return targetLabel(a).localeCompare(targetLabel(b));
 }
 
+/**
+ * Build the `owner/name` (or org) label identifying a result's target.
+ *
+ * @param result - Scan result to inspect.
+ * @returns      `owner/name` for repositories, the org login otherwise.
+ */
 function targetLabel(result: ScanResult): string {
 	return result.target.type === 'repo' ?
 		`${result.target.owner}/${result.target.name}` :
 		result.target.org;
 }
 
+/**
+ * Minimal shape carrying the repository reference used for ordering.
+ */
 type RepoEntry = { repo: { owner: string; name: string; }; };
 
+/**
+ * Comparator ordering entries by `owner/name`.
+ *
+ * @param a - First item to compare.
+ * @param b - Second item to compare.
+ * @returns Negative, zero, or positive per comparator contract.
+ */
 function byRepoRef(a: RepoEntry, b: RepoEntry): number {
 	return `${a.repo.owner}/${a.repo.name}`.localeCompare(`${b.repo.owner}/${b.repo.name}`);
 }
 
+/**
+ * Extract a human-readable message from an unknown error.
+ *
+ * @param err - Error thrown by an Octokit request.
+ * @returns   The extracted message.
+ */
 function errorMessage(err: unknown): string {
 	return err instanceof Error ?
 		err.message :
 		String(err);
 }
 
+/**
+ * Format a millisecond duration as `Xm Ys` or `Ys`.
+ *
+ * @param ms - Duration in milliseconds.
+ * @returns  The formatted duration.
+ */
 function formatElapsed(ms: number): string {
 	const totalSeconds = Math.round(ms / 1000);
 	const minutes = Math.floor(totalSeconds / 60);

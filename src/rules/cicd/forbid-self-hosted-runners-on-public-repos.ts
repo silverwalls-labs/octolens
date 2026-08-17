@@ -15,6 +15,10 @@ const REMEDIATION = 'For public repos, prefer GitHub-hosted runners. If self-hos
 	'is required, host them inside an organization-level runner group restricted to ' +
 	'private repositories, or require explicit approval for fork pull requests.';
 
+/**
+ * Flags public repositories with registered self-hosted runners,
+ * which untrusted forks could target.
+ */
 export const rule: Rule = {
 	id: RULE_ID,
 	category: 'cicd',
@@ -59,6 +63,13 @@ export const rule: Rule = {
 	},
 };
 
+/**
+ * Extract the display name from a runner.
+ *
+ * @param runner      - Runner to inspect.
+ * @param runner.name - Display name of the runner.
+ * @returns           The plain string form.
+ */
 function nameOf(runner: { name: string; }): string {
 	return runner.name;
 }

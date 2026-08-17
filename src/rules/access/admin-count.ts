@@ -14,6 +14,10 @@ const DETAIL = 'A large number of admin users widens the blast radius of a singl
 const REMEDIATION = 'Audit Settings -> Collaborators and demote unnecessary admins to ' +
 	'maintain or write. Prefer team-based admin grants over individual ones.';
 
+/**
+ * Flags repositories that grant the admin role to more direct
+ * collaborators than the built-in threshold allows.
+ */
 export const rule: Rule = {
 	id: RULE_ID,
 	category: 'access',
@@ -43,10 +47,22 @@ export const rule: Rule = {
 	},
 };
 
+/**
+ * Check whether a collaborator holds the admin role.
+ *
+ * @param collaborator - Collaborator to inspect.
+ * @returns            True for admin collaborators.
+ */
 function isAdmin(collaborator: Collaborator): boolean {
 	return collaborator.permission === 'admin';
 }
 
+/**
+ * Extract the account login from a collaborator.
+ *
+ * @param collaborator - Collaborator to inspect.
+ * @returns            Login of the collaborator.
+ */
 function loginOf(collaborator: Collaborator): string {
 	return collaborator.login;
 }

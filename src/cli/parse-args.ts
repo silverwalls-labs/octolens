@@ -3,6 +3,7 @@ import { isSeverity, type Severity } from '../types/severity.ts';
 /** Supported output format. */
 export type Format = 'pretty' | 'json' | 'md';
 
+/** Parsed arguments for the scan command. */
 export type ScanCommandArgs = {
 	command: 'scan';
 
@@ -28,13 +29,24 @@ export type ScanCommandArgs = {
 	failOnSkip: boolean;
 };
 
+/** Parsed arguments for `--help`. */
 export type HelpArgs = { command: 'help'; };
+
+/** Parsed arguments for `--version`. */
 export type VersionArgs = { command: 'version'; };
 
+/**
+ * Union of every parse outcome, discriminated by `command`.
+ */
 export type ParsedArgs = ScanCommandArgs | HelpArgs | VersionArgs;
 
 /** Thrown on invalid CLI usage (bad flags, missing required options). */
 export class CliUsageError extends Error {
+	/**
+	 * Create the error.
+	 *
+	 * @param message - Human-readable description of the usage problem.
+	 */
 	constructor(message: string) {
 		super(message);
 		this.name = 'CliUsageError';
@@ -44,8 +56,8 @@ export class CliUsageError extends Error {
 /**
  * Parse raw CLI arguments into a typed command object.
  *
- * @param argv - Arguments after the `scan` subcommand.
- * @returns A discriminated union: `ScanCommandArgs`, `HelpArgs`, or `VersionArgs`.
+ * @param    argv - Arguments after the `scan` subcommand.
+ * @returns       A discriminated union: `ScanCommandArgs`, `HelpArgs`, or `VersionArgs`.
  * @throws {CliUsageError} On unrecognised options, missing values, or invalid formats.
  */
 export function parseArgs(argv: string[]): ParsedArgs {
@@ -182,6 +194,15 @@ export function parseArgs(argv: string[]): ParsedArgs {
 	};
 }
 
+/**
+ * Read the value following a flag, throwing when absent or another flag.
+ *
+ * @param    argv  - Argument vector being parsed.
+ * @param    index - Index of the flag whose value to read.
+ * @param    flag  - Flag name used in error messages.
+ * @returns        The flag value.
+ * @throws {CliUsageError} When the value is missing or is another flag.
+ */
 function readValue(argv: string[], index: number, flag: string): string {
 	const value = argv[index];
 
@@ -192,6 +213,13 @@ function readValue(argv: string[], index: number, flag: string): string {
 	return value;
 }
 
+/**
+ * Parse an `owner/name` repository spec.
+ *
+ * @param    spec - Raw command-line value to parse.
+ * @returns       Owner and repository name.
+ * @throws {CliUsageError} When the spec is not `owner/name`.
+ */
 function parseRepoSpec(spec: string): { owner: string; name: string; } {
 	const slash = spec.indexOf('/');
 
@@ -202,6 +230,14 @@ function parseRepoSpec(spec: string): { owner: string; name: string; } {
 	return { owner: spec.slice(0, slash), name: spec.slice(slash + 1) };
 }
 
+/**
+ * Validate an `owner/name` allowlist entry and normalise it to lowercase.
+ *
+ * @param    spec - Raw command-line value to parse.
+ * @param    flag - Flag name used in error messages.
+ * @returns       The normalised `owner/name` entry.
+ * @throws {CliUsageError} When the entry is not `owner/name`.
+ */
 function parseAllowSpec(spec: string, flag: string): string {
 	const slash = spec.indexOf('/');
 
@@ -212,6 +248,13 @@ function parseAllowSpec(spec: string, flag: string): string {
 	return spec.toLowerCase();
 }
 
+/**
+ * Parse the `--concurrency` value, accepting integers between 1 and 32.
+ *
+ * @param    value - Raw command-line value to parse.
+ * @returns        The validated concurrency.
+ * @throws {CliUsageError} When the value is not an integer between 1 and 32.
+ */
 function parseConcurrency(value: string): number {
 	const parsed = Number.parseInt(value, 10);
 
@@ -225,6 +268,13 @@ function parseConcurrency(value: string): number {
 	return parsed;
 }
 
+/**
+ * Parse a `--format` value into a supported output format.
+ *
+ * @param    value - Raw command-line value to parse.
+ * @returns        The validated format.
+ * @throws {CliUsageError} When the format is unsupported.
+ */
 function parseFormat(value: string): Format {
 	if (value === 'pretty' || value === 'json' || value === 'md') {
 		return value;

@@ -198,7 +198,7 @@ export const allOrgRules: readonly OrgRule[] = [
  * Look up a repo-scoped rule by its ID.
  *
  * @param id - The rule ID to search for (e.g. `"repo-config/block-force-push"`).
- * @returns The matching rule, or `undefined` if not found.
+ * @returns  The matching rule, or `undefined` if not found.
  */
 export function findRuleById(id: string): Rule | undefined {
 	return allRules.find(byId(id));
@@ -208,12 +208,18 @@ export function findRuleById(id: string): Rule | undefined {
  * Look up an org-scoped rule by its ID.
  *
  * @param id - The rule ID to search for (e.g. `"org/two-factor-required"`).
- * @returns The matching rule, or `undefined` if not found.
+ * @returns  The matching rule, or `undefined` if not found.
  */
 export function findOrgRuleById(id: string): OrgRule | undefined {
 	return allOrgRules.find(byId(id));
 }
 
+/**
+ * Build a predicate matching a rule by its ID.
+ *
+ * @param id - Rule ID to match.
+ * @returns  Predicate testing a rule against the ID.
+ */
 function byId(id: string) {
 	return function matches(rule: { id: string; }): boolean {
 		return rule.id === id;

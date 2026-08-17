@@ -22,7 +22,7 @@ import { readVersion } from './version.ts';
  * or scan), and returns the exit code.
  *
  * @param argv - Raw command-line arguments (without `node` and script path).
- * @returns Exit code: `0` on success, `1` on findings, `2` on usage error.
+ * @returns    Exit code: `0` on success, `1` on findings, `2` on usage error.
  */
 export async function main(argv: string[]): Promise<number> {
 	let parsed;
@@ -53,6 +53,12 @@ export async function main(argv: string[]): Promise<number> {
 	return runScanCommand(parsed);
 }
 
+/**
+ * Run the scan command end to end and map the outcome to an exit code.
+ *
+ * @param args - Parsed scan command arguments.
+ * @returns    Process exit code for the scan.
+ */
 async function runScanCommand(args: ScanCommandArgs): Promise<number> {
 	// Fleet scans can run for a long time; surface progress by default.
 	const logger = createLogger(args.verbose ?
@@ -130,6 +136,14 @@ async function runScanCommand(args: ScanCommandArgs): Promise<number> {
 	return exitCodeFor(result, { failOnIncomplete: args.failOnSkip });
 }
 
+/**
+ * Render the result in every requested format. The last format goes to the
+ * output file when `--out` is set; everything else goes to stdout.
+ *
+ * @param result  - Scan result to inspect.
+ * @param formats - Formats to render, in order.
+ * @param out     - Optional output file path.
+ */
 function emitOutput(
 	result: ScanResult | OrgScanReport,
 	formats: Format[],
@@ -146,6 +160,13 @@ function emitOutput(
 	}
 }
 
+/**
+ * Render a scan result or fleet report in the given format.
+ *
+ * @param result - Scan result to inspect.
+ * @param format - Output format to use.
+ * @returns      The rendered document.
+ */
 function render(result: ScanResult | OrgScanReport, format: Format): string {
 	if (isFleetReport(result)) {
 		switch (format) {
@@ -168,6 +189,12 @@ function render(result: ScanResult | OrgScanReport, format: Format): string {
 	}
 }
 
+/**
+ * Narrow a scan outcome to the fleet report variant.
+ *
+ * @param result - Scan result to inspect.
+ * @returns      True when the result is a fleet report.
+ */
 function isFleetReport(result: ScanResult | OrgScanReport): result is OrgScanReport {
 	return result.target.type === 'org-fleet';
 }

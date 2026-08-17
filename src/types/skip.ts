@@ -9,6 +9,11 @@
  * for a clean pass.
  */
 export class RuleSkipped extends Error {
+	/**
+	 * Create the skip signal.
+	 *
+	 * @param reason - Human-readable explanation (becomes `RuleRun.skipReason`).
+	 */
 	constructor(reason: string) {
 		super(reason);
 		this.name = 'RuleSkipped';
@@ -18,9 +23,9 @@ export class RuleSkipped extends Error {
 /**
  * Signal that the current rule cannot run.
  *
- * @param reason - Human-readable explanation (becomes `RuleRun.skipReason`).
+ * @param  reason - Human-readable explanation (becomes `RuleRun.skipReason`).
  * @throws {RuleSkipped} Always — the `never` return type tells TypeScript
- *   that control flow does not continue past this call.
+ * that control flow does not continue past this call.
  */
 export function skip(reason: string): never {
 	throw new RuleSkipped(reason);

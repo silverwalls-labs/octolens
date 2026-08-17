@@ -13,6 +13,10 @@ const DETAIL = 'The default branch allows merge commits. Teams that prefer rebas
 const REMEDIATION = 'In the default branch protection rule, enable "Require linear history". ' +
 	'Disable this rule via config if your team intentionally uses merge commits.';
 
+/**
+ * Flags default branches that accept merge commits instead of
+ * enforcing a linear history.
+ */
 export const rule: Rule = {
 	id: RULE_ID,
 	category: 'repo-config',

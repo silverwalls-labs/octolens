@@ -12,6 +12,9 @@ const REMEDIATION = 'Audit Settings -> Collaborators and remove unused outside '
 	'collaborators. Where possible, invite users to the organization with team-based ' +
 	'access instead.';
 
+/**
+ * Flags repositories that grant access to accounts outside the organisation.
+ */
 export const rule: Rule = {
 	id: RULE_ID,
 	category: 'access',
@@ -40,6 +43,12 @@ export const rule: Rule = {
 	},
 };
 
+/**
+ * Extract the account login from a collaborator.
+ *
+ * @param collaborator - Collaborator to inspect.
+ * @returns            Login of the collaborator.
+ */
 function loginOf(collaborator: Collaborator): string {
 	return collaborator.login;
 }

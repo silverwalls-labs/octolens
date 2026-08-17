@@ -10,6 +10,9 @@ const DETAIL = 'Secret-scanning push protection is not enabled. ' +
 const REMEDIATION = 'Settings -> Code security -> Secret scanning -> ' +
 	'enable "Push protection". Requires secret scanning to be enabled.';
 
+/**
+ * Flags repositories with push protection turned off.
+ */
 export const rule: Rule = {
 	id: RULE_ID,
 	category: 'security',

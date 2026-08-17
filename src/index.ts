@@ -52,6 +52,7 @@ export type { ExitCodeOptions } from './engine/exit-code.ts';
 
 export { createOctokit } from './github/client.ts';
 export type { ClientOptions } from './github/client.ts';
+export type { OrgRepoListing, RepoVisibility } from './github/queries.ts';
 export { resolveAuth, AuthError } from './github/auth.ts';
 export type { AuthOptions, ResolvedAuth } from './github/auth.ts';
 export { createCachedFetcher, createScopedCache } from './github/fetcher.ts';
