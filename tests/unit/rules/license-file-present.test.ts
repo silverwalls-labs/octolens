@@ -1,4 +1,5 @@
 import {
+	describe,
 	test,
 	beforeEach,
 	afterEach,
@@ -11,53 +12,47 @@ import {
 } from '../../helpers/context.ts';
 import { makeRepoResponse } from '../../helpers/fixtures.ts';
 
-beforeEach(disableNet);
-afterEach(restoreNet);
+describe('repo-config/license-file-present', () => {
+	beforeEach(disableNet);
+	afterEach(restoreNet);
 
-test('reports no findings when a license is detected', licenseDetectedCase);
+	test('reports no findings when a license is detected', async () => {
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens')
+			.reply(200, makeRepoResponse({ licenseSpdx: 'MIT' }));
 
-async function licenseDetectedCase() {
-	nock('https://api.github.com')
-		.get('/repos/sheplu/Octolens')
-		.reply(200, makeRepoResponse({ licenseSpdx: 'MIT' }));
+		const findings = await rule.check(makeContext());
 
-	const findings = await rule.check(makeContext());
+		assert.equal(findings.length, 0);
+	});
 
-	assert.equal(findings.length, 0);
-}
+	test('reports a finding when no license is set', async () => {
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens')
+			.reply(200, makeRepoResponse({ hasLicense: false }));
 
-test('reports a finding when no license is set', noLicenseCase);
+		const findings = await rule.check(makeContext());
 
-async function noLicenseCase() {
-	nock('https://api.github.com')
-		.get('/repos/sheplu/Octolens')
-		.reply(200, makeRepoResponse({ hasLicense: false }));
+		assert.equal(findings.length, 1);
+		assert.equal(findings[0]?.ruleId, 'repo-config/license-file-present');
+		assert.equal(findings[0]?.severity, 'medium');
+	});
 
-	const findings = await rule.check(makeContext());
+	test('reports a finding when license SPDX is NOASSERTION', async () => {
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens')
+			.reply(200, makeRepoResponse({ licenseSpdx: 'NOASSERTION' }));
 
-	assert.equal(findings.length, 1);
-	assert.equal(findings[0]?.ruleId, 'repo-config/license-file-present');
-	assert.equal(findings[0]?.severity, 'medium');
-}
+		const findings = await rule.check(makeContext());
 
-test('reports a finding when license SPDX is NOASSERTION', noAssertionCase);
+		assert.equal(findings.length, 1);
+	});
 
-async function noAssertionCase() {
-	nock('https://api.github.com')
-		.get('/repos/sheplu/Octolens')
-		.reply(200, makeRepoResponse({ licenseSpdx: 'NOASSERTION' }));
+	test('propagates server errors from the API', async () => {
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens')
+			.reply(500, { message: 'Internal Server Error' });
 
-	const findings = await rule.check(makeContext());
-
-	assert.equal(findings.length, 1);
-}
-
-test('propagates server errors from the API', serverErrorCase);
-
-async function serverErrorCase() {
-	nock('https://api.github.com')
-		.get('/repos/sheplu/Octolens')
-		.reply(500, { message: 'Internal Server Error' });
-
-	await assert.rejects(rule.check(makeContext()));
-}
+		await assert.rejects(rule.check(makeContext()));
+	});
+});

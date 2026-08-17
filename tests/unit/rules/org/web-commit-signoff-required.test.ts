@@ -1,4 +1,5 @@
 import {
+	describe,
 	test,
 	beforeEach,
 	afterEach,
@@ -14,53 +15,47 @@ import { makeOrgResponse } from '../../../helpers/fixtures.ts';
 
 const ENDPOINT = '/orgs/silverwalls-labs';
 
-beforeEach(disableNet);
-afterEach(restoreNet);
+describe('org/web-commit-signoff-required', () => {
+	beforeEach(disableNet);
+	afterEach(restoreNet);
 
-test('reports no findings when web commit sign-off is required', passCase);
+	test('reports no findings when web commit sign-off is required', async () => {
+		nock('https://api.github.com')
+			.get(ENDPOINT)
+			.reply(200, makeOrgResponse({ webCommitSignoffRequired: true }));
 
-async function passCase() {
-	nock('https://api.github.com')
-		.get(ENDPOINT)
-		.reply(200, makeOrgResponse({ webCommitSignoffRequired: true }));
+		const findings = await rule.check(makeOrgContext());
 
-	const findings = await rule.check(makeOrgContext());
+		assert.equal(findings.length, 0);
+	});
 
-	assert.equal(findings.length, 0);
-}
+	test('reports a finding when web commit sign-off is not required', async () => {
+		nock('https://api.github.com')
+			.get(ENDPOINT)
+			.reply(200, makeOrgResponse({ webCommitSignoffRequired: false }));
 
-test('reports a finding when web commit sign-off is not required', findingCase);
+		const findings = await rule.check(makeOrgContext());
 
-async function findingCase() {
-	nock('https://api.github.com')
-		.get(ENDPOINT)
-		.reply(200, makeOrgResponse({ webCommitSignoffRequired: false }));
+		assert.equal(findings.length, 1);
+		assert.equal(findings[0]?.ruleId, 'org/web-commit-signoff-required');
+		assert.equal(findings[0]?.severity, 'low');
+		assert.equal(findings[0]?.org, 'silverwalls-labs');
+		assert.equal(findings[0]?.repo, undefined);
+	});
 
-	const findings = await rule.check(makeOrgContext());
+	test('skips when the field is not visible (non-owner token)', async () => {
+		nock('https://api.github.com')
+			.get(ENDPOINT)
+			.reply(200, makeOrgResponse({ privileged: false }));
 
-	assert.equal(findings.length, 1);
-	assert.equal(findings[0]?.ruleId, 'org/web-commit-signoff-required');
-	assert.equal(findings[0]?.severity, 'low');
-	assert.equal(findings[0]?.org, 'silverwalls-labs');
-	assert.equal(findings[0]?.repo, undefined);
-}
+		await assert.rejects(rule.check(makeOrgContext()), RuleSkipped);
+	});
 
-test('skips when the field is not visible (non-owner token)', hiddenCase);
+	test('propagates server errors from the API', async () => {
+		nock('https://api.github.com')
+			.get(ENDPOINT)
+			.reply(500, { message: 'Internal Server Error' });
 
-async function hiddenCase() {
-	nock('https://api.github.com')
-		.get(ENDPOINT)
-		.reply(200, makeOrgResponse({ privileged: false }));
-
-	await assert.rejects(rule.check(makeOrgContext()), RuleSkipped);
-}
-
-test('propagates server errors from the API', serverErrorCase);
-
-async function serverErrorCase() {
-	nock('https://api.github.com')
-		.get(ENDPOINT)
-		.reply(500, { message: 'Internal Server Error' });
-
-	await assert.rejects(rule.check(makeOrgContext()));
-}
+		await assert.rejects(rule.check(makeOrgContext()));
+	});
+});

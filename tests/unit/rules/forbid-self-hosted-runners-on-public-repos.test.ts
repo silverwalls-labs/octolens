@@ -1,4 +1,5 @@
 import {
+	describe,
 	test,
 	beforeEach,
 	afterEach,
@@ -15,79 +16,71 @@ import { makeRepoResponse } from '../../helpers/fixtures.ts';
 const REPO = '/repos/sheplu/Octolens';
 const RUNNERS = '/repos/sheplu/Octolens/actions/runners';
 
-beforeEach(disableNet);
-afterEach(restoreNet);
+describe('cicd/forbid-self-hosted-runners-on-public-repos', () => {
+	beforeEach(disableNet);
+	afterEach(restoreNet);
 
-test('does not fire on private repos', privateCase);
+	test('does not fire on private repos', async () => {
+		nock('https://api.github.com')
+			.get(REPO)
+			.reply(200, makeRepoResponse({ 'private': true }));
 
-async function privateCase() {
-	nock('https://api.github.com')
-		.get(REPO)
-		.reply(200, makeRepoResponse({ 'private': true }));
+		const findings = await rule.check(makeContext());
 
-	const findings = await rule.check(makeContext());
+		assert.equal(findings.length, 0);
+	});
 
-	assert.equal(findings.length, 0);
-}
+	test('reports no findings on a public repo with no runners', async () => {
+		nock('https://api.github.com').get(REPO).reply(200, makeRepoResponse());
+		nock('https://api.github.com')
+			.get(RUNNERS)
+			.query({ per_page: '100' })
+			.reply(200, { total_count: 0, runners: [] });
 
-test('reports no findings on a public repo with no runners', emptyCase);
+		const findings = await rule.check(makeContext());
 
-async function emptyCase() {
-	nock('https://api.github.com').get(REPO).reply(200, makeRepoResponse());
-	nock('https://api.github.com')
-		.get(RUNNERS)
-		.query({ per_page: '100' })
-		.reply(200, { total_count: 0, runners: [] });
+		assert.equal(findings.length, 0);
+	});
 
-	const findings = await rule.check(makeContext());
+	test('reports a finding when public repo has self-hosted runners', async () => {
+		nock('https://api.github.com').get(REPO).reply(200, makeRepoResponse());
+		nock('https://api.github.com')
+			.get(RUNNERS)
+			.query({ per_page: '100' })
+			.reply(200, {
+				total_count: 1,
+				runners: [
+					{
+						id: 1,
+						name: 'self-hosted-1',
+						labels: [ { name: 'self-hosted' } ],
+					},
+				],
+			});
 
-	assert.equal(findings.length, 0);
-}
+		const findings = await rule.check(makeContext());
 
-test('reports a finding when public repo has self-hosted runners', presentCase);
+		assert.equal(findings.length, 1);
+		assert.equal(findings[0]?.ruleId, 'cicd/forbid-self-hosted-runners-on-public-repos');
+		assert.equal(findings[0]?.severity, 'high');
+		assert.match(findings[0]?.detail ?? '', /self-hosted-1/);
+	});
 
-async function presentCase() {
-	nock('https://api.github.com').get(REPO).reply(200, makeRepoResponse());
-	nock('https://api.github.com')
-		.get(RUNNERS)
-		.query({ per_page: '100' })
-		.reply(200, {
-			total_count: 1,
-			runners: [
-				{
-					id: 1,
-					name: 'self-hosted-1',
-					labels: [ { name: 'self-hosted' } ],
-				},
-			],
-		});
+	test('skips when runners endpoint returns a permission 403', async () => {
+		nock('https://api.github.com').get(REPO).reply(200, makeRepoResponse());
+		nock('https://api.github.com')
+			.get(RUNNERS)
+			.query({ per_page: '100' })
+			.reply(403, { message: 'Forbidden' });
 
-	const findings = await rule.check(makeContext());
+		await assert.rejects(rule.check(makeContext()), RuleSkipped);
+	});
 
-	assert.equal(findings.length, 1);
-	assert.equal(findings[0]?.ruleId, 'cicd/forbid-self-hosted-runners-on-public-repos');
-	assert.equal(findings[0]?.severity, 'high');
-	assert.match(findings[0]?.detail ?? '', /self-hosted-1/);
-}
+	test('propagates server errors from the API', async () => {
+		nock('https://api.github.com')
+			.get(REPO)
+			.reply(500, { message: 'Internal Server Error' });
 
-test('skips when runners endpoint returns a permission 403', forbiddenCase);
-
-async function forbiddenCase() {
-	nock('https://api.github.com').get(REPO).reply(200, makeRepoResponse());
-	nock('https://api.github.com')
-		.get(RUNNERS)
-		.query({ per_page: '100' })
-		.reply(403, { message: 'Forbidden' });
-
-	await assert.rejects(rule.check(makeContext()), RuleSkipped);
-}
-
-test('propagates server errors from the API', serverErrorCase);
-
-async function serverErrorCase() {
-	nock('https://api.github.com')
-		.get(REPO)
-		.reply(500, { message: 'Internal Server Error' });
-
-	await assert.rejects(rule.check(makeContext()));
-}
+		await assert.rejects(rule.check(makeContext()));
+	});
+});

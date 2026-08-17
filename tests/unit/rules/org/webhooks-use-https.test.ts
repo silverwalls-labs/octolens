@@ -1,4 +1,5 @@
 import {
+	describe,
 	test,
 	beforeEach,
 	afterEach,
@@ -14,79 +15,71 @@ import { makeOrgHooksResponse } from '../../../helpers/fixtures.ts';
 
 const ENDPOINT = '/orgs/silverwalls-labs/hooks';
 
-beforeEach(disableNet);
-afterEach(restoreNet);
+describe('org/webhooks-use-https', () => {
+	beforeEach(disableNet);
+	afterEach(restoreNet);
 
-test('reports no findings when no webhooks exist', emptyCase);
+	test('reports no findings when no webhooks exist', async () => {
+		nock('https://api.github.com')
+			.get(ENDPOINT)
+			.query({ per_page: '100' })
+			.reply(200, []);
 
-async function emptyCase() {
-	nock('https://api.github.com')
-		.get(ENDPOINT)
-		.query({ per_page: '100' })
-		.reply(200, []);
+		const findings = await rule.check(makeOrgContext());
 
-	const findings = await rule.check(makeOrgContext());
+		assert.equal(findings.length, 0);
+	});
 
-	assert.equal(findings.length, 0);
-}
+	test('reports no findings when all webhooks use HTTPS with verification', async () => {
+		nock('https://api.github.com')
+			.get(ENDPOINT)
+			.query({ per_page: '100' })
+			.reply(200, makeOrgHooksResponse([ { id: 1, url: 'https://example.com/hook' } ]));
 
-test('reports no findings when all webhooks use HTTPS with verification', secureCase);
+		const findings = await rule.check(makeOrgContext());
 
-async function secureCase() {
-	nock('https://api.github.com')
-		.get(ENDPOINT)
-		.query({ per_page: '100' })
-		.reply(200, makeOrgHooksResponse([ { id: 1, url: 'https://example.com/hook' } ]));
+		assert.equal(findings.length, 0);
+	});
 
-	const findings = await rule.check(makeOrgContext());
+	test('reports a finding when webhooks use plain HTTP or skip SSL verification', async () => {
+		nock('https://api.github.com')
+			.get(ENDPOINT)
+			.query({ per_page: '100' })
+			.reply(200, makeOrgHooksResponse([
+				{ id: 1, url: 'http://example.com/hook' },
+				{
+					id: 2, url: 'https://example.com/hook', insecureSsl: '1',
+				},
+				{ id: 3, url: 'https://example.com/hook' },
+			]));
 
-	assert.equal(findings.length, 0);
-}
+		const findings = await rule.check(makeOrgContext());
 
-test('reports a finding when webhooks use plain HTTP or skip SSL verification', insecureCase);
+		assert.equal(findings.length, 1);
+		assert.equal(findings[0]?.ruleId, 'org/webhooks-use-https');
+		assert.equal(findings[0]?.severity, 'medium');
+		assert.equal(findings[0]?.org, 'silverwalls-labs');
+		assert.equal(findings[0]?.repo, undefined);
+		assert.match(findings[0]?.detail ?? '', /#1.*plain http/);
+		assert.match(findings[0]?.detail ?? '', /#2.*ssl verification disabled/);
+		assert.doesNotMatch(findings[0]?.detail ?? '', /#3/);
+	});
 
-async function insecureCase() {
-	nock('https://api.github.com')
-		.get(ENDPOINT)
-		.query({ per_page: '100' })
-		.reply(200, makeOrgHooksResponse([
-			{ id: 1, url: 'http://example.com/hook' },
-			{
-				id: 2, url: 'https://example.com/hook', insecureSsl: '1',
-			},
-			{ id: 3, url: 'https://example.com/hook' },
-		]));
+	test('skips on a permission-denied 403', async () => {
+		nock('https://api.github.com')
+			.get(ENDPOINT)
+			.query({ per_page: '100' })
+			.reply(403, { message: 'Must have admin rights' });
 
-	const findings = await rule.check(makeOrgContext());
+		await assert.rejects(rule.check(makeOrgContext()), RuleSkipped);
+	});
 
-	assert.equal(findings.length, 1);
-	assert.equal(findings[0]?.ruleId, 'org/webhooks-use-https');
-	assert.equal(findings[0]?.severity, 'medium');
-	assert.equal(findings[0]?.org, 'silverwalls-labs');
-	assert.equal(findings[0]?.repo, undefined);
-	assert.match(findings[0]?.detail ?? '', /#1.*plain http/);
-	assert.match(findings[0]?.detail ?? '', /#2.*ssl verification disabled/);
-	assert.doesNotMatch(findings[0]?.detail ?? '', /#3/);
-}
+	test('propagates server errors from the API', async () => {
+		nock('https://api.github.com')
+			.get(ENDPOINT)
+			.query({ per_page: '100' })
+			.reply(500, { message: 'Internal Server Error' });
 
-test('skips on a permission-denied 403', forbiddenCase);
-
-async function forbiddenCase() {
-	nock('https://api.github.com')
-		.get(ENDPOINT)
-		.query({ per_page: '100' })
-		.reply(403, { message: 'Must have admin rights' });
-
-	await assert.rejects(rule.check(makeOrgContext()), RuleSkipped);
-}
-
-test('propagates server errors from the API', serverErrorCase);
-
-async function serverErrorCase() {
-	nock('https://api.github.com')
-		.get(ENDPOINT)
-		.query({ per_page: '100' })
-		.reply(500, { message: 'Internal Server Error' });
-
-	await assert.rejects(rule.check(makeOrgContext()));
-}
+		await assert.rejects(rule.check(makeOrgContext()));
+	});
+});

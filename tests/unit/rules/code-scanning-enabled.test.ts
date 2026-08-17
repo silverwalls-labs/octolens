@@ -1,4 +1,5 @@
 import {
+	describe,
 	test,
 	beforeEach,
 	afterEach,
@@ -10,70 +11,62 @@ import {
 	disableNet, makeContext, restoreNet,
 } from '../../helpers/context.ts';
 
-beforeEach(disableNet);
-afterEach(restoreNet);
+describe('security/code-scanning-enabled', () => {
+	beforeEach(disableNet);
+	afterEach(restoreNet);
 
-test('reports no findings when at least one analysis exists', analysisExistsCase);
+	test('reports no findings when at least one analysis exists', async () => {
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens/code-scanning/analyses')
+			.query(true)
+			.reply(200, [ { id: 1, ref: 'refs/heads/main' } ]);
 
-async function analysisExistsCase() {
-	nock('https://api.github.com')
-		.get('/repos/sheplu/Octolens/code-scanning/analyses')
-		.query(true)
-		.reply(200, [ { id: 1, ref: 'refs/heads/main' } ]);
+		const findings = await rule.check(makeContext());
 
-	const findings = await rule.check(makeContext());
+		assert.equal(findings.length, 0);
+	});
 
-	assert.equal(findings.length, 0);
-}
+	test('reports a finding when no analyses exist (empty list)', async () => {
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens/code-scanning/analyses')
+			.query(true)
+			.reply(200, []);
 
-test('reports a finding when no analyses exist (empty list)', noAnalysesCase);
+		const findings = await rule.check(makeContext());
 
-async function noAnalysesCase() {
-	nock('https://api.github.com')
-		.get('/repos/sheplu/Octolens/code-scanning/analyses')
-		.query(true)
-		.reply(200, []);
+		assert.equal(findings.length, 1);
+		assert.equal(findings[0]?.ruleId, 'security/code-scanning-enabled');
+		assert.equal(findings[0]?.severity, 'high');
+	});
 
-	const findings = await rule.check(makeContext());
+	test('reports a finding when code scanning is unavailable (404)', async () => {
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens/code-scanning/analyses')
+			.query(true)
+			.reply(404, { message: 'no analysis found' });
 
-	assert.equal(findings.length, 1);
-	assert.equal(findings[0]?.ruleId, 'security/code-scanning-enabled');
-	assert.equal(findings[0]?.severity, 'high');
-}
+		const findings = await rule.check(makeContext());
 
-test('reports a finding when code scanning is unavailable (404)', notFoundCase);
+		assert.equal(findings.length, 1);
+	});
 
-async function notFoundCase() {
-	nock('https://api.github.com')
-		.get('/repos/sheplu/Octolens/code-scanning/analyses')
-		.query(true)
-		.reply(404, { message: 'no analysis found' });
+	test('reports a finding when code scanning endpoint returns 403', async () => {
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens/code-scanning/analyses')
+			.query(true)
+			.reply(403, { message: 'Resource not accessible by integration' });
 
-	const findings = await rule.check(makeContext());
+		const findings = await rule.check(makeContext());
 
-	assert.equal(findings.length, 1);
-}
+		assert.equal(findings.length, 1);
+	});
 
-test('reports a finding when code scanning endpoint returns 403', permissionDeniedCase);
+	test('propagates server errors from the API', async () => {
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens/code-scanning/analyses')
+			.query({ per_page: '1' })
+			.reply(500, { message: 'Internal Server Error' });
 
-async function permissionDeniedCase() {
-	nock('https://api.github.com')
-		.get('/repos/sheplu/Octolens/code-scanning/analyses')
-		.query(true)
-		.reply(403, { message: 'Resource not accessible by integration' });
-
-	const findings = await rule.check(makeContext());
-
-	assert.equal(findings.length, 1);
-}
-
-test('propagates server errors from the API', serverErrorCase);
-
-async function serverErrorCase() {
-	nock('https://api.github.com')
-		.get('/repos/sheplu/Octolens/code-scanning/analyses')
-		.query({ per_page: '1' })
-		.reply(500, { message: 'Internal Server Error' });
-
-	await assert.rejects(rule.check(makeContext()));
-}
+		await assert.rejects(rule.check(makeContext()));
+	});
+});

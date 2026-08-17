@@ -1,4 +1,5 @@
 import {
+	describe,
 	test,
 	beforeEach,
 	afterEach,
@@ -14,159 +15,141 @@ import {
 	makeRepoPropertyValues,
 } from '../../helpers/fixtures.ts';
 
-beforeEach(disableNet);
-afterEach(restoreNet);
+describe('access/required-custom-properties', () => {
+	beforeEach(disableNet);
+	afterEach(restoreNet);
 
-test('reports no findings when all required properties are set', allSetCase);
+	test('reports no findings when all required properties are set', async () => {
+		nock('https://api.github.com')
+			.get('/orgs/sheplu/properties/schema')
+			.reply(200, [
+				{ property_name: 'team', required: true },
+				{ property_name: 'compliance', required: true },
+			]);
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens/properties/values')
+			.reply(200, [
+				{ property_name: 'team', value: 'payments' },
+				{ property_name: 'compliance', value: 'pci' },
+			]);
 
-async function allSetCase() {
-	nock('https://api.github.com')
-		.get('/orgs/sheplu/properties/schema')
-		.reply(200, [
-			{ property_name: 'team', required: true },
-			{ property_name: 'compliance', required: true },
-		]);
-	nock('https://api.github.com')
-		.get('/repos/sheplu/Octolens/properties/values')
-		.reply(200, [
-			{ property_name: 'team', value: 'payments' },
-			{ property_name: 'compliance', value: 'pci' },
-		]);
+		const findings = await rule.check(makeContext());
 
-	const findings = await rule.check(makeContext());
+		assert.equal(findings.length, 0);
+	});
 
-	assert.equal(findings.length, 0);
-}
+	test('reports a finding for each missing required property', async () => {
+		nock('https://api.github.com')
+			.get('/orgs/sheplu/properties/schema')
+			.reply(200, [
+				{ property_name: 'team', required: true },
+				{ property_name: 'compliance', required: true },
+			]);
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens/properties/values')
+			.reply(200, [ { property_name: 'team', value: 'payments' } ]);
 
-test('reports a finding for each missing required property', missingCase);
+		const findings = await rule.check(makeContext());
 
-async function missingCase() {
-	nock('https://api.github.com')
-		.get('/orgs/sheplu/properties/schema')
-		.reply(200, [
-			{ property_name: 'team', required: true },
-			{ property_name: 'compliance', required: true },
-		]);
-	nock('https://api.github.com')
-		.get('/repos/sheplu/Octolens/properties/values')
-		.reply(200, [ { property_name: 'team', value: 'payments' } ]);
+		assert.equal(findings.length, 1);
+		assert.equal(findings[0]?.ruleId, 'access/required-custom-properties');
+		assert.match(findings[0]?.title ?? '', /compliance/);
+	});
 
-	const findings = await rule.check(makeContext());
+	test('reports a finding when value is empty string', async () => {
+		nock('https://api.github.com')
+			.get('/orgs/sheplu/properties/schema')
+			.reply(200, [ { property_name: 'team', required: true } ]);
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens/properties/values')
+			.reply(200, [ { property_name: 'team', value: '' } ]);
 
-	assert.equal(findings.length, 1);
-	assert.equal(findings[0]?.ruleId, 'access/required-custom-properties');
-	assert.match(findings[0]?.title ?? '', /compliance/);
-}
+		const findings = await rule.check(makeContext());
 
-test('reports a finding when value is empty string', emptyValueCase);
+		assert.equal(findings.length, 1);
+	});
 
-async function emptyValueCase() {
-	nock('https://api.github.com')
-		.get('/orgs/sheplu/properties/schema')
-		.reply(200, [ { property_name: 'team', required: true } ]);
-	nock('https://api.github.com')
-		.get('/repos/sheplu/Octolens/properties/values')
-		.reply(200, [ { property_name: 'team', value: '' } ]);
+	test('does not fire when org schema is not accessible (404)', async () => {
+		nock('https://api.github.com')
+			.get('/orgs/sheplu/properties/schema')
+			.reply(404, { message: 'Not Found' });
 
-	const findings = await rule.check(makeContext());
+		const findings = await rule.check(makeContext());
 
-	assert.equal(findings.length, 1);
-}
+		assert.equal(findings.length, 0);
+	});
 
-test('does not fire when org schema is not accessible (404)', schema404Case);
+	test('does not fire when no properties are required', async () => {
+		nock('https://api.github.com')
+			.get('/orgs/sheplu/properties/schema')
+			.reply(200, [ { property_name: 'team', required: false } ]);
 
-async function schema404Case() {
-	nock('https://api.github.com')
-		.get('/orgs/sheplu/properties/schema')
-		.reply(404, { message: 'Not Found' });
+		const findings = await rule.check(makeContext());
 
-	const findings = await rule.check(makeContext());
+		assert.equal(findings.length, 0);
+	});
 
-	assert.equal(findings.length, 0);
-}
+	test('reports no findings when required property has a non-empty array value', async () => {
+		nock('https://api.github.com')
+			.get('/orgs/sheplu/properties/schema')
+			.reply(200, makeOrgPropertySchema([ { property_name: 'team', required: true } ]));
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens/properties/values')
+			.reply(
+				200,
+				makeRepoPropertyValues([ { property_name: 'team', value: [ 'engineering' ] } ]),
+			);
 
-test('does not fire when no properties are required', noRequiredCase);
+		const findings = await rule.check(makeContext());
 
-async function noRequiredCase() {
-	nock('https://api.github.com')
-		.get('/orgs/sheplu/properties/schema')
-		.reply(200, [ { property_name: 'team', required: false } ]);
+		assert.equal(findings.length, 0);
+	});
 
-	const findings = await rule.check(makeContext());
+	test('reports a finding when required property has an empty array value', async () => {
+		nock('https://api.github.com')
+			.get('/orgs/sheplu/properties/schema')
+			.reply(200, makeOrgPropertySchema([ { property_name: 'team', required: true } ]));
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens/properties/values')
+			.reply(200, makeRepoPropertyValues([ { property_name: 'team', value: [] } ]));
 
-	assert.equal(findings.length, 0);
-}
+		const findings = await rule.check(makeContext());
 
-test('reports no findings when required property has a non-empty array value', arraySetCase);
+		assert.equal(findings.length, 1);
+	});
 
-async function arraySetCase() {
-	nock('https://api.github.com')
-		.get('/orgs/sheplu/properties/schema')
-		.reply(200, makeOrgPropertySchema([ { property_name: 'team', required: true } ]));
-	nock('https://api.github.com')
-		.get('/repos/sheplu/Octolens/properties/values')
-		.reply(
-			200,
-			makeRepoPropertyValues([ { property_name: 'team', value: [ 'engineering' ] } ]),
-		);
+	test('propagates server errors from the API', async () => {
+		nock('https://api.github.com')
+			.get('/orgs/sheplu/properties/schema')
+			.reply(500, { message: 'Internal Server Error' });
 
-	const findings = await rule.check(makeContext());
+		await assert.rejects(rule.check(makeContext()));
+	});
 
-	assert.equal(findings.length, 0);
-}
+	test('reports no findings when property values are unreadable', async () => {
+		nock('https://api.github.com')
+			.get('/orgs/sheplu/properties/schema')
+			.reply(200, makeOrgPropertySchema([ { property_name: 'team', required: true } ]));
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens/properties/values')
+			.reply(404);
 
-test('reports a finding when required property has an empty array value', emptyArrayCase);
+		const findings = await rule.check(makeContext());
 
-async function emptyArrayCase() {
-	nock('https://api.github.com')
-		.get('/orgs/sheplu/properties/schema')
-		.reply(200, makeOrgPropertySchema([ { property_name: 'team', required: true } ]));
-	nock('https://api.github.com')
-		.get('/repos/sheplu/Octolens/properties/values')
-		.reply(200, makeRepoPropertyValues([ { property_name: 'team', value: [] } ]));
+		assert.equal(findings.length, 0);
+	});
 
-	const findings = await rule.check(makeContext());
+	test('reports a finding when a required value is explicitly null', async () => {
+		nock('https://api.github.com')
+			.get('/orgs/sheplu/properties/schema')
+			.reply(200, makeOrgPropertySchema([ { property_name: 'team', required: true } ]));
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens/properties/values')
+			.reply(200, makeRepoPropertyValues([ { property_name: 'team', value: null } ]));
 
-	assert.equal(findings.length, 1);
-}
+		const findings = await rule.check(makeContext());
 
-test('propagates server errors from the API', serverErrorCase);
-
-async function serverErrorCase() {
-	nock('https://api.github.com')
-		.get('/orgs/sheplu/properties/schema')
-		.reply(500, { message: 'Internal Server Error' });
-
-	await assert.rejects(rule.check(makeContext()));
-}
-
-test('reports no findings when property values are unreadable', unreadableValuesCase);
-
-async function unreadableValuesCase() {
-	nock('https://api.github.com')
-		.get('/orgs/sheplu/properties/schema')
-		.reply(200, makeOrgPropertySchema([ { property_name: 'team', required: true } ]));
-	nock('https://api.github.com')
-		.get('/repos/sheplu/Octolens/properties/values')
-		.reply(404);
-
-	const findings = await rule.check(makeContext());
-
-	assert.equal(findings.length, 0);
-}
-
-test('reports a finding when a required value is explicitly null', nullValueCase);
-
-async function nullValueCase() {
-	nock('https://api.github.com')
-		.get('/orgs/sheplu/properties/schema')
-		.reply(200, makeOrgPropertySchema([ { property_name: 'team', required: true } ]));
-	nock('https://api.github.com')
-		.get('/repos/sheplu/Octolens/properties/values')
-		.reply(200, makeRepoPropertyValues([ { property_name: 'team', value: null } ]));
-
-	const findings = await rule.check(makeContext());
-
-	assert.equal(findings.length, 1);
-	assert.match(findings[0]?.title ?? '', /team/);
-}
+		assert.equal(findings.length, 1);
+		assert.match(findings[0]?.title ?? '', /team/);
+	});
+});

@@ -1,4 +1,5 @@
 import {
+	describe,
 	test,
 	beforeEach,
 	afterEach,
@@ -16,65 +17,60 @@ import { makeOrgForkPrApprovalResponse } from '../../../helpers/fixtures.ts';
 
 const ENDPOINT = '/orgs/silverwalls-labs/actions/permissions/fork-pr-contributor-approval';
 
-beforeEach(disableNet);
-afterEach(restoreNet);
+describe('org/fork-pr-approval-all-contributors', () => {
+	beforeEach(disableNet);
+	afterEach(restoreNet);
 
-test('reports no findings when approval is required for all external contributors', passCase);
+	test(
+		'reports no findings when approval is required for all external contributors',
+		async () => {
+			nock('https://api.github.com')
+				.get(ENDPOINT)
+				.reply(200, makeOrgForkPrApprovalResponse('all_external_contributors'));
 
-async function passCase() {
-	nock('https://api.github.com')
-		.get(ENDPOINT)
-		.reply(200, makeOrgForkPrApprovalResponse('all_external_contributors'));
+			const findings = await rule.check(makeOrgContext());
 
-	const findings = await rule.check(makeOrgContext());
+			assert.equal(findings.length, 0);
+		},
+	);
 
-	assert.equal(findings.length, 0);
-}
+	test('reports a finding on the first-time-contributors policy', async () => {
+		nock('https://api.github.com')
+			.get(ENDPOINT)
+			.reply(200, makeOrgForkPrApprovalResponse('first_time_contributors'));
 
-test('reports a finding on the first-time-contributors policy', firstTimeCase);
+		const findings = await rule.check(makeOrgContext());
 
-async function firstTimeCase() {
-	nock('https://api.github.com')
-		.get(ENDPOINT)
-		.reply(200, makeOrgForkPrApprovalResponse('first_time_contributors'));
+		assert.equal(findings.length, 1);
+		assert.equal(findings[0]?.ruleId, 'org/fork-pr-approval-all-contributors');
+		assert.equal(findings[0]?.severity, 'medium');
+		assert.equal(findings[0]?.org, 'silverwalls-labs');
+		assert.equal(findings[0]?.repo, undefined);
+	});
 
-	const findings = await rule.check(makeOrgContext());
+	test('reports a finding on the weakest new-to-github policy', async () => {
+		nock('https://api.github.com')
+			.get(ENDPOINT)
+			.reply(200, makeOrgForkPrApprovalResponse('first_time_contributors_new_to_github'));
 
-	assert.equal(findings.length, 1);
-	assert.equal(findings[0]?.ruleId, 'org/fork-pr-approval-all-contributors');
-	assert.equal(findings[0]?.severity, 'medium');
-	assert.equal(findings[0]?.org, 'silverwalls-labs');
-	assert.equal(findings[0]?.repo, undefined);
-}
+		const findings = await rule.check(makeOrgContext());
 
-test('reports a finding on the weakest new-to-github policy', weakestCase);
+		assert.equal(findings.length, 1);
+	});
 
-async function weakestCase() {
-	nock('https://api.github.com')
-		.get(ENDPOINT)
-		.reply(200, makeOrgForkPrApprovalResponse('first_time_contributors_new_to_github'));
+	test('skips on a permission-denied 403', async () => {
+		nock('https://api.github.com')
+			.get(ENDPOINT)
+			.reply(403, { message: 'Must have admin rights' });
 
-	const findings = await rule.check(makeOrgContext());
+		await assert.rejects(rule.check(makeOrgContext()), RuleSkipped);
+	});
 
-	assert.equal(findings.length, 1);
-}
+	test('propagates server errors from the API', async () => {
+		nock('https://api.github.com')
+			.get(ENDPOINT)
+			.reply(500, { message: 'Internal Server Error' });
 
-test('skips on a permission-denied 403', forbiddenCase);
-
-async function forbiddenCase() {
-	nock('https://api.github.com')
-		.get(ENDPOINT)
-		.reply(403, { message: 'Must have admin rights' });
-
-	await assert.rejects(rule.check(makeOrgContext()), RuleSkipped);
-}
-
-test('propagates server errors from the API', serverErrorCase);
-
-async function serverErrorCase() {
-	nock('https://api.github.com')
-		.get(ENDPOINT)
-		.reply(500, { message: 'Internal Server Error' });
-
-	await assert.rejects(rule.check(makeOrgContext()));
-}
+		await assert.rejects(rule.check(makeOrgContext()));
+	});
+});

@@ -1,4 +1,5 @@
 import {
+	describe,
 	test,
 	beforeEach,
 	afterEach,
@@ -14,6 +15,101 @@ import type { ScanResult } from '../../src/types/index.ts';
 
 const BASE = 'https://api.github.com';
 const REPO_PATH = '/repos/sheplu/Octolens';
+
+const EXPECTED_FINDINGS = [
+	'access/admin-count',
+	'access/outside-collaborator-count',
+	'access/team-based-admin',
+	'access/webhooks-use-https',
+	'access/deploy-keys-readonly',
+	'access/codeowners-valid',
+	'access/required-custom-properties',
+	'access/visibility-private-default',
+	'security/secrets-rotation',
+	'security/scope-secrets-to-environments',
+	'repo-config/environment-protection',
+	'repo-config/branch-protection-required',
+	'cicd/forbid-workflow-pr-approval',
+	'cicd/default-workflow-permissions-read',
+	'cicd/forbid-self-hosted-runners-on-public-repos',
+];
+
+describe('misconfigured repo pipeline', () => {
+	beforeEach(() => {
+		nock.disableNetConnect();
+	});
+
+	afterEach(() => {
+		nock.cleanAll();
+		nock.enableNetConnect();
+	});
+
+	test(
+		'a misconfigured repository triggers every data-driven finding path',
+		async () => {
+			mockMisconfiguredRepo();
+
+			const result = await runMisconfiguredScan();
+			const flagged = new Set(result.findings.map((f) => f.ruleId));
+
+			for (const ruleId of EXPECTED_FINDINGS) {
+				assert.ok(
+					flagged.has(ruleId),
+					`expected a finding from ${ruleId}`,
+				);
+			}
+
+			assert.equal(result.summary.rulesErrored, 0);
+			assert.equal(exitCodeFor(result), 1);
+		},
+	);
+
+	test(
+		'the misconfigured scan renders in markdown and pretty output',
+		async () => {
+			mockMisconfiguredRepo();
+
+			const result = await runMisconfiguredScan();
+
+			const md = formatMarkdown(result);
+
+			assert.match(md, /# Octolens/);
+			assert.match(md, /admin/i);
+			assert.doesNotMatch(md, /undefined/);
+
+			const pretty = formatPretty(result, { color: false });
+
+			assert.match(pretty, /sheplu\/Octolens/);
+			assert.doesNotMatch(pretty, /undefined/);
+
+			const colored = formatPretty(result, { color: true });
+
+			assert.match(colored, /MEDIUM|LOW|INFO/);
+		},
+	);
+
+	test('a private repository allowing forks is flagged', async () => {
+		nock(BASE).get(REPO_PATH).reply(200, makeRepoResponse({
+			visibility: 'private',
+			allowForking: true,
+		}));
+		nock(BASE)
+			.get(`${REPO_PATH}/branches/main/protection`)
+			.reply(404, { message: 'Branch not protected' });
+		nock(BASE).persist().get(new RegExp(`${REPO_PATH}/`))
+			.reply(200, []);
+		nock(BASE).persist().head(new RegExp(`${REPO_PATH}/`))
+			.reply(204);
+		nock(BASE).persist().get(/\/orgs\//)
+			.reply(404, { message: 'Not Found' });
+
+		const result = await runMisconfiguredScan();
+		const flagged = new Set(result.findings.map((f) => f.ruleId));
+
+		assert.ok(flagged.has('repo-config/forbid-forking-private-repos'));
+		assert.ok(!flagged.has('access/visibility-private-default'));
+	});
+});
 
 function noop() {
 	/* intentional no-op */
@@ -34,11 +130,7 @@ function isoDaysAgo(days: number): string {
 }
 
 /**
- * A public repository where every data-driven rule sees its worst case:
- * too many admins, plain-HTTP webhooks, stale unscoped secrets, an
- * unprotected environment, writable deploy keys, broken CODEOWNERS,
- * workflow PR approval, self-hosted runners, and a missing required
- * custom property.
+ * A public repository where every data-driven rule sees its worst case.
  */
 function mockMisconfiguredRepo(): void {
 	nock(BASE).get(REPO_PATH).reply(200, makeRepoResponse());
@@ -71,7 +163,15 @@ function mockMisconfiguredRepo(): void {
 	nock(BASE)
 		.get(`${REPO_PATH}/hooks`)
 		.query(true)
-		.reply(200, [ { id: 1, config: { url: 'http://ci.example.com/hook', insecure_ssl: '1' } } ]);
+		.reply(200, [
+			{
+				id: 1,
+				config: {
+					url: 'http://ci.example.com/hook',
+					insecure_ssl: '1',
+				},
+			},
+		]);
 	nock(BASE)
 		.get(`${REPO_PATH}/keys`)
 		.query(true)
@@ -82,7 +182,9 @@ function mockMisconfiguredRepo(): void {
 		]);
 	nock(BASE)
 		.get(`${REPO_PATH}/codeowners/errors`)
-		.reply(200, { errors: [ { kind: 'Unknown owner', line: 1 } ] });
+		.reply(200, {
+			errors: [ { kind: 'Unknown owner', line: 1 } ],
+		});
 
 	nock(BASE)
 		.get(`${REPO_PATH}/actions/secrets`)
@@ -132,7 +234,9 @@ function mockMisconfiguredRepo(): void {
 			total_count: 1,
 			runners: [
 				{
-					id: 1, name: 'shed-mac-mini', labels: [ { name: 'self-hosted' } ],
+					id: 1,
+					name: 'shed-mac-mini',
+					labels: [ { name: 'self-hosted' } ],
 				},
 			],
 		});
@@ -144,7 +248,6 @@ function mockMisconfiguredRepo(): void {
 		.get(`${REPO_PATH}/properties/values`)
 		.reply(200, []);
 
-	// Everything else stays quiet so unrelated rules take their pass paths.
 	nock(BASE).persist().get(new RegExp(`${REPO_PATH}/`))
 		.reply(200, []);
 	nock(BASE).persist().head(new RegExp(`${REPO_PATH}/`))
@@ -161,98 +264,4 @@ async function runMisconfiguredScan(): Promise<ScanResult> {
 		logger: silentLogger(),
 		threshold: 'info',
 	});
-}
-
-beforeEach(setupCase);
-
-function setupCase() {
-	nock.disableNetConnect();
-}
-
-afterEach(teardownCase);
-
-function teardownCase() {
-	nock.cleanAll();
-	nock.enableNetConnect();
-}
-
-const EXPECTED_FINDINGS = [
-	'access/admin-count',
-	'access/outside-collaborator-count',
-	'access/team-based-admin',
-	'access/webhooks-use-https',
-	'access/deploy-keys-readonly',
-	'access/codeowners-valid',
-	'access/required-custom-properties',
-	'access/visibility-private-default',
-	'security/secrets-rotation',
-	'security/scope-secrets-to-environments',
-	'repo-config/environment-protection',
-	'repo-config/branch-protection-required',
-	'cicd/forbid-workflow-pr-approval',
-	'cicd/default-workflow-permissions-read',
-	'cicd/forbid-self-hosted-runners-on-public-repos',
-];
-
-test('a misconfigured repository triggers every data-driven finding path', misconfiguredCase);
-
-async function misconfiguredCase() {
-	mockMisconfiguredRepo();
-
-	const result = await runMisconfiguredScan();
-	const flagged = new Set(result.findings.map((f) => f.ruleId));
-
-	for (const ruleId of EXPECTED_FINDINGS) {
-		assert.ok(flagged.has(ruleId), `expected a finding from ${ruleId}`);
-	}
-
-	assert.equal(result.summary.rulesErrored, 0);
-	assert.equal(exitCodeFor(result), 1);
-}
-
-test('the misconfigured scan renders in markdown and pretty output', misconfiguredRendering);
-
-async function misconfiguredRendering() {
-	mockMisconfiguredRepo();
-
-	const result = await runMisconfiguredScan();
-
-	const md = formatMarkdown(result);
-
-	assert.match(md, /# Octolens/);
-	assert.match(md, /admin/i);
-	assert.doesNotMatch(md, /undefined/);
-
-	const pretty = formatPretty(result, { color: false });
-
-	assert.match(pretty, /sheplu\/Octolens/);
-	assert.doesNotMatch(pretty, /undefined/);
-
-	const colored = formatPretty(result, { color: true });
-
-	assert.match(colored, /MEDIUM|LOW|INFO/);
-}
-
-test('a private repository allowing forks is flagged', privateForkingCase);
-
-async function privateForkingCase() {
-	nock(BASE).get(REPO_PATH).reply(200, makeRepoResponse({
-		visibility: 'private',
-		allowForking: true,
-	}));
-	nock(BASE)
-		.get(`${REPO_PATH}/branches/main/protection`)
-		.reply(404, { message: 'Branch not protected' });
-	nock(BASE).persist().get(new RegExp(`${REPO_PATH}/`))
-		.reply(200, []);
-	nock(BASE).persist().head(new RegExp(`${REPO_PATH}/`))
-		.reply(204);
-	nock(BASE).persist().get(/\/orgs\//)
-		.reply(404, { message: 'Not Found' });
-
-	const result = await runMisconfiguredScan();
-	const flagged = new Set(result.findings.map((f) => f.ruleId));
-
-	assert.ok(flagged.has('repo-config/forbid-forking-private-repos'));
-	assert.ok(!flagged.has('access/visibility-private-default'));
 }

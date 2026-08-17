@@ -1,4 +1,5 @@
 import {
+	describe,
 	test,
 	beforeEach,
 	afterEach,
@@ -10,70 +11,64 @@ import {
 	disableNet, makeContext, restoreNet,
 } from '../../helpers/context.ts';
 
-beforeEach(disableNet);
-afterEach(restoreNet);
+describe('access/codeowners-file-present', () => {
+	beforeEach(disableNet);
+	afterEach(restoreNet);
 
-test('reports no findings when CODEOWNERS is at the root', rootCase);
+	test('reports no findings when CODEOWNERS is at the root', async () => {
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens/contents/CODEOWNERS')
+			.reply(200, {
+				name: 'CODEOWNERS',
+				path: 'CODEOWNERS',
+				type: 'file',
+			});
 
-async function rootCase() {
-	nock('https://api.github.com')
-		.get('/repos/sheplu/Octolens/contents/CODEOWNERS')
-		.reply(200, {
-			name: 'CODEOWNERS',
-			path: 'CODEOWNERS',
-			type: 'file',
-		});
+		const findings = await rule.check(makeContext());
 
-	const findings = await rule.check(makeContext());
+		assert.equal(findings.length, 0);
+	});
 
-	assert.equal(findings.length, 0);
-}
+	test('reports no findings when CODEOWNERS is under .github/', async () => {
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens/contents/CODEOWNERS')
+			.reply(404);
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens/contents/.github%2FCODEOWNERS')
+			.reply(200, {
+				name: 'CODEOWNERS',
+				path: '.github/CODEOWNERS',
+				type: 'file',
+			});
 
-test('reports no findings when CODEOWNERS is under .github/', dotGithubCase);
+		const findings = await rule.check(makeContext());
 
-async function dotGithubCase() {
-	nock('https://api.github.com')
-		.get('/repos/sheplu/Octolens/contents/CODEOWNERS')
-		.reply(404);
-	nock('https://api.github.com')
-		.get('/repos/sheplu/Octolens/contents/.github%2FCODEOWNERS')
-		.reply(200, {
-			name: 'CODEOWNERS',
-			path: '.github/CODEOWNERS',
-			type: 'file',
-		});
+		assert.equal(findings.length, 0);
+	});
 
-	const findings = await rule.check(makeContext());
+	test('reports a finding when no CODEOWNERS is present', async () => {
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens/contents/CODEOWNERS')
+			.reply(404);
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens/contents/.github%2FCODEOWNERS')
+			.reply(404);
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens/contents/docs%2FCODEOWNERS')
+			.reply(404);
 
-	assert.equal(findings.length, 0);
-}
+		const findings = await rule.check(makeContext());
 
-test('reports a finding when no CODEOWNERS is present', missingCase);
+		assert.equal(findings.length, 1);
+		assert.equal(findings[0]?.ruleId, 'access/codeowners-file-present');
+		assert.equal(findings[0]?.severity, 'medium');
+	});
 
-async function missingCase() {
-	nock('https://api.github.com')
-		.get('/repos/sheplu/Octolens/contents/CODEOWNERS')
-		.reply(404);
-	nock('https://api.github.com')
-		.get('/repos/sheplu/Octolens/contents/.github%2FCODEOWNERS')
-		.reply(404);
-	nock('https://api.github.com')
-		.get('/repos/sheplu/Octolens/contents/docs%2FCODEOWNERS')
-		.reply(404);
+	test('propagates server errors from the API', async () => {
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens/contents/CODEOWNERS')
+			.reply(500, { message: 'Internal Server Error' });
 
-	const findings = await rule.check(makeContext());
-
-	assert.equal(findings.length, 1);
-	assert.equal(findings[0]?.ruleId, 'access/codeowners-file-present');
-	assert.equal(findings[0]?.severity, 'medium');
-}
-
-test('propagates server errors from the API', serverErrorCase);
-
-async function serverErrorCase() {
-	nock('https://api.github.com')
-		.get('/repos/sheplu/Octolens/contents/CODEOWNERS')
-		.reply(500, { message: 'Internal Server Error' });
-
-	await assert.rejects(rule.check(makeContext()));
-}
+		await assert.rejects(rule.check(makeContext()));
+	});
+});

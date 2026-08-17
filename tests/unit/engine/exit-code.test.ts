@@ -1,14 +1,132 @@
-import { test } from 'node:test';
+import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { exitCodeFor, exitCodeForReport } from '../../../src/engine/index.ts';
 import type {
-	FailedRepo, Finding, FleetSummary, OrgScanReport, ScanResult, ScanSummary,
+	FailedRepo, Finding, FleetSummary,
+	OrgScanReport, ScanResult, ScanSummary,
 } from '../../../src/types/index.ts';
 
 type ResultOptions = {
 	summary?: Partial<ScanSummary>;
 	findings?: Finding[];
 };
+
+const FINDING: Finding = {
+	ruleId: 'repo-config/branch-protection-required',
+	severity: 'high',
+	repo: { owner: 'sheplu', name: 'editorconfig' },
+	title: 'example',
+};
+
+type ReportOptions = {
+	summary?: Partial<FleetSummary>;
+	failures?: FailedRepo[];
+};
+
+describe('exitCodeFor', () => {
+	test('exit 0 on a clean, complete scan', () => {
+		assert.equal(exitCodeFor(makeResult()), 0);
+	});
+
+	test('exit 1 when findings exist regardless of flags', () => {
+		const result = makeResult({ findings: [ FINDING ] });
+
+		assert.equal(exitCodeFor(result), 1);
+		assert.equal(
+			exitCodeFor(result, { failOnIncomplete: true }),
+			1,
+		);
+	});
+
+	test(
+		'incomplete coverage exits 0 by default, 1 under fail-on-skip',
+		() => {
+			const skipped = makeResult({
+				summary: { rulesSkipped: 2 },
+			});
+			const errored = makeResult({
+				summary: { rulesErrored: 1 },
+			});
+
+			assert.equal(exitCodeFor(skipped), 0);
+			assert.equal(exitCodeFor(errored), 0);
+			assert.equal(
+				exitCodeFor(skipped, { failOnIncomplete: true }),
+				1,
+			);
+			assert.equal(
+				exitCodeFor(errored, { failOnIncomplete: true }),
+				1,
+			);
+		},
+	);
+
+	test('report: exit 0 on a clean, complete fleet scan', () => {
+		assert.equal(exitCodeForReport(makeReport()), 0);
+		assert.equal(
+			exitCodeForReport(
+				makeReport(),
+				{ failOnIncomplete: true },
+			),
+			0,
+		);
+	});
+
+	test('report: exit 1 when findings exist anywhere', () => {
+		const report = makeReport({
+			summary: { findingsTotal: 1 },
+		});
+
+		assert.equal(exitCodeForReport(report), 1);
+	});
+
+	test(
+		'report: incomplete coverage exits 1 only under fail-on-skip',
+		() => {
+			const failure: FailedRepo = {
+				repo: {
+					owner: 'silverwalls-labs',
+					name: 'broken',
+				},
+				error: 'boom',
+			};
+			const withFailure = makeReport({
+				failures: [ failure ],
+			});
+			const withSkips = makeReport({
+				summary: { rulesSkipped: 3 },
+			});
+			const truncated = makeReport({
+				summary: { listingComplete: false },
+			});
+
+			assert.equal(exitCodeForReport(withFailure), 0);
+			assert.equal(exitCodeForReport(withSkips), 0);
+			assert.equal(exitCodeForReport(truncated), 0);
+			assert.equal(
+				exitCodeForReport(
+					withFailure,
+					{ failOnIncomplete: true },
+				),
+				1,
+			);
+			assert.equal(
+				exitCodeForReport(
+					withSkips,
+					{ failOnIncomplete: true },
+				),
+				1,
+			);
+			assert.equal(
+				exitCodeForReport(
+					truncated,
+					{ failOnIncomplete: true },
+				),
+				1,
+			);
+		},
+	);
+});
 
 function makeResult(options: ResultOptions = {}): ScanResult {
 	const findings = options.findings ?? [];
@@ -38,45 +156,6 @@ function makeResult(options: ResultOptions = {}): ScanResult {
 		summary,
 	};
 }
-
-const FINDING: Finding = {
-	ruleId: 'repo-config/branch-protection-required',
-	severity: 'high',
-	repo: { owner: 'sheplu', name: 'editorconfig' },
-	title: 'example',
-};
-
-test('exit 0 on a clean, complete scan', cleanScan);
-
-function cleanScan() {
-	assert.equal(exitCodeFor(makeResult()), 0);
-}
-
-test('exit 1 when findings exist regardless of flags', withFindings);
-
-function withFindings() {
-	const result = makeResult({ findings: [ FINDING ] });
-
-	assert.equal(exitCodeFor(result), 1);
-	assert.equal(exitCodeFor(result, { failOnIncomplete: true }), 1);
-}
-
-test('incomplete coverage exits 0 by default, 1 under fail-on-skip', incompleteCoverage);
-
-function incompleteCoverage() {
-	const skipped = makeResult({ summary: { rulesSkipped: 2 } });
-	const errored = makeResult({ summary: { rulesErrored: 1 } });
-
-	assert.equal(exitCodeFor(skipped), 0);
-	assert.equal(exitCodeFor(errored), 0);
-	assert.equal(exitCodeFor(skipped, { failOnIncomplete: true }), 1);
-	assert.equal(exitCodeFor(errored, { failOnIncomplete: true }), 1);
-}
-
-type ReportOptions = {
-	summary?: Partial<FleetSummary>;
-	failures?: FailedRepo[];
-};
 
 function makeReport(options: ReportOptions = {}): OrgScanReport {
 	const summary: FleetSummary = {
@@ -109,38 +188,4 @@ function makeReport(options: ReportOptions = {}): OrgScanReport {
 		failures: options.failures ?? [],
 		summary,
 	};
-}
-
-test('report: exit 0 on a clean, complete fleet scan', cleanReport);
-
-function cleanReport() {
-	assert.equal(exitCodeForReport(makeReport()), 0);
-	assert.equal(exitCodeForReport(makeReport(), { failOnIncomplete: true }), 0);
-}
-
-test('report: exit 1 when findings exist anywhere', reportWithFindings);
-
-function reportWithFindings() {
-	const report = makeReport({ summary: { findingsTotal: 1 } });
-
-	assert.equal(exitCodeForReport(report), 1);
-}
-
-test('report: incomplete coverage exits 1 only under fail-on-skip', reportIncomplete);
-
-function reportIncomplete() {
-	const failure: FailedRepo = {
-		repo: { owner: 'silverwalls-labs', name: 'broken' },
-		error: 'boom',
-	};
-	const withFailure = makeReport({ failures: [ failure ] });
-	const withSkips = makeReport({ summary: { rulesSkipped: 3 } });
-	const truncated = makeReport({ summary: { listingComplete: false } });
-
-	assert.equal(exitCodeForReport(withFailure), 0);
-	assert.equal(exitCodeForReport(withSkips), 0);
-	assert.equal(exitCodeForReport(truncated), 0);
-	assert.equal(exitCodeForReport(withFailure, { failOnIncomplete: true }), 1);
-	assert.equal(exitCodeForReport(withSkips, { failOnIncomplete: true }), 1);
-	assert.equal(exitCodeForReport(truncated, { failOnIncomplete: true }), 1);
 }

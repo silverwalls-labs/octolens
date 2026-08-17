@@ -1,4 +1,5 @@
 import {
+	describe,
 	test,
 	beforeEach,
 	afterEach,
@@ -14,63 +15,57 @@ import {
 	makeRepoResponse,
 } from '../../helpers/fixtures.ts';
 
-beforeEach(disableNet);
-afterEach(restoreNet);
+describe('repo-config/branch-protection-required', () => {
+	beforeEach(disableNet);
+	afterEach(restoreNet);
 
-test('reports no findings when default branch is protected', protectedCase);
+	test('reports no findings when default branch is protected', async () => {
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens')
+			.reply(200, makeRepoResponse());
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens/branches/main/protection')
+			.reply(200, makeBranchProtectionResponse({ requirePullRequest: true }));
 
-async function protectedCase() {
-	nock('https://api.github.com')
-		.get('/repos/sheplu/Octolens')
-		.reply(200, makeRepoResponse());
-	nock('https://api.github.com')
-		.get('/repos/sheplu/Octolens/branches/main/protection')
-		.reply(200, makeBranchProtectionResponse({ requirePullRequest: true }));
+		const findings = await rule.check(makeContext());
 
-	const findings = await rule.check(makeContext());
+		assert.equal(findings.length, 0);
+	});
 
-	assert.equal(findings.length, 0);
-}
+	test('reports a critical finding when default branch is unprotected (404)', async () => {
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens')
+			.reply(200, makeRepoResponse());
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens/branches/main/protection')
+			.reply(404, { message: 'Branch not protected' });
 
-test('reports a critical finding when default branch is unprotected (404)', unprotectedCase);
+		const findings = await rule.check(makeContext());
 
-async function unprotectedCase() {
-	nock('https://api.github.com')
-		.get('/repos/sheplu/Octolens')
-		.reply(200, makeRepoResponse());
-	nock('https://api.github.com')
-		.get('/repos/sheplu/Octolens/branches/main/protection')
-		.reply(404, { message: 'Branch not protected' });
+		assert.equal(findings.length, 1);
+		assert.equal(findings[0]?.ruleId, 'repo-config/branch-protection-required');
+		assert.equal(findings[0]?.severity, 'critical');
+	});
 
-	const findings = await rule.check(makeContext());
+	test('reports a critical finding when protection endpoint returns 403', async () => {
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens')
+			.reply(200, makeRepoResponse());
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens/branches/main/protection')
+			.reply(403, { message: 'Forbidden' });
 
-	assert.equal(findings.length, 1);
-	assert.equal(findings[0]?.ruleId, 'repo-config/branch-protection-required');
-	assert.equal(findings[0]?.severity, 'critical');
-}
+		const findings = await rule.check(makeContext());
 
-test('reports a critical finding when protection endpoint returns 403', permissionDeniedCase);
+		assert.equal(findings.length, 1);
+		assert.equal(findings[0]?.severity, 'critical');
+	});
 
-async function permissionDeniedCase() {
-	nock('https://api.github.com')
-		.get('/repos/sheplu/Octolens')
-		.reply(200, makeRepoResponse());
-	nock('https://api.github.com')
-		.get('/repos/sheplu/Octolens/branches/main/protection')
-		.reply(403, { message: 'Forbidden' });
+	test('propagates server errors from the API', async () => {
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens')
+			.reply(500, { message: 'Internal Server Error' });
 
-	const findings = await rule.check(makeContext());
-
-	assert.equal(findings.length, 1);
-	assert.equal(findings[0]?.severity, 'critical');
-}
-
-test('propagates server errors from the API', serverErrorCase);
-
-async function serverErrorCase() {
-	nock('https://api.github.com')
-		.get('/repos/sheplu/Octolens')
-		.reply(500, { message: 'Internal Server Error' });
-
-	await assert.rejects(rule.check(makeContext()));
-}
+		await assert.rejects(rule.check(makeContext()));
+	});
+});

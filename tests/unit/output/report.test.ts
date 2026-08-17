@@ -1,4 +1,4 @@
-import { test } from 'node:test';
+import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { formatPrettyReport } from '../../../src/output/pretty.ts';
 import { formatMarkdownReport } from '../../../src/output/markdown.ts';
@@ -9,7 +9,158 @@ import type {
 
 const ORG = 'silverwalls-labs';
 
-function makeRepoResult(name: string, findings: Finding[]): ScanResult {
+const ORG_FINDING: Finding = {
+	ruleId: 'org/two-factor-required',
+	severity: 'critical',
+	org: ORG,
+	title: 'Two-factor authentication is not required',
+};
+
+const REPO_FINDING: Finding = {
+	ruleId: 'repo-config/branch-protection-required',
+	severity: 'high',
+	repo: { owner: ORG, name: 'flagged-repo' },
+	title: 'Default branch is not protected',
+};
+
+describe('report formatters', () => {
+	test(
+		'pretty report shows org, repos, failures, skips, and summary',
+		() => {
+			const out = formatPrettyReport(makeReport(), { color: false });
+
+			assert.match(
+				out,
+				/Octolens scan — silverwalls-labs \(organization \+ 2 repositories\)/,
+			);
+			assert.match(out, /Organization posture/);
+			assert.match(
+				out,
+				/Two-factor authentication is not required/,
+			);
+			assert.match(out, /Repositories \(2 scanned\)/);
+			assert.match(
+				out,
+				/Default branch is not protected/,
+			);
+			assert.match(
+				out,
+				/1 repositories with no findings/,
+			);
+			assert.match(out, /Failed repositories \(1\)/);
+			assert.match(out, /broken-repo: boom/);
+			assert.match(out, /Skipped: 1 archived/);
+			assert.match(
+				out,
+				/Repositories: 2 scanned · 1 skipped · 1 failed/,
+			);
+			assert.match(out, /Findings \(>= high\): 2/);
+		},
+	);
+
+	test(
+		'pretty report warns when the listing is incomplete',
+		() => {
+			const report = makeReport();
+
+			report.summary.listingComplete = false;
+			const out = formatPrettyReport(report, { color: false });
+
+			assert.match(out, /Repository listing incomplete/);
+		},
+	);
+
+	test('markdown report renders all sections', () => {
+		const out = formatMarkdownReport(makeReport());
+
+		assert.match(
+			out,
+			/^# Octolens scan — silverwalls-labs \(organization fleet\)/,
+		);
+		assert.match(out, /## Organization posture/);
+		assert.match(
+			out,
+			/## Repositories \(2 scanned, 1 skipped, 1 failed\)/,
+		);
+		assert.match(
+			out,
+			/### High — Default branch is not protected/,
+		);
+		assert.match(out, /## Failed repositories \(1\)/);
+		assert.match(
+			out,
+			/\| `silverwalls-labs\/broken-repo` \| boom \|/,
+		);
+		assert.match(out, /## Skipped repositories \(1\)/);
+		assert.match(
+			out,
+			/\| `silverwalls-labs\/old-repo` \| archived \|/,
+		);
+	});
+
+	test(
+		'json report round-trips with the org-fleet target',
+		() => {
+			const report = makeReport();
+			const parsed = JSON.parse(formatJson(report)) as OrgScanReport;
+
+			assert.equal(parsed.schemaVersion, 1);
+			assert.deepEqual(parsed.target, {
+				type: 'org-fleet', org: ORG,
+			});
+			assert.equal(parsed.repos.length, 2);
+			assert.equal(parsed.summary.findingsTotal, 2);
+		},
+	);
+
+	test(
+		'markdown report warns when the listing is incomplete',
+		() => {
+			const report = makeReport();
+
+			report.summary.listingComplete = false;
+			const output = formatMarkdownReport(report);
+
+			assert.match(output, /listing incomplete/i);
+		},
+	);
+
+	test(
+		'reports render a placeholder when no repositories were scanned',
+		() => {
+			const report = makeReport({ repos: [] });
+
+			assert.match(
+				formatMarkdownReport(report),
+				/No repositories scanned\./,
+			);
+			assert.match(
+				formatPrettyReport(report, { color: false }),
+				/No repositories scanned\./,
+			);
+		},
+	);
+
+	test(
+		'markdown report renders a clean org posture section',
+		() => {
+			const report = makeReport({
+				org: makeOrgResult([]),
+			});
+			const output = formatMarkdownReport(report);
+
+			assert.match(
+				output,
+				/No findings at or above|no findings/i,
+			);
+		},
+	);
+});
+
+function makeRepoResult(
+	name: string,
+	findings: Finding[],
+): ScanResult {
 	return {
 		schemaVersion: 1,
 		target: {
@@ -75,20 +226,6 @@ function countBySeverity(findings: Finding[]): Record<Severity, number> {
 	return counts;
 }
 
-const ORG_FINDING: Finding = {
-	ruleId: 'org/two-factor-required',
-	severity: 'critical',
-	org: ORG,
-	title: 'Two-factor authentication is not required',
-};
-
-const REPO_FINDING: Finding = {
-	ruleId: 'repo-config/branch-protection-required',
-	severity: 'high',
-	repo: { owner: ORG, name: 'flagged-repo' },
-	title: 'Default branch is not protected',
-};
-
 function makeReport(overrides: Partial<OrgScanReport> = {}): OrgScanReport {
 	const org = makeOrgResult([ ORG_FINDING ]);
 	const repos = [
@@ -102,8 +239,18 @@ function makeReport(overrides: Partial<OrgScanReport> = {}): OrgScanReport {
 		threshold: 'high',
 		org,
 		repos,
-		skipped: [ { repo: { owner: ORG, name: 'old-repo' }, reason: 'archived' } ],
-		failures: [ { repo: { owner: ORG, name: 'broken-repo' }, error: 'boom' } ],
+		skipped: [
+			{
+				repo: { owner: ORG, name: 'old-repo' },
+				reason: 'archived',
+			},
+		],
+		failures: [
+			{
+				repo: { owner: ORG, name: 'broken-repo' },
+				error: 'boom',
+			},
+		],
 		summary: {
 			reposDiscovered: 4,
 			reposScanned: 2,
@@ -124,89 +271,4 @@ function makeReport(overrides: Partial<OrgScanReport> = {}): OrgScanReport {
 		},
 		...overrides,
 	};
-}
-
-test('pretty report shows org, repos, failures, skips, and summary', prettyReportSections);
-
-function prettyReportSections() {
-	const out = formatPrettyReport(makeReport(), { color: false });
-
-	assert.match(out, /Octolens scan — silverwalls-labs \(organization \+ 2 repositories\)/);
-	assert.match(out, /Organization posture/);
-	assert.match(out, /Two-factor authentication is not required/);
-	assert.match(out, /Repositories \(2 scanned\)/);
-	assert.match(out, /Default branch is not protected/);
-	assert.match(out, /1 repositories with no findings/);
-	assert.match(out, /Failed repositories \(1\)/);
-	assert.match(out, /broken-repo: boom/);
-	assert.match(out, /Skipped: 1 archived/);
-	assert.match(out, /Repositories: 2 scanned · 1 skipped · 1 failed/);
-	assert.match(out, /Findings \(>= high\): 2/);
-}
-
-test('pretty report warns when the listing is incomplete', prettyReportTruncated);
-
-function prettyReportTruncated() {
-	const report = makeReport();
-
-	report.summary.listingComplete = false;
-	const out = formatPrettyReport(report, { color: false });
-
-	assert.match(out, /Repository listing incomplete/);
-}
-
-test('markdown report renders all sections', markdownReportSections);
-
-function markdownReportSections() {
-	const out = formatMarkdownReport(makeReport());
-
-	assert.match(out, /^# Octolens scan — silverwalls-labs \(organization fleet\)/);
-	assert.match(out, /## Organization posture/);
-	assert.match(out, /## Repositories \(2 scanned, 1 skipped, 1 failed\)/);
-	assert.match(out, /### High — Default branch is not protected/);
-	assert.match(out, /## Failed repositories \(1\)/);
-	assert.match(out, /\| `silverwalls-labs\/broken-repo` \| boom \|/);
-	assert.match(out, /## Skipped repositories \(1\)/);
-	assert.match(out, /\| `silverwalls-labs\/old-repo` \| archived \|/);
-}
-
-test('json report round-trips with the org-fleet target', jsonReportRoundTrip);
-
-function jsonReportRoundTrip() {
-	const report = makeReport();
-	const parsed = JSON.parse(formatJson(report)) as OrgScanReport;
-
-	assert.equal(parsed.schemaVersion, 1);
-	assert.deepEqual(parsed.target, { type: 'org-fleet', org: ORG });
-	assert.equal(parsed.repos.length, 2);
-	assert.equal(parsed.summary.findingsTotal, 2);
-}
-
-test('markdown report warns when the listing is incomplete', markdownReportTruncated);
-
-function markdownReportTruncated() {
-	const report = makeReport();
-
-	report.summary.listingComplete = false;
-	const output = formatMarkdownReport(report);
-
-	assert.match(output, /listing incomplete/i);
-}
-
-test('reports render a placeholder when no repositories were scanned', emptyFleetReports);
-
-function emptyFleetReports() {
-	const report = makeReport({ repos: [] });
-
-	assert.match(formatMarkdownReport(report), /No repositories scanned\./);
-	assert.match(formatPrettyReport(report, { color: false }), /No repositories scanned\./);
-}
-
-test('markdown report renders a clean org posture section', cleanOrgPosture);
-
-function cleanOrgPosture() {
-	const report = makeReport({ org: makeOrgResult([]) });
-	const output = formatMarkdownReport(report);
-
-	assert.match(output, /No findings at or above|no findings/i);
 }

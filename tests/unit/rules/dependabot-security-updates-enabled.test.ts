@@ -1,4 +1,5 @@
 import {
+	describe,
 	test,
 	beforeEach,
 	afterEach,
@@ -12,53 +13,47 @@ import {
 
 const ENDPOINT = '/repos/sheplu/Octolens/automated-security-fixes';
 
-beforeEach(disableNet);
-afterEach(restoreNet);
+describe('security/dependabot-security-updates-enabled', () => {
+	beforeEach(disableNet);
+	afterEach(restoreNet);
 
-test('reports no findings when security updates are enabled', enabledCase);
+	test('reports no findings when security updates are enabled', async () => {
+		nock('https://api.github.com')
+			.get(ENDPOINT)
+			.reply(200, { enabled: true, paused: false });
 
-async function enabledCase() {
-	nock('https://api.github.com')
-		.get(ENDPOINT)
-		.reply(200, { enabled: true, paused: false });
+		const findings = await rule.check(makeContext());
 
-	const findings = await rule.check(makeContext());
+		assert.equal(findings.length, 0);
+	});
 
-	assert.equal(findings.length, 0);
-}
+	test('reports a finding when security updates are disabled', async () => {
+		nock('https://api.github.com')
+			.get(ENDPOINT)
+			.reply(200, { enabled: false, paused: false });
 
-test('reports a finding when security updates are disabled', disabledCase);
+		const findings = await rule.check(makeContext());
 
-async function disabledCase() {
-	nock('https://api.github.com')
-		.get(ENDPOINT)
-		.reply(200, { enabled: false, paused: false });
+		assert.equal(findings.length, 1);
+		assert.equal(findings[0]?.ruleId, 'security/dependabot-security-updates-enabled');
+		assert.equal(findings[0]?.severity, 'high');
+	});
 
-	const findings = await rule.check(makeContext());
+	test('reports a finding when the endpoint returns 404', async () => {
+		nock('https://api.github.com')
+			.get(ENDPOINT)
+			.reply(404, { message: 'Not Found' });
 
-	assert.equal(findings.length, 1);
-	assert.equal(findings[0]?.ruleId, 'security/dependabot-security-updates-enabled');
-	assert.equal(findings[0]?.severity, 'high');
-}
+		const findings = await rule.check(makeContext());
 
-test('reports a finding when the endpoint returns 404', notFoundCase);
+		assert.equal(findings.length, 1);
+	});
 
-async function notFoundCase() {
-	nock('https://api.github.com')
-		.get(ENDPOINT)
-		.reply(404, { message: 'Not Found' });
+	test('propagates server errors from the API', async () => {
+		nock('https://api.github.com')
+			.get(ENDPOINT)
+			.reply(500, { message: 'Internal Server Error' });
 
-	const findings = await rule.check(makeContext());
-
-	assert.equal(findings.length, 1);
-}
-
-test('propagates server errors from the API', serverErrorCase);
-
-async function serverErrorCase() {
-	nock('https://api.github.com')
-		.get(ENDPOINT)
-		.reply(500, { message: 'Internal Server Error' });
-
-	await assert.rejects(rule.check(makeContext()));
-}
+		await assert.rejects(rule.check(makeContext()));
+	});
+});

@@ -1,4 +1,5 @@
 import {
+	describe,
 	test,
 	beforeEach,
 	afterEach,
@@ -12,69 +13,63 @@ import {
 
 const ENDPOINT = '/repos/sheplu/Octolens/collaborators';
 
-beforeEach(disableNet);
-afterEach(restoreNet);
+describe('access/outside-collaborator-count', () => {
+	beforeEach(disableNet);
+	afterEach(restoreNet);
 
-test('reports no findings when no outside collaborators exist', emptyCase);
+	test('reports no findings when no outside collaborators exist', async () => {
+		nock('https://api.github.com')
+			.get(ENDPOINT)
+			.query({ affiliation: 'outside', per_page: '100' })
+			.reply(200, []);
 
-async function emptyCase() {
-	nock('https://api.github.com')
-		.get(ENDPOINT)
-		.query({ affiliation: 'outside', per_page: '100' })
-		.reply(200, []);
+		const findings = await rule.check(makeContext());
 
-	const findings = await rule.check(makeContext());
+		assert.equal(findings.length, 0);
+	});
 
-	assert.equal(findings.length, 0);
-}
+	test('reports a finding when outside collaborators exist', async () => {
+		nock('https://api.github.com')
+			.get(ENDPOINT)
+			.query({ affiliation: 'outside', per_page: '100' })
+			.reply(200, [
+				{
+					login: 'contractor1',
+					role_name: 'write',
+					permissions: { push: true },
+				},
+				{
+					login: 'contractor2',
+					role_name: 'read',
+					permissions: { pull: true },
+				},
+			]);
 
-test('reports a finding when outside collaborators exist', presentCase);
+		const findings = await rule.check(makeContext());
 
-async function presentCase() {
-	nock('https://api.github.com')
-		.get(ENDPOINT)
-		.query({ affiliation: 'outside', per_page: '100' })
-		.reply(200, [
-			{
-				login: 'contractor1',
-				role_name: 'write',
-				permissions: { push: true },
-			},
-			{
-				login: 'contractor2',
-				role_name: 'read',
-				permissions: { pull: true },
-			},
-		]);
+		assert.equal(findings.length, 1);
+		assert.equal(findings[0]?.ruleId, 'access/outside-collaborator-count');
+		assert.equal(findings[0]?.severity, 'low');
+		assert.match(findings[0]?.detail ?? '', /contractor1.*contractor2/);
+	});
 
-	const findings = await rule.check(makeContext());
+	test('reports no findings when collaborator endpoint returns 403', async () => {
+		nock('https://api.github.com')
+			.get(ENDPOINT)
+			.query({ affiliation: 'outside', per_page: '100' })
+			.reply(403, { message: 'Forbidden' });
 
-	assert.equal(findings.length, 1);
-	assert.equal(findings[0]?.ruleId, 'access/outside-collaborator-count');
-	assert.equal(findings[0]?.severity, 'low');
-	assert.match(findings[0]?.detail ?? '', /contractor1.*contractor2/);
-}
+		const findings = await rule.check(makeContext());
 
-test('reports no findings when collaborator endpoint returns 403', forbiddenCase);
+		assert.equal(findings.length, 0);
+	});
 
-async function forbiddenCase() {
-	nock('https://api.github.com')
-		.get(ENDPOINT)
-		.query({ affiliation: 'outside', per_page: '100' })
-		.reply(403, { message: 'Forbidden' });
+	test('propagates server errors from the API', async () => {
+		nock('https://api.github.com')
+			.get(ENDPOINT)
+			.query({ affiliation: 'outside', per_page: '100' })
+			.reply(500, { message: 'Internal Server Error' });
 
-	const findings = await rule.check(makeContext());
-
-	assert.equal(findings.length, 0);
-}
-
-test('propagates server errors from the API', serverErrorCase);
-
-async function serverErrorCase() {
-	nock('https://api.github.com')
-		.get(ENDPOINT)
-		.query({ affiliation: 'outside', per_page: '100' })
-		.reply(500, { message: 'Internal Server Error' });
-
-	await assert.rejects(rule.check(makeContext()));
-}
+		await assert.rejects(rule.check(makeContext()));
+	});
+});

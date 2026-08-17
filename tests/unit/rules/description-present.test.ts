@@ -1,4 +1,5 @@
 import {
+	describe,
 	test,
 	beforeEach,
 	afterEach,
@@ -11,53 +12,47 @@ import {
 } from '../../helpers/context.ts';
 import { makeRepoResponse } from '../../helpers/fixtures.ts';
 
-beforeEach(disableNet);
-afterEach(restoreNet);
+describe('repo-config/description-present', () => {
+	beforeEach(disableNet);
+	afterEach(restoreNet);
 
-test('reports no findings when a description is set', descriptionCase);
+	test('reports no findings when a description is set', async () => {
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens')
+			.reply(200, makeRepoResponse({ description: 'A GitHub security auditor' }));
 
-async function descriptionCase() {
-	nock('https://api.github.com')
-		.get('/repos/sheplu/Octolens')
-		.reply(200, makeRepoResponse({ description: 'A GitHub security auditor' }));
+		const findings = await rule.check(makeContext());
 
-	const findings = await rule.check(makeContext());
+		assert.equal(findings.length, 0);
+	});
 
-	assert.equal(findings.length, 0);
-}
+	test('reports a finding when description is null', async () => {
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens')
+			.reply(200, makeRepoResponse({ description: null }));
 
-test('reports a finding when description is null', nullDescriptionCase);
+		const findings = await rule.check(makeContext());
 
-async function nullDescriptionCase() {
-	nock('https://api.github.com')
-		.get('/repos/sheplu/Octolens')
-		.reply(200, makeRepoResponse({ description: null }));
+		assert.equal(findings.length, 1);
+		assert.equal(findings[0]?.ruleId, 'repo-config/description-present');
+		assert.equal(findings[0]?.severity, 'info');
+	});
 
-	const findings = await rule.check(makeContext());
+	test('reports a finding when description is empty whitespace', async () => {
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens')
+			.reply(200, makeRepoResponse({ description: '   ' }));
 
-	assert.equal(findings.length, 1);
-	assert.equal(findings[0]?.ruleId, 'repo-config/description-present');
-	assert.equal(findings[0]?.severity, 'info');
-}
+		const findings = await rule.check(makeContext());
 
-test('reports a finding when description is empty whitespace', whitespaceCase);
+		assert.equal(findings.length, 1);
+	});
 
-async function whitespaceCase() {
-	nock('https://api.github.com')
-		.get('/repos/sheplu/Octolens')
-		.reply(200, makeRepoResponse({ description: '   ' }));
+	test('propagates server errors from the API', async () => {
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens')
+			.reply(500, { message: 'Internal Server Error' });
 
-	const findings = await rule.check(makeContext());
-
-	assert.equal(findings.length, 1);
-}
-
-test('propagates server errors from the API', serverErrorCase);
-
-async function serverErrorCase() {
-	nock('https://api.github.com')
-		.get('/repos/sheplu/Octolens')
-		.reply(500, { message: 'Internal Server Error' });
-
-	await assert.rejects(rule.check(makeContext()));
-}
+		await assert.rejects(rule.check(makeContext()));
+	});
+});

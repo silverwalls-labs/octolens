@@ -1,4 +1,4 @@
-import { test } from 'node:test';
+import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import fc from 'fast-check';
 import {
@@ -15,62 +15,48 @@ import {
 } from '../helpers/arbitraries.ts';
 import type { OrgScanReport, ScanResult } from '../../src/types/index.ts';
 
-test('formatJson round-trips any scan result', fuzzJsonRoundTrip);
+describe('formatters fuzz', () => {
+	test('formatJson round-trips any scan result', () => {
+		fc.assert(fc.property(arbScanResult, (result: ScanResult): void => {
+			assert.deepEqual(JSON.parse(formatJson(result)), result);
+		}), fuzzParams);
+	});
 
-function fuzzJsonRoundTrip() {
-	fc.assert(fc.property(arbScanResult, checkJsonRoundTrip), fuzzParams);
-}
+	test('formatJson round-trips any fleet report', () => {
+		fc.assert(fc.property(arbOrgScanReport, (report: OrgScanReport): void => {
+			assert.deepEqual(JSON.parse(formatJson(report)), report);
+		}), fuzzParams);
+	});
 
-function checkJsonRoundTrip(result: ScanResult): void {
-	assert.deepEqual(JSON.parse(formatJson(result)), result);
-}
+	test('markdown and pretty renderers never crash or leak undefined', () => {
+		fc.assert(fc.property(arbScanResult, (result: ScanResult): void => {
+			const md = formatMarkdown(result);
 
-test('formatJson round-trips any fleet report', fuzzJsonReportRoundTrip);
+			assert.equal(typeof md, 'string');
+			assert.doesNotMatch(md, /\bundefined\b/);
 
-function fuzzJsonReportRoundTrip() {
-	fc.assert(fc.property(arbOrgScanReport, checkJsonReportRoundTrip), fuzzParams);
-}
+			const plain = formatPretty(result, { color: false });
 
-function checkJsonReportRoundTrip(report: OrgScanReport): void {
-	assert.deepEqual(JSON.parse(formatJson(report)), report);
-}
+			assert.equal(typeof plain, 'string');
+			assert.doesNotMatch(plain, /\bundefined\b/);
 
-test('markdown and pretty renderers never crash or leak undefined', fuzzResultRenderers);
+			assert.equal(typeof formatPretty(result, { color: true }), 'string');
+		}), fuzzParams);
+	});
 
-function fuzzResultRenderers() {
-	fc.assert(fc.property(arbScanResult, checkResultRenderers), fuzzParams);
-}
+	test('fleet report renderers never crash or leak undefined', () => {
+		fc.assert(fc.property(arbOrgScanReport, (report: OrgScanReport): void => {
+			const md = formatMarkdownReport(report);
 
-function checkResultRenderers(result: ScanResult): void {
-	const md = formatMarkdown(result);
+			assert.equal(typeof md, 'string');
+			assert.doesNotMatch(md, /\bundefined\b/);
 
-	assert.equal(typeof md, 'string');
-	assert.doesNotMatch(md, /\bundefined\b/);
+			const plain = formatPrettyReport(report, { color: false });
 
-	const plain = formatPretty(result, { color: false });
+			assert.equal(typeof plain, 'string');
+			assert.doesNotMatch(plain, /\bundefined\b/);
 
-	assert.equal(typeof plain, 'string');
-	assert.doesNotMatch(plain, /\bundefined\b/);
-
-	assert.equal(typeof formatPretty(result, { color: true }), 'string');
-}
-
-test('fleet report renderers never crash or leak undefined', fuzzReportRenderers);
-
-function fuzzReportRenderers() {
-	fc.assert(fc.property(arbOrgScanReport, checkReportRenderers), fuzzParams);
-}
-
-function checkReportRenderers(report: OrgScanReport): void {
-	const md = formatMarkdownReport(report);
-
-	assert.equal(typeof md, 'string');
-	assert.doesNotMatch(md, /\bundefined\b/);
-
-	const plain = formatPrettyReport(report, { color: false });
-
-	assert.equal(typeof plain, 'string');
-	assert.doesNotMatch(plain, /\bundefined\b/);
-
-	assert.equal(typeof formatPrettyReport(report, { color: true }), 'string');
-}
+			assert.equal(typeof formatPrettyReport(report, { color: true }), 'string');
+		}), fuzzParams);
+	});
+});

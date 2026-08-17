@@ -1,4 +1,5 @@
 import {
+	describe,
 	test,
 	afterEach,
 } from 'node:test';
@@ -17,69 +18,64 @@ function captureStderr() {
 	};
 }
 
-afterEach(restoreStderr);
+describe('createLogger', () => {
+	afterEach(() => {
+		process.stderr.write = originalWrite;
+		captured.length = 0;
+	});
 
-function restoreStderr() {
-	process.stderr.write = originalWrite;
-	captured.length = 0;
-}
+	test('emits warn and error at default level (warn)', () => {
+		captureStderr();
+		const logger = createLogger();
 
-test('emits warn and error at default level (warn)', defaultLevelCase);
+		logger.debug('d');
+		logger.info('i');
+		logger.warn('w');
+		logger.error('e');
 
-function defaultLevelCase() {
-	captureStderr();
-	const logger = createLogger();
+		assert.equal(captured.length, 2);
+		assert.match(captured[0] ?? '', /\[warn\] w/);
+		assert.match(captured[1] ?? '', /\[error\] e/);
+	});
 
-	logger.debug('d');
-	logger.info('i');
-	logger.warn('w');
-	logger.error('e');
+	test('emits nothing at silent level', () => {
+		captureStderr();
+		const logger = createLogger('silent');
 
-	assert.equal(captured.length, 2);
-	assert.match(captured[0] ?? '', /\[warn\] w/);
-	assert.match(captured[1] ?? '', /\[error\] e/);
-}
+		logger.debug('d');
+		logger.info('i');
+		logger.warn('w');
+		logger.error('e');
 
-test('emits nothing at silent level', silentCase);
+		assert.equal(captured.length, 0);
+	});
 
-function silentCase() {
-	captureStderr();
-	const logger = createLogger('silent');
+	test('emits all levels at debug level', () => {
+		captureStderr();
+		const logger = createLogger('debug');
 
-	logger.debug('d');
-	logger.info('i');
-	logger.warn('w');
-	logger.error('e');
+		logger.debug('d');
+		logger.info('i');
+		logger.warn('w');
+		logger.error('e');
 
-	assert.equal(captured.length, 0);
-}
+		assert.equal(captured.length, 4);
+		assert.match(captured[0] ?? '', /\[debug\] d/);
+		assert.match(captured[1] ?? '', /\[info\] i/);
+		assert.match(captured[2] ?? '', /\[warn\] w/);
+		assert.match(captured[3] ?? '', /\[error\] e/);
+	});
 
-test('emits all levels at debug level', debugCase);
+	test('appends JSON data when provided', () => {
+		captureStderr();
+		const logger = createLogger('info');
 
-function debugCase() {
-	captureStderr();
-	const logger = createLogger('debug');
+		logger.info('msg', { key: 'val' });
 
-	logger.debug('d');
-	logger.info('i');
-	logger.warn('w');
-	logger.error('e');
-
-	assert.equal(captured.length, 4);
-	assert.match(captured[0] ?? '', /\[debug\] d/);
-	assert.match(captured[1] ?? '', /\[info\] i/);
-	assert.match(captured[2] ?? '', /\[warn\] w/);
-	assert.match(captured[3] ?? '', /\[error\] e/);
-}
-
-test('appends JSON data when provided', dataCase);
-
-function dataCase() {
-	captureStderr();
-	const logger = createLogger('info');
-
-	logger.info('msg', { key: 'val' });
-
-	assert.equal(captured.length, 1);
-	assert.match(captured[0] ?? '', /\[info\] msg {"key":"val"}/);
-}
+		assert.equal(captured.length, 1);
+		assert.match(
+			captured[0] ?? '',
+			/\[info\] msg {"key":"val"}/,
+		);
+	});
+});

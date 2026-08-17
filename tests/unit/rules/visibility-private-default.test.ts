@@ -1,4 +1,5 @@
 import {
+	describe,
 	test,
 	beforeEach,
 	afterEach,
@@ -13,107 +14,95 @@ import { makeRepoResponse } from '../../helpers/fixtures.ts';
 
 const RULE_ID = 'access/visibility-private-default';
 
-beforeEach(disableNet);
-afterEach(restoreNet);
+describe('access/visibility-private-default', () => {
+	beforeEach(disableNet);
+	afterEach(restoreNet);
 
-test('reports no findings when the repo is private', privateCase);
+	test('reports no findings when the repo is private', async () => {
+		mockMeta({ visibility: 'private' });
 
-async function privateCase() {
-	mockMeta({ visibility: 'private' });
+		const findings = await rule.check(makeContext());
 
-	const findings = await rule.check(makeContext());
+		assert.equal(findings.length, 0);
+	});
 
-	assert.equal(findings.length, 0);
-}
+	test('reports a finding when the repo is public and not allowed', async () => {
+		mockMeta({ visibility: 'public' });
 
-test('reports a finding when the repo is public and not allowed', publicNotAllowedCase);
+		const findings = await rule.check(makeContext());
 
-async function publicNotAllowedCase() {
-	mockMeta({ visibility: 'public' });
+		assert.equal(findings.length, 1);
+		assert.equal(findings[0]?.ruleId, RULE_ID);
+		assert.equal(findings[0]?.severity, 'medium');
+		assert.match(findings[0]?.title ?? '', /public/);
+	});
 
-	const findings = await rule.check(makeContext());
+	test('reports no findings when the repo is public and on allow-public', async () => {
+		mockMeta({ visibility: 'public' });
 
-	assert.equal(findings.length, 1);
-	assert.equal(findings[0]?.ruleId, RULE_ID);
-	assert.equal(findings[0]?.severity, 'medium');
-	assert.match(findings[0]?.title ?? '', /public/);
-}
-
-test('reports no findings when the repo is public and on allow-public', publicAllowedCase);
-
-async function publicAllowedCase() {
-	mockMeta({ visibility: 'public' });
-
-	const findings = await rule.check(makeContext({
-		ruleConfig: {
-			[RULE_ID]: {
-				allowPublic: [ 'sheplu/octolens' ],
-				allowInternal: [],
+		const findings = await rule.check(makeContext({
+			ruleConfig: {
+				[RULE_ID]: {
+					allowPublic: [ 'sheplu/octolens' ],
+					allowInternal: [],
+				},
 			},
-		},
-	}));
+		}));
 
-	assert.equal(findings.length, 0);
-}
+		assert.equal(findings.length, 0);
+	});
 
-test('reports a finding when the repo is internal and not allowed', internalNotAllowedCase);
+	test('reports a finding when the repo is internal and not allowed', async () => {
+		mockMeta({ visibility: 'internal' });
 
-async function internalNotAllowedCase() {
-	mockMeta({ visibility: 'internal' });
+		const findings = await rule.check(makeContext());
 
-	const findings = await rule.check(makeContext());
+		assert.equal(findings.length, 1);
+		assert.equal(findings[0]?.ruleId, RULE_ID);
+		assert.match(findings[0]?.title ?? '', /internal/);
+	});
 
-	assert.equal(findings.length, 1);
-	assert.equal(findings[0]?.ruleId, RULE_ID);
-	assert.match(findings[0]?.title ?? '', /internal/);
-}
+	test('reports no findings when the repo is internal and on allow-internal', async () => {
+		mockMeta({ visibility: 'internal' });
 
-test('reports no findings when the repo is internal and on allow-internal', internalAllowedCase);
-
-async function internalAllowedCase() {
-	mockMeta({ visibility: 'internal' });
-
-	const findings = await rule.check(makeContext({
-		ruleConfig: {
-			[RULE_ID]: {
-				allowPublic: [],
-				allowInternal: [ 'sheplu/octolens' ],
+		const findings = await rule.check(makeContext({
+			ruleConfig: {
+				[RULE_ID]: {
+					allowPublic: [],
+					allowInternal: [ 'sheplu/octolens' ],
+				},
 			},
-		},
-	}));
+		}));
 
-	assert.equal(findings.length, 0);
-}
+		assert.equal(findings.length, 0);
+	});
 
-test('public allowlist does not exempt internal repos', crossListCase);
+	test('public allowlist does not exempt internal repos', async () => {
+		mockMeta({ visibility: 'internal' });
 
-async function crossListCase() {
-	mockMeta({ visibility: 'internal' });
-
-	const findings = await rule.check(makeContext({
-		ruleConfig: {
-			[RULE_ID]: {
-				allowPublic: [ 'sheplu/octolens' ],
-				allowInternal: [],
+		const findings = await rule.check(makeContext({
+			ruleConfig: {
+				[RULE_ID]: {
+					allowPublic: [ 'sheplu/octolens' ],
+					allowInternal: [],
+				},
 			},
-		},
-	}));
+		}));
 
-	assert.equal(findings.length, 1);
-}
+		assert.equal(findings.length, 1);
+	});
+
+	test('propagates server errors from the API', async () => {
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens')
+			.reply(500, { message: 'Internal Server Error' });
+
+		await assert.rejects(rule.check(makeContext()));
+	});
+});
 
 function mockMeta(opts: { visibility: 'public' | 'private' | 'internal'; }) {
 	nock('https://api.github.com')
 		.get('/repos/sheplu/Octolens')
 		.reply(200, makeRepoResponse({ visibility: opts.visibility }));
-}
-
-test('propagates server errors from the API', serverErrorCase);
-
-async function serverErrorCase() {
-	nock('https://api.github.com')
-		.get('/repos/sheplu/Octolens')
-		.reply(500, { message: 'Internal Server Error' });
-
-	await assert.rejects(rule.check(makeContext()));
 }

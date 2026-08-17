@@ -1,4 +1,5 @@
 import {
+	describe,
 	test,
 	beforeEach,
 	afterEach,
@@ -12,53 +13,47 @@ import {
 
 const ENDPOINT = '/repos/sheplu/Octolens/actions/permissions';
 
-beforeEach(disableNet);
-afterEach(restoreNet);
+describe('cicd/actions-allowlist', () => {
+	beforeEach(disableNet);
+	afterEach(restoreNet);
 
-test('reports no findings when allowed_actions is selected', selectedCase);
+	test('reports no findings when allowed_actions is selected', async () => {
+		nock('https://api.github.com')
+			.get(ENDPOINT)
+			.reply(200, { enabled: true, allowed_actions: 'selected' });
 
-async function selectedCase() {
-	nock('https://api.github.com')
-		.get(ENDPOINT)
-		.reply(200, { enabled: true, allowed_actions: 'selected' });
+		const findings = await rule.check(makeContext());
 
-	const findings = await rule.check(makeContext());
+		assert.equal(findings.length, 0);
+	});
 
-	assert.equal(findings.length, 0);
-}
+	test('reports no findings when Actions is disabled', async () => {
+		nock('https://api.github.com')
+			.get(ENDPOINT)
+			.reply(200, { enabled: false, allowed_actions: null });
 
-test('reports no findings when Actions is disabled', disabledCase);
+		const findings = await rule.check(makeContext());
 
-async function disabledCase() {
-	nock('https://api.github.com')
-		.get(ENDPOINT)
-		.reply(200, { enabled: false, allowed_actions: null });
+		assert.equal(findings.length, 0);
+	});
 
-	const findings = await rule.check(makeContext());
+	test('reports a finding when allowed_actions is "all"', async () => {
+		nock('https://api.github.com')
+			.get(ENDPOINT)
+			.reply(200, { enabled: true, allowed_actions: 'all' });
 
-	assert.equal(findings.length, 0);
-}
+		const findings = await rule.check(makeContext());
 
-test('reports a finding when allowed_actions is "all"', allCase);
+		assert.equal(findings.length, 1);
+		assert.equal(findings[0]?.ruleId, 'cicd/actions-allowlist');
+		assert.equal(findings[0]?.severity, 'medium');
+	});
 
-async function allCase() {
-	nock('https://api.github.com')
-		.get(ENDPOINT)
-		.reply(200, { enabled: true, allowed_actions: 'all' });
+	test('propagates server errors from the API', async () => {
+		nock('https://api.github.com')
+			.get(ENDPOINT)
+			.reply(500, { message: 'Internal Server Error' });
 
-	const findings = await rule.check(makeContext());
-
-	assert.equal(findings.length, 1);
-	assert.equal(findings[0]?.ruleId, 'cicd/actions-allowlist');
-	assert.equal(findings[0]?.severity, 'medium');
-}
-
-test('propagates server errors from the API', serverErrorCase);
-
-async function serverErrorCase() {
-	nock('https://api.github.com')
-		.get(ENDPOINT)
-		.reply(500, { message: 'Internal Server Error' });
-
-	await assert.rejects(rule.check(makeContext()));
-}
+		await assert.rejects(rule.check(makeContext()));
+	});
+});

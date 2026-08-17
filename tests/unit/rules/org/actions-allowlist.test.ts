@@ -1,4 +1,5 @@
 import {
+	describe,
 	test,
 	beforeEach,
 	afterEach,
@@ -14,80 +15,70 @@ import { makeOrgActionsPermissionsResponse } from '../../../helpers/fixtures.ts'
 
 const ENDPOINT = '/orgs/silverwalls-labs/actions/permissions';
 
-beforeEach(disableNet);
-afterEach(restoreNet);
+describe('org/actions-allowlist', () => {
+	beforeEach(disableNet);
+	afterEach(restoreNet);
 
-test('reports no findings when actions are restricted to selected', selectedCase);
+	test('reports no findings when actions are restricted to selected', async () => {
+		nock('https://api.github.com')
+			.get(ENDPOINT)
+			.reply(200, makeOrgActionsPermissionsResponse({ allowedActions: 'selected' }));
 
-async function selectedCase() {
-	nock('https://api.github.com')
-		.get(ENDPOINT)
-		.reply(200, makeOrgActionsPermissionsResponse({ allowedActions: 'selected' }));
+		const findings = await rule.check(makeOrgContext());
 
-	const findings = await rule.check(makeOrgContext());
+		assert.equal(findings.length, 0);
+	});
 
-	assert.equal(findings.length, 0);
-}
+	test('reports no findings when actions are restricted to local only', async () => {
+		nock('https://api.github.com')
+			.get(ENDPOINT)
+			.reply(200, makeOrgActionsPermissionsResponse({ allowedActions: 'local_only' }));
 
-test('reports no findings when actions are restricted to local only', localOnlyCase);
+		const findings = await rule.check(makeOrgContext());
 
-async function localOnlyCase() {
-	nock('https://api.github.com')
-		.get(ENDPOINT)
-		.reply(200, makeOrgActionsPermissionsResponse({ allowedActions: 'local_only' }));
+		assert.equal(findings.length, 0);
+	});
 
-	const findings = await rule.check(makeOrgContext());
+	test('reports no findings when actions are disabled for all repositories', async () => {
+		nock('https://api.github.com')
+			.get(ENDPOINT)
+			.reply(200, makeOrgActionsPermissionsResponse({
+				enabledRepositories: 'none',
+				allowedActions: 'all',
+			}));
 
-	assert.equal(findings.length, 0);
-}
+		const findings = await rule.check(makeOrgContext());
 
-test('reports no findings when actions are disabled for all repositories', disabledCase);
+		assert.equal(findings.length, 0);
+	});
 
-async function disabledCase() {
-	nock('https://api.github.com')
-		.get(ENDPOINT)
-		.reply(200, makeOrgActionsPermissionsResponse({
-			enabledRepositories: 'none',
-			allowedActions: 'all',
-		}));
+	test('reports a finding when all marketplace actions are allowed', async () => {
+		nock('https://api.github.com')
+			.get(ENDPOINT)
+			.reply(200, makeOrgActionsPermissionsResponse({ allowedActions: 'all' }));
 
-	const findings = await rule.check(makeOrgContext());
+		const findings = await rule.check(makeOrgContext());
 
-	assert.equal(findings.length, 0);
-}
+		assert.equal(findings.length, 1);
+		assert.equal(findings[0]?.ruleId, 'org/actions-allowlist');
+		assert.equal(findings[0]?.severity, 'medium');
+		assert.equal(findings[0]?.org, 'silverwalls-labs');
+		assert.equal(findings[0]?.repo, undefined);
+	});
 
-test('reports a finding when all marketplace actions are allowed', allAllowedCase);
+	test('skips on a permission-denied 403', async () => {
+		nock('https://api.github.com')
+			.get(ENDPOINT)
+			.reply(403, { message: 'Must have admin rights' });
 
-async function allAllowedCase() {
-	nock('https://api.github.com')
-		.get(ENDPOINT)
-		.reply(200, makeOrgActionsPermissionsResponse({ allowedActions: 'all' }));
+		await assert.rejects(rule.check(makeOrgContext()), RuleSkipped);
+	});
 
-	const findings = await rule.check(makeOrgContext());
+	test('propagates server errors from the API', async () => {
+		nock('https://api.github.com')
+			.get(ENDPOINT)
+			.reply(500, { message: 'Internal Server Error' });
 
-	assert.equal(findings.length, 1);
-	assert.equal(findings[0]?.ruleId, 'org/actions-allowlist');
-	assert.equal(findings[0]?.severity, 'medium');
-	assert.equal(findings[0]?.org, 'silverwalls-labs');
-	assert.equal(findings[0]?.repo, undefined);
-}
-
-test('skips on a permission-denied 403', forbiddenCase);
-
-async function forbiddenCase() {
-	nock('https://api.github.com')
-		.get(ENDPOINT)
-		.reply(403, { message: 'Must have admin rights' });
-
-	await assert.rejects(rule.check(makeOrgContext()), RuleSkipped);
-}
-
-test('propagates server errors from the API', serverErrorCase);
-
-async function serverErrorCase() {
-	nock('https://api.github.com')
-		.get(ENDPOINT)
-		.reply(500, { message: 'Internal Server Error' });
-
-	await assert.rejects(rule.check(makeOrgContext()));
-}
+		await assert.rejects(rule.check(makeOrgContext()));
+	});
+});

@@ -1,4 +1,6 @@
-import { test, afterEach } from 'node:test';
+import {
+	describe, test, afterEach,
+} from 'node:test';
 import assert from 'node:assert/strict';
 import {
 	mkdtempSync, rmSync, writeFileSync,
@@ -9,13 +11,29 @@ import { readVersion } from '../../../src/cli/version.ts';
 
 const tempDirs: string[] = [];
 
-afterEach(cleanupTempDirs);
+describe('readVersion', () => {
+	afterEach(() => {
+		for (const dir of tempDirs.splice(0)) {
+			rmSync(dir, { recursive: true, force: true });
+		}
+	});
 
-function cleanupTempDirs() {
-	for (const dir of tempDirs.splice(0)) {
-		rmSync(dir, { recursive: true, force: true });
-	}
-}
+	test('readVersion returns the package version by default', () => {
+		assert.match(readVersion(), /^\d+\.\d+\.\d+/);
+	});
+
+	test('readVersion reads an explicit package.json path', () => {
+		const path = writePackageJson({ version: '9.9.9' });
+
+		assert.equal(readVersion(path), '9.9.9');
+	});
+
+	test('readVersion falls back when the version field is missing', () => {
+		const path = writePackageJson({ name: 'no-version' });
+
+		assert.equal(readVersion(path), '0.0.0');
+	});
+});
 
 function writePackageJson(body: Record<string, unknown>): string {
 	const dir = mkdtempSync(join(tmpdir(), 'octolens-version-'));
@@ -25,26 +43,4 @@ function writePackageJson(body: Record<string, unknown>): string {
 	tempDirs.push(dir);
 
 	return path;
-}
-
-test('readVersion returns the package version by default', defaultVersion);
-
-function defaultVersion() {
-	assert.match(readVersion(), /^\d+\.\d+\.\d+/);
-}
-
-test('readVersion reads an explicit package.json path', explicitPath);
-
-function explicitPath() {
-	const path = writePackageJson({ version: '9.9.9' });
-
-	assert.equal(readVersion(path), '9.9.9');
-}
-
-test('readVersion falls back when the version field is missing', missingVersion);
-
-function missingVersion() {
-	const path = writePackageJson({ name: 'no-version' });
-
-	assert.equal(readVersion(path), '0.0.0');
 }

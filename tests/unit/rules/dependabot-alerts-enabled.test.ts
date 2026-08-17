@@ -1,4 +1,5 @@
 import {
+	describe,
 	test,
 	beforeEach,
 	afterEach,
@@ -10,52 +11,46 @@ import {
 	disableNet, makeContext, restoreNet,
 } from '../../helpers/context.ts';
 
-beforeEach(disableNet);
-afterEach(restoreNet);
+describe('security/dependabot-alerts-enabled', () => {
+	beforeEach(disableNet);
+	afterEach(restoreNet);
 
-test('reports no findings when alerts are enabled (204)', alertsEnabledCase);
+	test('reports no findings when alerts are enabled (204)', async () => {
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens/vulnerability-alerts')
+			.reply(204);
 
-async function alertsEnabledCase() {
-	nock('https://api.github.com')
-		.get('/repos/sheplu/Octolens/vulnerability-alerts')
-		.reply(204);
+		const findings = await rule.check(makeContext());
 
-	const findings = await rule.check(makeContext());
+		assert.equal(findings.length, 0);
+	});
 
-	assert.equal(findings.length, 0);
-}
+	test('reports a finding when alerts are disabled (404)', async () => {
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens/vulnerability-alerts')
+			.reply(404, { message: 'Not Found' });
 
-test('reports a finding when alerts are disabled (404)', alertsDisabledCase);
+		const findings = await rule.check(makeContext());
 
-async function alertsDisabledCase() {
-	nock('https://api.github.com')
-		.get('/repos/sheplu/Octolens/vulnerability-alerts')
-		.reply(404, { message: 'Not Found' });
+		assert.equal(findings.length, 1);
+		assert.equal(findings[0]?.ruleId, 'security/dependabot-alerts-enabled');
+		assert.equal(findings[0]?.severity, 'high');
+		assert.deepEqual(findings[0]?.repo, { owner: 'sheplu', name: 'Octolens' });
+	});
 
-	const findings = await rule.check(makeContext());
+	test('propagates non-404 errors (e.g. 401)', async () => {
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens/vulnerability-alerts')
+			.reply(401, { message: 'Bad credentials' });
 
-	assert.equal(findings.length, 1);
-	assert.equal(findings[0]?.ruleId, 'security/dependabot-alerts-enabled');
-	assert.equal(findings[0]?.severity, 'high');
-	assert.deepEqual(findings[0]?.repo, { owner: 'sheplu', name: 'Octolens' });
-}
+		await assert.rejects(rule.check(makeContext()));
+	});
 
-test('propagates non-404 errors (e.g. 401)', alertsAuthErrorCase);
+	test('propagates server errors from the API', async () => {
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens/vulnerability-alerts')
+			.reply(500, { message: 'Internal Server Error' });
 
-async function alertsAuthErrorCase() {
-	nock('https://api.github.com')
-		.get('/repos/sheplu/Octolens/vulnerability-alerts')
-		.reply(401, { message: 'Bad credentials' });
-
-	await assert.rejects(rule.check(makeContext()));
-}
-
-test('propagates server errors from the API', serverErrorCase);
-
-async function serverErrorCase() {
-	nock('https://api.github.com')
-		.get('/repos/sheplu/Octolens/vulnerability-alerts')
-		.reply(500, { message: 'Internal Server Error' });
-
-	await assert.rejects(rule.check(makeContext()));
-}
+		await assert.rejects(rule.check(makeContext()));
+	});
+});

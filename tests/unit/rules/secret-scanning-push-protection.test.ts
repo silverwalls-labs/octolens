@@ -1,4 +1,5 @@
 import {
+	describe,
 	test,
 	beforeEach,
 	afterEach,
@@ -11,59 +12,53 @@ import {
 } from '../../helpers/context.ts';
 import { makeRepoResponse } from '../../helpers/fixtures.ts';
 
-beforeEach(disableNet);
-afterEach(restoreNet);
+describe('security/secret-scanning-push-protection', () => {
+	beforeEach(disableNet);
+	afterEach(restoreNet);
 
-test('reports no findings when push protection is enabled', enabledCase);
+	test('reports no findings when push protection is enabled', async () => {
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens')
+			.reply(200, makeRepoResponse({
+				secretScanning: 'enabled',
+				secretScanningPushProtection: 'enabled',
+			}));
 
-async function enabledCase() {
-	nock('https://api.github.com')
-		.get('/repos/sheplu/Octolens')
-		.reply(200, makeRepoResponse({
-			secretScanning: 'enabled',
-			secretScanningPushProtection: 'enabled',
-		}));
+		const findings = await rule.check(makeContext());
 
-	const findings = await rule.check(makeContext());
+		assert.equal(findings.length, 0);
+	});
 
-	assert.equal(findings.length, 0);
-}
+	test('reports a finding when push protection is disabled', async () => {
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens')
+			.reply(200, makeRepoResponse({
+				secretScanning: 'enabled',
+				secretScanningPushProtection: 'disabled',
+			}));
 
-test('reports a finding when push protection is disabled', disabledCase);
+		const findings = await rule.check(makeContext());
 
-async function disabledCase() {
-	nock('https://api.github.com')
-		.get('/repos/sheplu/Octolens')
-		.reply(200, makeRepoResponse({
-			secretScanning: 'enabled',
-			secretScanningPushProtection: 'disabled',
-		}));
+		assert.equal(findings.length, 1);
+		assert.equal(findings[0]?.ruleId, 'security/secret-scanning-push-protection');
+		assert.equal(findings[0]?.severity, 'high');
+	});
 
-	const findings = await rule.check(makeContext());
+	test('reports a finding when security_and_analysis is absent', async () => {
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens')
+			.reply(200, makeRepoResponse({ secretScanning: 'absent' }));
 
-	assert.equal(findings.length, 1);
-	assert.equal(findings[0]?.ruleId, 'security/secret-scanning-push-protection');
-	assert.equal(findings[0]?.severity, 'high');
-}
+		const findings = await rule.check(makeContext());
 
-test('reports a finding when security_and_analysis is absent', absentCase);
+		assert.equal(findings.length, 1);
+	});
 
-async function absentCase() {
-	nock('https://api.github.com')
-		.get('/repos/sheplu/Octolens')
-		.reply(200, makeRepoResponse({ secretScanning: 'absent' }));
+	test('propagates server errors from the API', async () => {
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens')
+			.reply(500, { message: 'Internal Server Error' });
 
-	const findings = await rule.check(makeContext());
-
-	assert.equal(findings.length, 1);
-}
-
-test('propagates server errors from the API', serverErrorCase);
-
-async function serverErrorCase() {
-	nock('https://api.github.com')
-		.get('/repos/sheplu/Octolens')
-		.reply(500, { message: 'Internal Server Error' });
-
-	await assert.rejects(rule.check(makeContext()));
-}
+		await assert.rejects(rule.check(makeContext()));
+	});
+});

@@ -1,4 +1,5 @@
 import {
+	describe,
 	test,
 	beforeEach,
 	afterEach,
@@ -12,61 +13,55 @@ import {
 
 const ENDPOINT = '/repos/sheplu/Octolens/actions/permissions/workflow';
 
-beforeEach(disableNet);
-afterEach(restoreNet);
+describe('cicd/forbid-workflow-pr-approval', () => {
+	beforeEach(disableNet);
+	afterEach(restoreNet);
 
-test('reports no findings when workflows cannot approve PRs', forbiddenCase);
+	test('reports no findings when workflows cannot approve PRs', async () => {
+		nock('https://api.github.com')
+			.get(ENDPOINT)
+			.reply(200, {
+				default_workflow_permissions: 'read',
+				can_approve_pull_request_reviews: false,
+			});
 
-async function forbiddenCase() {
-	nock('https://api.github.com')
-		.get(ENDPOINT)
-		.reply(200, {
-			default_workflow_permissions: 'read',
-			can_approve_pull_request_reviews: false,
-		});
+		const findings = await rule.check(makeContext());
 
-	const findings = await rule.check(makeContext());
+		assert.equal(findings.length, 0);
+	});
 
-	assert.equal(findings.length, 0);
-}
+	test('reports a finding when workflows can approve PRs', async () => {
+		nock('https://api.github.com')
+			.get(ENDPOINT)
+			.reply(200, {
+				default_workflow_permissions: 'read',
+				can_approve_pull_request_reviews: true,
+			});
 
-test('reports a finding when workflows can approve PRs', allowedCase);
+		const findings = await rule.check(makeContext());
 
-async function allowedCase() {
-	nock('https://api.github.com')
-		.get(ENDPOINT)
-		.reply(200, {
-			default_workflow_permissions: 'read',
-			can_approve_pull_request_reviews: true,
-		});
+		assert.equal(findings.length, 1);
+		assert.equal(findings[0]?.ruleId, 'cicd/forbid-workflow-pr-approval');
+		assert.equal(findings[0]?.severity, 'high');
+	});
 
-	const findings = await rule.check(makeContext());
+	test('reports no findings when the field is missing (defaults false)', async () => {
+		nock('https://api.github.com')
+			.get(ENDPOINT)
+			.reply(200, {
+				default_workflow_permissions: 'read',
+			});
 
-	assert.equal(findings.length, 1);
-	assert.equal(findings[0]?.ruleId, 'cicd/forbid-workflow-pr-approval');
-	assert.equal(findings[0]?.severity, 'high');
-}
+		const findings = await rule.check(makeContext());
 
-test('reports no findings when the field is missing (defaults false)', missingCase);
+		assert.equal(findings.length, 0);
+	});
 
-async function missingCase() {
-	nock('https://api.github.com')
-		.get(ENDPOINT)
-		.reply(200, {
-			default_workflow_permissions: 'read',
-		});
+	test('propagates server errors from the API', async () => {
+		nock('https://api.github.com')
+			.get(ENDPOINT)
+			.reply(500, { message: 'Internal Server Error' });
 
-	const findings = await rule.check(makeContext());
-
-	assert.equal(findings.length, 0);
-}
-
-test('propagates server errors from the API', serverErrorCase);
-
-async function serverErrorCase() {
-	nock('https://api.github.com')
-		.get(ENDPOINT)
-		.reply(500, { message: 'Internal Server Error' });
-
-	await assert.rejects(rule.check(makeContext()));
-}
+		await assert.rejects(rule.check(makeContext()));
+	});
+});
