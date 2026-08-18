@@ -1,4 +1,5 @@
 import {
+	describe,
 	test,
 	beforeEach,
 	afterEach,
@@ -18,60 +19,54 @@ import {
 const REPO = '/repos/sheplu/Octolens';
 const PROTECTION = '/repos/sheplu/Octolens/branches/main/protection';
 
-beforeEach(disableNet);
-afterEach(restoreNet);
+describe('repo-config/require-signed-commits', () => {
+	beforeEach(disableNet);
+	afterEach(restoreNet);
 
-test('reports no findings when signed commits are required', requiredCase);
+	test('reports no findings when signed commits are required', async () => {
+		nock('https://api.github.com').get(REPO).reply(200, makeRepoResponse());
+		nock('https://api.github.com').get(PROTECTION).reply(
+			200,
+			makeBranchProtectionResponse({
+				requirePullRequest: true,
+				requireSignedCommits: true,
+			}),
+		);
 
-async function requiredCase() {
-	nock('https://api.github.com').get(REPO).reply(200, makeRepoResponse());
-	nock('https://api.github.com').get(PROTECTION).reply(
-		200,
-		makeBranchProtectionResponse({
-			requirePullRequest: true,
-			requireSignedCommits: true,
-		}),
-	);
+		const findings = await rule.check(makeContext());
 
-	const findings = await rule.check(makeContext());
+		assert.equal(findings.length, 0);
+	});
 
-	assert.equal(findings.length, 0);
-}
+	test('reports a finding when signed commits are not required', async () => {
+		nock('https://api.github.com').get(REPO).reply(200, makeRepoResponse());
+		nock('https://api.github.com').get(PROTECTION).reply(
+			200,
+			makeBranchProtectionResponse({
+				requirePullRequest: true,
+				requireSignedCommits: false,
+			}),
+		);
 
-test('reports a finding when signed commits are not required', missingCase);
+		const findings = await rule.check(makeContext());
 
-async function missingCase() {
-	nock('https://api.github.com').get(REPO).reply(200, makeRepoResponse());
-	nock('https://api.github.com').get(PROTECTION).reply(
-		200,
-		makeBranchProtectionResponse({
-			requirePullRequest: true,
-			requireSignedCommits: false,
-		}),
-	);
+		assert.equal(findings.length, 1);
+		assert.equal(findings[0]?.ruleId, 'repo-config/require-signed-commits');
+		assert.equal(findings[0]?.severity, 'medium');
+	});
 
-	const findings = await rule.check(makeContext());
+	test('skips when no protection rule exists', async () => {
+		nock('https://api.github.com').get(REPO).reply(200, makeRepoResponse());
+		nock('https://api.github.com').get(PROTECTION).reply(404, { message: 'Branch not protected' });
 
-	assert.equal(findings.length, 1);
-	assert.equal(findings[0]?.ruleId, 'repo-config/require-signed-commits');
-	assert.equal(findings[0]?.severity, 'medium');
-}
+		await assert.rejects(rule.check(makeContext()), RuleSkipped);
+	});
 
-test('skips when no protection rule exists', noProtectionCase);
+	test('propagates server errors from the API', async () => {
+		nock('https://api.github.com')
+			.get(REPO)
+			.reply(500, { message: 'Internal Server Error' });
 
-async function noProtectionCase() {
-	nock('https://api.github.com').get(REPO).reply(200, makeRepoResponse());
-	nock('https://api.github.com').get(PROTECTION).reply(404, { message: 'Branch not protected' });
-
-	await assert.rejects(rule.check(makeContext()), RuleSkipped);
-}
-
-test('propagates server errors from the API', serverErrorCase);
-
-async function serverErrorCase() {
-	nock('https://api.github.com')
-		.get(REPO)
-		.reply(500, { message: 'Internal Server Error' });
-
-	await assert.rejects(rule.check(makeContext()));
-}
+		await assert.rejects(rule.check(makeContext()));
+	});
+});

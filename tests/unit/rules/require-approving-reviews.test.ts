@@ -1,4 +1,5 @@
 import {
+	describe,
 	test,
 	beforeEach,
 	afterEach,
@@ -15,81 +16,73 @@ import {
 	makeRepoResponse,
 } from '../../helpers/fixtures.ts';
 
-beforeEach(disableNet);
-afterEach(restoreNet);
+describe('repo-config/require-approving-reviews', () => {
+	beforeEach(disableNet);
+	afterEach(restoreNet);
 
-test('reports no findings when at least one approval is required', oneApprovalCase);
+	test('reports no findings when at least one approval is required', async () => {
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens')
+			.reply(200, makeRepoResponse());
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens/branches/main/protection')
+			.reply(200, makeBranchProtectionResponse({
+				requirePullRequest: true,
+				requiredApprovingReviewCount: 1,
+			}));
 
-async function oneApprovalCase() {
-	nock('https://api.github.com')
-		.get('/repos/sheplu/Octolens')
-		.reply(200, makeRepoResponse());
-	nock('https://api.github.com')
-		.get('/repos/sheplu/Octolens/branches/main/protection')
-		.reply(200, makeBranchProtectionResponse({
-			requirePullRequest: true,
-			requiredApprovingReviewCount: 1,
-		}));
+		const findings = await rule.check(makeContext());
 
-	const findings = await rule.check(makeContext());
+		assert.equal(findings.length, 0);
+	});
 
-	assert.equal(findings.length, 0);
-}
+	test('reports a finding when zero approvals are required', async () => {
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens')
+			.reply(200, makeRepoResponse());
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens/branches/main/protection')
+			.reply(200, makeBranchProtectionResponse({
+				requirePullRequest: true,
+				requiredApprovingReviewCount: 0,
+			}));
 
-test('reports a finding when zero approvals are required', zeroApprovalCase);
+		const findings = await rule.check(makeContext());
 
-async function zeroApprovalCase() {
-	nock('https://api.github.com')
-		.get('/repos/sheplu/Octolens')
-		.reply(200, makeRepoResponse());
-	nock('https://api.github.com')
-		.get('/repos/sheplu/Octolens/branches/main/protection')
-		.reply(200, makeBranchProtectionResponse({
-			requirePullRequest: true,
-			requiredApprovingReviewCount: 0,
-		}));
+		assert.equal(findings.length, 1);
+		assert.equal(findings[0]?.ruleId, 'repo-config/require-approving-reviews');
+		assert.equal(findings[0]?.severity, 'high');
+	});
 
-	const findings = await rule.check(makeContext());
+	test('does not fire when PRs are not required at all', async () => {
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens')
+			.reply(200, makeRepoResponse());
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens/branches/main/protection')
+			.reply(200, makeBranchProtectionResponse({ requirePullRequest: false }));
 
-	assert.equal(findings.length, 1);
-	assert.equal(findings[0]?.ruleId, 'repo-config/require-approving-reviews');
-	assert.equal(findings[0]?.severity, 'high');
-}
+		const findings = await rule.check(makeContext());
 
-test('does not fire when PRs are not required at all', noPrRequiredCase);
+		assert.equal(findings.length, 0);
+	});
 
-async function noPrRequiredCase() {
-	nock('https://api.github.com')
-		.get('/repos/sheplu/Octolens')
-		.reply(200, makeRepoResponse());
-	nock('https://api.github.com')
-		.get('/repos/sheplu/Octolens/branches/main/protection')
-		.reply(200, makeBranchProtectionResponse({ requirePullRequest: false }));
+	test('skips when no protection rule exists', async () => {
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens')
+			.reply(200, makeRepoResponse());
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens/branches/main/protection')
+			.reply(404, { message: 'Branch not protected' });
 
-	const findings = await rule.check(makeContext());
+		await assert.rejects(rule.check(makeContext()), RuleSkipped);
+	});
 
-	assert.equal(findings.length, 0);
-}
+	test('propagates server errors from the API', async () => {
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens')
+			.reply(500, { message: 'Internal Server Error' });
 
-test('skips when no protection rule exists', noProtectionCase);
-
-async function noProtectionCase() {
-	nock('https://api.github.com')
-		.get('/repos/sheplu/Octolens')
-		.reply(200, makeRepoResponse());
-	nock('https://api.github.com')
-		.get('/repos/sheplu/Octolens/branches/main/protection')
-		.reply(404, { message: 'Branch not protected' });
-
-	await assert.rejects(rule.check(makeContext()), RuleSkipped);
-}
-
-test('propagates server errors from the API', serverErrorCase);
-
-async function serverErrorCase() {
-	nock('https://api.github.com')
-		.get('/repos/sheplu/Octolens')
-		.reply(500, { message: 'Internal Server Error' });
-
-	await assert.rejects(rule.check(makeContext()));
-}
+		await assert.rejects(rule.check(makeContext()));
+	});
+});

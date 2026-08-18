@@ -1,4 +1,5 @@
 import {
+	describe,
 	test,
 	beforeEach,
 	afterEach,
@@ -13,83 +14,75 @@ import {
 
 const ENDPOINT = '/repos/sheplu/Octolens/teams';
 
-beforeEach(disableNet);
-afterEach(restoreNet);
+describe('access/team-based-admin', () => {
+	beforeEach(disableNet);
+	afterEach(restoreNet);
 
-test('reports no findings when at least one team has admin access', adminCase);
+	test('reports no findings when at least one team has admin access', async () => {
+		nock('https://api.github.com')
+			.get(ENDPOINT)
+			.query({ per_page: '100' })
+			.reply(200, [
+				{
+					slug: 'platform', name: 'Platform', permission: 'admin',
+				},
+				{
+					slug: 'frontend', name: 'Frontend', permission: 'push',
+				},
+			]);
 
-async function adminCase() {
-	nock('https://api.github.com')
-		.get(ENDPOINT)
-		.query({ per_page: '100' })
-		.reply(200, [
-			{
-				slug: 'platform', name: 'Platform', permission: 'admin',
-			},
-			{
-				slug: 'frontend', name: 'Frontend', permission: 'push',
-			},
-		]);
+		const findings = await rule.check(makeContext());
 
-	const findings = await rule.check(makeContext());
+		assert.equal(findings.length, 0);
+	});
 
-	assert.equal(findings.length, 0);
-}
+	test('reports a finding when no team has admin access', async () => {
+		nock('https://api.github.com')
+			.get(ENDPOINT)
+			.query({ per_page: '100' })
+			.reply(200, [
+				{
+					slug: 'frontend', name: 'Frontend', permission: 'maintain',
+				},
+				{
+					slug: 'reviewers', name: 'Reviewers', permission: 'push',
+				},
+			]);
 
-test('reports a finding when no team has admin access', noAdminCase);
+		const findings = await rule.check(makeContext());
 
-async function noAdminCase() {
-	nock('https://api.github.com')
-		.get(ENDPOINT)
-		.query({ per_page: '100' })
-		.reply(200, [
-			{
-				slug: 'frontend', name: 'Frontend', permission: 'maintain',
-			},
-			{
-				slug: 'reviewers', name: 'Reviewers', permission: 'push',
-			},
-		]);
+		assert.equal(findings.length, 1);
+		assert.equal(findings[0]?.ruleId, 'access/team-based-admin');
+		assert.equal(findings[0]?.severity, 'info');
+	});
 
-	const findings = await rule.check(makeContext());
+	test('reports a finding when no teams are attached', async () => {
+		nock('https://api.github.com')
+			.get(ENDPOINT)
+			.query({ per_page: '100' })
+			.reply(200, []);
 
-	assert.equal(findings.length, 1);
-	assert.equal(findings[0]?.ruleId, 'access/team-based-admin');
-	assert.equal(findings[0]?.severity, 'info');
-}
+		const findings = await rule.check(makeContext());
 
-test('reports a finding when no teams are attached', emptyCase);
+		assert.equal(findings.length, 1);
+		assert.equal(findings[0]?.ruleId, 'access/team-based-admin');
+	});
 
-async function emptyCase() {
-	nock('https://api.github.com')
-		.get(ENDPOINT)
-		.query({ per_page: '100' })
-		.reply(200, []);
+	test('skips when teams cannot be listed (no permission)', async () => {
+		nock('https://api.github.com')
+			.get(ENDPOINT)
+			.query({ per_page: '100' })
+			.reply(404, { message: 'Not Found' });
 
-	const findings = await rule.check(makeContext());
+		await assert.rejects(rule.check(makeContext()), RuleSkipped);
+	});
 
-	assert.equal(findings.length, 1);
-	assert.equal(findings[0]?.ruleId, 'access/team-based-admin');
-}
+	test('propagates server errors from the API', async () => {
+		nock('https://api.github.com')
+			.get(ENDPOINT)
+			.query({ per_page: '100' })
+			.reply(500, { message: 'Internal Server Error' });
 
-test('skips when teams cannot be listed (no permission)', notCheckedCase);
-
-async function notCheckedCase() {
-	nock('https://api.github.com')
-		.get(ENDPOINT)
-		.query({ per_page: '100' })
-		.reply(404, { message: 'Not Found' });
-
-	await assert.rejects(rule.check(makeContext()), RuleSkipped);
-}
-
-test('propagates server errors from the API', serverErrorCase);
-
-async function serverErrorCase() {
-	nock('https://api.github.com')
-		.get(ENDPOINT)
-		.query({ per_page: '100' })
-		.reply(500, { message: 'Internal Server Error' });
-
-	await assert.rejects(rule.check(makeContext()));
-}
+		await assert.rejects(rule.check(makeContext()));
+	});
+});

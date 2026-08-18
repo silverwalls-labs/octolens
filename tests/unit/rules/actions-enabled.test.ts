@@ -1,4 +1,5 @@
 import {
+	describe,
 	test,
 	beforeEach,
 	afterEach,
@@ -10,53 +11,47 @@ import {
 	disableNet, makeContext, restoreNet,
 } from '../../helpers/context.ts';
 
-beforeEach(disableNet);
-afterEach(restoreNet);
+describe('cicd/actions-enabled', () => {
+	beforeEach(disableNet);
+	afterEach(restoreNet);
 
-test('reports no findings when Actions is enabled', enabledCase);
+	test('reports no findings when Actions is enabled', async () => {
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens/actions/permissions')
+			.reply(200, { enabled: true, allowed_actions: 'all' });
 
-async function enabledCase() {
-	nock('https://api.github.com')
-		.get('/repos/sheplu/Octolens/actions/permissions')
-		.reply(200, { enabled: true, allowed_actions: 'all' });
+		const findings = await rule.check(makeContext());
 
-	const findings = await rule.check(makeContext());
+		assert.equal(findings.length, 0);
+	});
 
-	assert.equal(findings.length, 0);
-}
+	test('reports a finding when Actions is disabled', async () => {
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens/actions/permissions')
+			.reply(200, { enabled: false, allowed_actions: null });
 
-test('reports a finding when Actions is disabled', disabledCase);
+		const findings = await rule.check(makeContext());
 
-async function disabledCase() {
-	nock('https://api.github.com')
-		.get('/repos/sheplu/Octolens/actions/permissions')
-		.reply(200, { enabled: false, allowed_actions: null });
+		assert.equal(findings.length, 1);
+		assert.equal(findings[0]?.ruleId, 'cicd/actions-enabled');
+		assert.equal(findings[0]?.severity, 'info');
+	});
 
-	const findings = await rule.check(makeContext());
+	test('reports a finding when permissions endpoint returns 404', async () => {
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens/actions/permissions')
+			.reply(404, { message: 'Not Found' });
 
-	assert.equal(findings.length, 1);
-	assert.equal(findings[0]?.ruleId, 'cicd/actions-enabled');
-	assert.equal(findings[0]?.severity, 'info');
-}
+		const findings = await rule.check(makeContext());
 
-test('reports a finding when permissions endpoint returns 404', notFoundCase);
+		assert.equal(findings.length, 1);
+	});
 
-async function notFoundCase() {
-	nock('https://api.github.com')
-		.get('/repos/sheplu/Octolens/actions/permissions')
-		.reply(404, { message: 'Not Found' });
+	test('propagates server errors from the API', async () => {
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens/actions/permissions')
+			.reply(500, { message: 'Internal Server Error' });
 
-	const findings = await rule.check(makeContext());
-
-	assert.equal(findings.length, 1);
-}
-
-test('propagates server errors from the API', serverErrorCase);
-
-async function serverErrorCase() {
-	nock('https://api.github.com')
-		.get('/repos/sheplu/Octolens/actions/permissions')
-		.reply(500, { message: 'Internal Server Error' });
-
-	await assert.rejects(rule.check(makeContext()));
-}
+		await assert.rejects(rule.check(makeContext()));
+	});
+});

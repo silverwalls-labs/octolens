@@ -1,4 +1,5 @@
 import {
+	describe,
 	test,
 	beforeEach,
 	afterEach,
@@ -11,41 +12,37 @@ import {
 } from '../../helpers/context.ts';
 import { makeRepoResponse } from '../../helpers/fixtures.ts';
 
-beforeEach(disableNet);
-afterEach(restoreNet);
+describe('repo-config/topics-present', () => {
+	beforeEach(disableNet);
+	afterEach(restoreNet);
 
-test('reports no findings when topics exist', topicsPresentCase);
+	test('reports no findings when topics exist', async () => {
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens')
+			.reply(200, makeRepoResponse({ topics: [ 'security', 'cli' ] }));
 
-async function topicsPresentCase() {
-	nock('https://api.github.com')
-		.get('/repos/sheplu/Octolens')
-		.reply(200, makeRepoResponse({ topics: [ 'security', 'cli' ] }));
+		const findings = await rule.check(makeContext());
 
-	const findings = await rule.check(makeContext());
+		assert.equal(findings.length, 0);
+	});
 
-	assert.equal(findings.length, 0);
-}
+	test('reports a finding when no topics are set', async () => {
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens')
+			.reply(200, makeRepoResponse({ topics: [] }));
 
-test('reports a finding when no topics are set', noTopicsCase);
+		const findings = await rule.check(makeContext());
 
-async function noTopicsCase() {
-	nock('https://api.github.com')
-		.get('/repos/sheplu/Octolens')
-		.reply(200, makeRepoResponse({ topics: [] }));
+		assert.equal(findings.length, 1);
+		assert.equal(findings[0]?.ruleId, 'repo-config/topics-present');
+		assert.equal(findings[0]?.severity, 'info');
+	});
 
-	const findings = await rule.check(makeContext());
+	test('propagates server errors from the API', async () => {
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens')
+			.reply(500, { message: 'Internal Server Error' });
 
-	assert.equal(findings.length, 1);
-	assert.equal(findings[0]?.ruleId, 'repo-config/topics-present');
-	assert.equal(findings[0]?.severity, 'info');
-}
-
-test('propagates server errors from the API', serverErrorCase);
-
-async function serverErrorCase() {
-	nock('https://api.github.com')
-		.get('/repos/sheplu/Octolens')
-		.reply(500, { message: 'Internal Server Error' });
-
-	await assert.rejects(rule.check(makeContext()));
-}
+		await assert.rejects(rule.check(makeContext()));
+	});
+});

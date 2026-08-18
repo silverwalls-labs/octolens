@@ -1,4 +1,5 @@
 import {
+	describe,
 	test,
 	beforeEach,
 	afterEach,
@@ -14,53 +15,49 @@ import { makeOrgWorkflowPermissionsResponse } from '../../../helpers/fixtures.ts
 
 const ENDPOINT = '/orgs/silverwalls-labs/actions/permissions/workflow';
 
-beforeEach(disableNet);
-afterEach(restoreNet);
+describe('org/default-workflow-permissions-read', () => {
+	beforeEach(disableNet);
+	afterEach(restoreNet);
 
-test('reports no findings when the default is read-only', readCase);
+	test('reports no findings when the default is read-only', async () => {
+		nock('https://api.github.com')
+			.get(ENDPOINT)
+			.reply(200, makeOrgWorkflowPermissionsResponse({ defaultWorkflowPermissions: 'read' }));
 
-async function readCase() {
-	nock('https://api.github.com')
-		.get(ENDPOINT)
-		.reply(200, makeOrgWorkflowPermissionsResponse({ defaultWorkflowPermissions: 'read' }));
+		const findings = await rule.check(makeOrgContext());
 
-	const findings = await rule.check(makeOrgContext());
+		assert.equal(findings.length, 0);
+	});
 
-	assert.equal(findings.length, 0);
-}
+	test('reports a finding when the default is write', async () => {
+		nock('https://api.github.com')
+			.get(ENDPOINT)
+			.reply(200, makeOrgWorkflowPermissionsResponse({
+				defaultWorkflowPermissions: 'write',
+			}));
 
-test('reports a finding when the default is write', writeCase);
+		const findings = await rule.check(makeOrgContext());
 
-async function writeCase() {
-	nock('https://api.github.com')
-		.get(ENDPOINT)
-		.reply(200, makeOrgWorkflowPermissionsResponse({ defaultWorkflowPermissions: 'write' }));
+		assert.equal(findings.length, 1);
+		assert.equal(findings[0]?.ruleId, 'org/default-workflow-permissions-read');
+		assert.equal(findings[0]?.severity, 'high');
+		assert.equal(findings[0]?.org, 'silverwalls-labs');
+		assert.equal(findings[0]?.repo, undefined);
+	});
 
-	const findings = await rule.check(makeOrgContext());
+	test('skips on a permission-denied 403', async () => {
+		nock('https://api.github.com')
+			.get(ENDPOINT)
+			.reply(403, { message: 'Must have admin rights' });
 
-	assert.equal(findings.length, 1);
-	assert.equal(findings[0]?.ruleId, 'org/default-workflow-permissions-read');
-	assert.equal(findings[0]?.severity, 'high');
-	assert.equal(findings[0]?.org, 'silverwalls-labs');
-	assert.equal(findings[0]?.repo, undefined);
-}
+		await assert.rejects(rule.check(makeOrgContext()), RuleSkipped);
+	});
 
-test('skips on a permission-denied 403', forbiddenCase);
+	test('propagates server errors from the API', async () => {
+		nock('https://api.github.com')
+			.get(ENDPOINT)
+			.reply(500, { message: 'Internal Server Error' });
 
-async function forbiddenCase() {
-	nock('https://api.github.com')
-		.get(ENDPOINT)
-		.reply(403, { message: 'Must have admin rights' });
-
-	await assert.rejects(rule.check(makeOrgContext()), RuleSkipped);
-}
-
-test('propagates server errors from the API', serverErrorCase);
-
-async function serverErrorCase() {
-	nock('https://api.github.com')
-		.get(ENDPOINT)
-		.reply(500, { message: 'Internal Server Error' });
-
-	await assert.rejects(rule.check(makeOrgContext()));
-}
+		await assert.rejects(rule.check(makeOrgContext()));
+	});
+});

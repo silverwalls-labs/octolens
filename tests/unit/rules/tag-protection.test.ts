@@ -1,4 +1,5 @@
 import {
+	describe,
 	test,
 	beforeEach,
 	afterEach,
@@ -11,98 +12,88 @@ import {
 } from '../../helpers/context.ts';
 import { makeRulesetsResponse } from '../../helpers/fixtures.ts';
 
-beforeEach(disableNet);
-afterEach(restoreNet);
+describe('repo-config/tag-protection', () => {
+	beforeEach(disableNet);
+	afterEach(restoreNet);
 
-test('reports no findings when an active tag ruleset exists', tagRulesetCase);
+	test('reports no findings when an active tag ruleset exists', async () => {
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens/rulesets')
+			.reply(200, makeRulesetsResponse([
+				{
+					id: 1,
+					name: 'Tag protection',
+					target: 'tag',
+					enforcement: 'active',
+				},
+			]));
 
-async function tagRulesetCase() {
-	nock('https://api.github.com')
-		.get('/repos/sheplu/Octolens/rulesets')
-		.reply(200, makeRulesetsResponse([
-			{
-				id: 1,
-				name: 'Tag protection',
-				target: 'tag',
-				enforcement: 'active',
-			},
-		]));
+		const findings = await rule.check(makeContext());
 
-	const findings = await rule.check(makeContext());
+		assert.equal(findings.length, 0);
+	});
 
-	assert.equal(findings.length, 0);
-}
+	test('reports a finding when no rulesets exist', async () => {
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens/rulesets')
+			.reply(200, makeRulesetsResponse([]));
 
-test('reports a finding when no rulesets exist', emptyCase);
+		const findings = await rule.check(makeContext());
 
-async function emptyCase() {
-	nock('https://api.github.com')
-		.get('/repos/sheplu/Octolens/rulesets')
-		.reply(200, makeRulesetsResponse([]));
+		assert.equal(findings.length, 1);
+		assert.equal(findings[0]?.ruleId, 'repo-config/tag-protection');
+		assert.equal(findings[0]?.severity, 'medium');
+	});
 
-	const findings = await rule.check(makeContext());
+	test('reports a finding when only branch rulesets exist', async () => {
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens/rulesets')
+			.reply(200, makeRulesetsResponse([
+				{
+					id: 1,
+					name: 'Branch protection',
+					target: 'branch',
+					enforcement: 'active',
+				},
+			]));
 
-	assert.equal(findings.length, 1);
-	assert.equal(findings[0]?.ruleId, 'repo-config/tag-protection');
-	assert.equal(findings[0]?.severity, 'medium');
-}
+		const findings = await rule.check(makeContext());
 
-test('reports a finding when only branch rulesets exist', branchOnlyCase);
+		assert.equal(findings.length, 1);
+	});
 
-async function branchOnlyCase() {
-	nock('https://api.github.com')
-		.get('/repos/sheplu/Octolens/rulesets')
-		.reply(200, makeRulesetsResponse([
-			{
-				id: 1,
-				name: 'Branch protection',
-				target: 'branch',
-				enforcement: 'active',
-			},
-		]));
+	test('reports a finding when tag ruleset is in evaluate mode', async () => {
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens/rulesets')
+			.reply(200, makeRulesetsResponse([
+				{
+					id: 1,
+					name: 'Tag protection',
+					target: 'tag',
+					enforcement: 'evaluate',
+				},
+			]));
 
-	const findings = await rule.check(makeContext());
+		const findings = await rule.check(makeContext());
 
-	assert.equal(findings.length, 1);
-}
+		assert.equal(findings.length, 1);
+	});
 
-test('reports a finding when tag ruleset is in evaluate mode', evaluateModeCase);
+	test('reports a finding when rulesets endpoint returns 404', async () => {
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens/rulesets')
+			.reply(404, { message: 'Not Found' });
 
-async function evaluateModeCase() {
-	nock('https://api.github.com')
-		.get('/repos/sheplu/Octolens/rulesets')
-		.reply(200, makeRulesetsResponse([
-			{
-				id: 1,
-				name: 'Tag protection',
-				target: 'tag',
-				enforcement: 'evaluate',
-			},
-		]));
+		const findings = await rule.check(makeContext());
 
-	const findings = await rule.check(makeContext());
+		assert.equal(findings.length, 1);
+	});
 
-	assert.equal(findings.length, 1);
-}
+	test('propagates server errors from the API', async () => {
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens/rulesets')
+			.reply(500, { message: 'Internal Server Error' });
 
-test('reports a finding when rulesets endpoint returns 404', notFoundCase);
-
-async function notFoundCase() {
-	nock('https://api.github.com')
-		.get('/repos/sheplu/Octolens/rulesets')
-		.reply(404, { message: 'Not Found' });
-
-	const findings = await rule.check(makeContext());
-
-	assert.equal(findings.length, 1);
-}
-
-test('propagates server errors from the API', serverErrorCase);
-
-async function serverErrorCase() {
-	nock('https://api.github.com')
-		.get('/repos/sheplu/Octolens/rulesets')
-		.reply(500, { message: 'Internal Server Error' });
-
-	await assert.rejects(rule.check(makeContext()));
-}
+		await assert.rejects(rule.check(makeContext()));
+	});
+});

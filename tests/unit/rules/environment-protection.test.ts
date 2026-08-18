@@ -1,4 +1,5 @@
 import {
+	describe,
 	test,
 	beforeEach,
 	afterEach,
@@ -13,92 +14,84 @@ import {
 
 const ENDPOINT = '/repos/sheplu/Octolens/environments';
 
-beforeEach(disableNet);
-afterEach(restoreNet);
+describe('repo-config/environment-protection', () => {
+	beforeEach(disableNet);
+	afterEach(restoreNet);
 
-test('reports no findings when no environments exist', emptyCase);
+	test('reports no findings when no environments exist', async () => {
+		nock('https://api.github.com')
+			.get(ENDPOINT)
+			.query({ per_page: '100' })
+			.reply(200, { total_count: 0, environments: [] });
 
-async function emptyCase() {
-	nock('https://api.github.com')
-		.get(ENDPOINT)
-		.query({ per_page: '100' })
-		.reply(200, { total_count: 0, environments: [] });
+		const findings = await rule.check(makeContext());
 
-	const findings = await rule.check(makeContext());
+		assert.equal(findings.length, 0);
+	});
 
-	assert.equal(findings.length, 0);
-}
+	test('reports no findings when environments have protection rules', async () => {
+		nock('https://api.github.com')
+			.get(ENDPOINT)
+			.query({ per_page: '100' })
+			.reply(200, {
+				total_count: 1,
+				environments: [
+					{
+						name: 'production',
+						protection_rules: [ { type: 'required_reviewers', reviewers: [] } ],
+						deployment_branch_policy: null,
+					},
+				],
+			});
 
-test('reports no findings when environments have protection rules', protectedCase);
+		const findings = await rule.check(makeContext());
 
-async function protectedCase() {
-	nock('https://api.github.com')
-		.get(ENDPOINT)
-		.query({ per_page: '100' })
-		.reply(200, {
-			total_count: 1,
-			environments: [
-				{
-					name: 'production',
-					protection_rules: [ { type: 'required_reviewers', reviewers: [] } ],
-					deployment_branch_policy: null,
-				},
-			],
-		});
+		assert.equal(findings.length, 0);
+	});
 
-	const findings = await rule.check(makeContext());
+	test('reports one finding per unprotected environment', async () => {
+		nock('https://api.github.com')
+			.get(ENDPOINT)
+			.query({ per_page: '100' })
+			.reply(200, {
+				total_count: 2,
+				environments: [
+					{
+						name: 'staging',
+						protection_rules: [],
+						deployment_branch_policy: null,
+					},
+					{
+						name: 'production',
+						protection_rules: [],
+						deployment_branch_policy: { protected_branches: true },
+					},
+				],
+			});
 
-	assert.equal(findings.length, 0);
-}
+		const findings = await rule.check(makeContext());
 
-test('reports one finding per unprotected environment', unprotectedCase);
+		assert.equal(findings.length, 1);
+		assert.equal(findings[0]?.ruleId, 'repo-config/environment-protection');
+		assert.equal(findings[0]?.severity, 'medium');
+		assert.match(findings[0]?.title ?? '', /staging/);
+	});
 
-async function unprotectedCase() {
-	nock('https://api.github.com')
-		.get(ENDPOINT)
-		.query({ per_page: '100' })
-		.reply(200, {
-			total_count: 2,
-			environments: [
-				{
-					name: 'staging',
-					protection_rules: [],
-					deployment_branch_policy: null,
-				},
-				{
-					name: 'production',
-					protection_rules: [],
-					deployment_branch_policy: { protected_branches: true },
-				},
-			],
-		});
+	test('skips when the environments endpoint returns 404', async () => {
+		nock('https://api.github.com')
+			.get(ENDPOINT)
+			.query({ per_page: '100' })
+			.reply(404, { message: 'Not Found' });
 
-	const findings = await rule.check(makeContext());
+		await assert.rejects(rule.check(makeContext()), RuleSkipped);
+	});
 
-	assert.equal(findings.length, 1);
-	assert.equal(findings[0]?.ruleId, 'repo-config/environment-protection');
-	assert.equal(findings[0]?.severity, 'medium');
-	assert.match(findings[0]?.title ?? '', /staging/);
-}
+	test('propagates server errors from the API', async () => {
+		nock('https://api.github.com')
+			.get(ENDPOINT)
+			.query({ per_page: '100' })
+			.reply(500, { message: 'Internal Server Error' });
 
-test('skips when the environments endpoint returns 404', notFoundCase);
-
-async function notFoundCase() {
-	nock('https://api.github.com')
-		.get(ENDPOINT)
-		.query({ per_page: '100' })
-		.reply(404, { message: 'Not Found' });
-
-	await assert.rejects(rule.check(makeContext()), RuleSkipped);
-}
-
-test('propagates server errors from the API', serverErrorCase);
-
-async function serverErrorCase() {
-	nock('https://api.github.com')
-		.get(ENDPOINT)
-		.query({ per_page: '100' })
-		.reply(500, { message: 'Internal Server Error' });
-
-	await assert.rejects(rule.check(makeContext()));
-}
+		await assert.rejects(rule.check(makeContext()));
+	});
+});

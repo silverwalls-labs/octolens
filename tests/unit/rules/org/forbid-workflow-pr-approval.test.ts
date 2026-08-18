@@ -1,4 +1,5 @@
 import {
+	describe,
 	test,
 	beforeEach,
 	afterEach,
@@ -14,53 +15,49 @@ import { makeOrgWorkflowPermissionsResponse } from '../../../helpers/fixtures.ts
 
 const ENDPOINT = '/orgs/silverwalls-labs/actions/permissions/workflow';
 
-beforeEach(disableNet);
-afterEach(restoreNet);
+describe('org/forbid-workflow-pr-approval', () => {
+	beforeEach(disableNet);
+	afterEach(restoreNet);
 
-test('reports no findings when workflows cannot approve pull requests', passCase);
+	test('reports no findings when workflows cannot approve pull requests', async () => {
+		nock('https://api.github.com')
+			.get(ENDPOINT)
+			.reply(200, makeOrgWorkflowPermissionsResponse({
+				canApprovePullRequestReviews: false,
+			}));
 
-async function passCase() {
-	nock('https://api.github.com')
-		.get(ENDPOINT)
-		.reply(200, makeOrgWorkflowPermissionsResponse({ canApprovePullRequestReviews: false }));
+		const findings = await rule.check(makeOrgContext());
 
-	const findings = await rule.check(makeOrgContext());
+		assert.equal(findings.length, 0);
+	});
 
-	assert.equal(findings.length, 0);
-}
+	test('reports a finding when workflows can approve pull requests', async () => {
+		nock('https://api.github.com')
+			.get(ENDPOINT)
+			.reply(200, makeOrgWorkflowPermissionsResponse({ canApprovePullRequestReviews: true }));
 
-test('reports a finding when workflows can approve pull requests', findingCase);
+		const findings = await rule.check(makeOrgContext());
 
-async function findingCase() {
-	nock('https://api.github.com')
-		.get(ENDPOINT)
-		.reply(200, makeOrgWorkflowPermissionsResponse({ canApprovePullRequestReviews: true }));
+		assert.equal(findings.length, 1);
+		assert.equal(findings[0]?.ruleId, 'org/forbid-workflow-pr-approval');
+		assert.equal(findings[0]?.severity, 'high');
+		assert.equal(findings[0]?.org, 'silverwalls-labs');
+		assert.equal(findings[0]?.repo, undefined);
+	});
 
-	const findings = await rule.check(makeOrgContext());
+	test('skips on a permission-denied 403', async () => {
+		nock('https://api.github.com')
+			.get(ENDPOINT)
+			.reply(403, { message: 'Must have admin rights' });
 
-	assert.equal(findings.length, 1);
-	assert.equal(findings[0]?.ruleId, 'org/forbid-workflow-pr-approval');
-	assert.equal(findings[0]?.severity, 'high');
-	assert.equal(findings[0]?.org, 'silverwalls-labs');
-	assert.equal(findings[0]?.repo, undefined);
-}
+		await assert.rejects(rule.check(makeOrgContext()), RuleSkipped);
+	});
 
-test('skips on a permission-denied 403', forbiddenCase);
+	test('propagates server errors from the API', async () => {
+		nock('https://api.github.com')
+			.get(ENDPOINT)
+			.reply(500, { message: 'Internal Server Error' });
 
-async function forbiddenCase() {
-	nock('https://api.github.com')
-		.get(ENDPOINT)
-		.reply(403, { message: 'Must have admin rights' });
-
-	await assert.rejects(rule.check(makeOrgContext()), RuleSkipped);
-}
-
-test('propagates server errors from the API', serverErrorCase);
-
-async function serverErrorCase() {
-	nock('https://api.github.com')
-		.get(ENDPOINT)
-		.reply(500, { message: 'Internal Server Error' });
-
-	await assert.rejects(rule.check(makeOrgContext()));
-}
+		await assert.rejects(rule.check(makeOrgContext()));
+	});
+});

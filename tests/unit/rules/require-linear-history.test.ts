@@ -1,4 +1,5 @@
 import {
+	describe,
 	test,
 	beforeEach,
 	afterEach,
@@ -15,66 +16,60 @@ import {
 	makeRepoResponse,
 } from '../../helpers/fixtures.ts';
 
-beforeEach(disableNet);
-afterEach(restoreNet);
+describe('repo-config/require-linear-history', () => {
+	beforeEach(disableNet);
+	afterEach(restoreNet);
 
-test('reports no findings when linear history is required', linearCase);
+	test('reports no findings when linear history is required', async () => {
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens')
+			.reply(200, makeRepoResponse());
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens/branches/main/protection')
+			.reply(200, makeBranchProtectionResponse({
+				requirePullRequest: true,
+				requireLinearHistory: true,
+			}));
 
-async function linearCase() {
-	nock('https://api.github.com')
-		.get('/repos/sheplu/Octolens')
-		.reply(200, makeRepoResponse());
-	nock('https://api.github.com')
-		.get('/repos/sheplu/Octolens/branches/main/protection')
-		.reply(200, makeBranchProtectionResponse({
-			requirePullRequest: true,
-			requireLinearHistory: true,
-		}));
+		const findings = await rule.check(makeContext());
 
-	const findings = await rule.check(makeContext());
+		assert.equal(findings.length, 0);
+	});
 
-	assert.equal(findings.length, 0);
-}
+	test('reports a finding when linear history is not required', async () => {
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens')
+			.reply(200, makeRepoResponse());
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens/branches/main/protection')
+			.reply(200, makeBranchProtectionResponse({
+				requirePullRequest: true,
+				requireLinearHistory: false,
+			}));
 
-test('reports a finding when linear history is not required', nonLinearCase);
+		const findings = await rule.check(makeContext());
 
-async function nonLinearCase() {
-	nock('https://api.github.com')
-		.get('/repos/sheplu/Octolens')
-		.reply(200, makeRepoResponse());
-	nock('https://api.github.com')
-		.get('/repos/sheplu/Octolens/branches/main/protection')
-		.reply(200, makeBranchProtectionResponse({
-			requirePullRequest: true,
-			requireLinearHistory: false,
-		}));
+		assert.equal(findings.length, 1);
+		assert.equal(findings[0]?.ruleId, 'repo-config/require-linear-history');
+		assert.equal(findings[0]?.severity, 'low');
+	});
 
-	const findings = await rule.check(makeContext());
+	test('skips when no protection rule exists', async () => {
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens')
+			.reply(200, makeRepoResponse());
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens/branches/main/protection')
+			.reply(404, { message: 'Branch not protected' });
 
-	assert.equal(findings.length, 1);
-	assert.equal(findings[0]?.ruleId, 'repo-config/require-linear-history');
-	assert.equal(findings[0]?.severity, 'low');
-}
+		await assert.rejects(rule.check(makeContext()), RuleSkipped);
+	});
 
-test('skips when no protection rule exists', noProtectionCase);
+	test('propagates server errors from the API', async () => {
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens')
+			.reply(500, { message: 'Internal Server Error' });
 
-async function noProtectionCase() {
-	nock('https://api.github.com')
-		.get('/repos/sheplu/Octolens')
-		.reply(200, makeRepoResponse());
-	nock('https://api.github.com')
-		.get('/repos/sheplu/Octolens/branches/main/protection')
-		.reply(404, { message: 'Branch not protected' });
-
-	await assert.rejects(rule.check(makeContext()), RuleSkipped);
-}
-
-test('propagates server errors from the API', serverErrorCase);
-
-async function serverErrorCase() {
-	nock('https://api.github.com')
-		.get('/repos/sheplu/Octolens')
-		.reply(500, { message: 'Internal Server Error' });
-
-	await assert.rejects(rule.check(makeContext()));
-}
+		await assert.rejects(rule.check(makeContext()));
+	});
+});

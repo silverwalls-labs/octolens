@@ -1,4 +1,4 @@
-import { test } from 'node:test';
+import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import fc from 'fast-check';
 import { parseArgs, CliUsageError } from '../../src/cli/parse-args.ts';
@@ -16,61 +16,59 @@ const FORMATS = [
 	'md',
 ];
 
-test('parseArgs yields a valid command or a usage error', fuzzParseArgs);
+describe('parseArgs fuzz', () => {
+	test('parseArgs yields a valid command or a usage error', () => {
+		fc.assert(fc.property(arbArgv, (argv: string[]): void => {
+			let result;
 
-function fuzzParseArgs() {
-	fc.assert(fc.property(arbArgv, checkParseInvariants), fuzzParams);
-}
+			try {
+				result = parseArgs(argv);
+			} catch (err) {
+				// The only error a caller ever sees is a usage error.
+				assert.ok(err instanceof CliUsageError);
+				assert.ok(err.message.length > 0);
 
-function checkParseInvariants(argv: string[]): void {
-	let result;
+				return;
+			}
 
-	try {
-		result = parseArgs(argv);
-	} catch (err) {
-		// The only error a caller ever sees is a usage error.
-		assert.ok(err instanceof CliUsageError);
-		assert.ok(err.message.length > 0);
+			assert.ok(COMMANDS.includes(result.command));
 
-		return;
-	}
+			if (result.command !== 'scan') {
+				return;
+			}
 
-	assert.ok(COMMANDS.includes(result.command));
+			// Exactly one target is set.
+			const hasRepo = result.repo !== undefined;
+			const hasOrg = result.org !== undefined;
 
-	if (result.command !== 'scan') {
-		return;
-	}
+			assert.notEqual(hasRepo, hasOrg);
 
-	// Exactly one target is set.
-	const hasRepo = result.repo !== undefined;
-	const hasOrg = result.org !== undefined;
+			if (result.repo !== undefined) {
+				assert.ok(result.repo.owner.length > 0);
+				assert.ok(result.repo.name.length > 0);
+			}
 
-	assert.notEqual(hasRepo, hasOrg);
+			if (hasOrg) {
+				assert.ok(!(result.org as string).includes('/'));
+			}
 
-	if (result.repo !== undefined) {
-		assert.ok(result.repo.owner.length > 0);
-		assert.ok(result.repo.name.length > 0);
-	}
+			assert.ok(result.formats.length > 0);
 
-	if (hasOrg) {
-		assert.ok(!(result.org as string).includes('/'));
-	}
+			for (const format of result.formats) {
+				assert.ok(FORMATS.includes(format));
+			}
 
-	assert.ok(result.formats.length > 0);
+			assert.ok(isSeverity(result.severity));
 
-	for (const format of result.formats) {
-		assert.ok(FORMATS.includes(format));
-	}
+			if (result.concurrency !== undefined) {
+				assert.ok(result.concurrency >= 1);
+				assert.ok(result.concurrency <= 32);
+				assert.equal(result.allRepos, true);
+			}
 
-	assert.ok(isSeverity(result.severity));
-
-	if (result.concurrency !== undefined) {
-		assert.ok(result.concurrency >= 1);
-		assert.ok(result.concurrency <= 32);
-		assert.equal(result.allRepos, true);
-	}
-
-	if (result.allRepos) {
-		assert.equal(hasOrg, true);
-	}
-}
+			if (result.allRepos) {
+				assert.equal(hasOrg, true);
+			}
+		}), fuzzParams);
+	});
+});

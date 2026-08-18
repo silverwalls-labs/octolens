@@ -1,8 +1,8 @@
 import {
+	describe,
 	test,
 	beforeEach,
 	afterEach,
-	type TestContext,
 } from 'node:test';
 import assert from 'node:assert/strict';
 import nock from 'nock';
@@ -17,16 +17,291 @@ const BASE = 'https://api.github.com';
 const NOW_MS = 1_700_000_000_000;
 const RESET_EPOCH_S = 1_700_000_100;
 
-function noop() {
-	/* intentional no-op */
-}
-
 type Recorded = {
 	logger: Logger;
 	warnings: string[];
 	sleeps: number[];
 	sleep: (ms: number) => Promise<void>;
 };
+
+describe('createRateBudget', () => {
+	beforeEach(disableNet);
+	afterEach(restoreNet);
+
+	test(
+		'acquire passes through before any headers are observed',
+		async () => {
+			const recorded = makeRecorded();
+			const budget = createRateBudget({
+				octokit: makeOctokit(),
+				reserve: 50,
+				logger: recorded.logger,
+				now: () => NOW_MS,
+				sleep: recorded.sleep,
+			});
+
+			await budget.acquire();
+
+			assert.deepEqual(recorded.sleeps, []);
+			assert.deepEqual(budget.snapshot(), {
+				remaining: null, resetAt: null,
+			});
+		},
+	);
+
+	test(
+		'acquire passes through while remaining is at or above the reserve',
+		async () => {
+			const recorded = makeRecorded();
+			const octokit = makeOctokit();
+			const budget = createRateBudget({
+				octokit,
+				reserve: 50,
+				logger: recorded.logger,
+				now: () => NOW_MS,
+				sleep: recorded.sleep,
+			});
+
+			nock(BASE)
+				.get('/repos/a/b')
+				.reply(200, {}, rateHeaders(4000));
+			await octokit.rest.repos.get({
+				owner: 'a', repo: 'b',
+			});
+
+			await budget.acquire();
+
+			assert.deepEqual(recorded.sleeps, []);
+			assert.equal(budget.snapshot().remaining, 4000);
+		},
+	);
+
+	test(
+		'acquire pauses until reset when the budget drops below the reserve',
+		async () => {
+			const recorded = makeRecorded();
+			const octokit = makeOctokit();
+			const budget = createRateBudget({
+				octokit,
+				reserve: 50,
+				logger: recorded.logger,
+				now: () => NOW_MS,
+				sleep: recorded.sleep,
+			});
+
+			nock(BASE)
+				.get('/repos/a/b')
+				.reply(200, {}, rateHeaders(10));
+			await octokit.rest.repos.get({
+				owner: 'a', repo: 'b',
+			});
+
+			await budget.acquire();
+
+			assert.deepEqual(recorded.sleeps, [ 102_000 ]);
+			assert.equal(recorded.warnings.length, 1);
+			assert.match(
+				recorded.warnings[0],
+				/rate budget low \(10 remaining < reserve 50\)/,
+			);
+
+			await budget.acquire();
+			assert.deepEqual(recorded.sleeps, [ 102_000 ]);
+			assert.deepEqual(budget.snapshot(), {
+				remaining: null, resetAt: null,
+			});
+		},
+	);
+
+	test('concurrent acquires share a single pause', async () => {
+		const recorded = makeRecorded();
+		const octokit = makeOctokit();
+		const budget = createRateBudget({
+			octokit,
+			reserve: 50,
+			logger: recorded.logger,
+			now: () => NOW_MS,
+			sleep: recorded.sleep,
+		});
+
+		nock(BASE)
+			.get('/repos/a/b')
+			.reply(200, {}, rateHeaders(1));
+		await octokit.rest.repos.get({
+			owner: 'a', repo: 'b',
+		});
+
+		await Promise.all([
+			budget.acquire(),
+			budget.acquire(),
+			budget.acquire(),
+		]);
+
+		assert.equal(recorded.sleeps.length, 1);
+		assert.equal(recorded.warnings.length, 1);
+	});
+
+	test(
+		'rate-limit headers on error responses update the budget',
+		async () => {
+			const recorded = makeRecorded();
+			const octokit = makeOctokit();
+			const budget = createRateBudget({
+				octokit,
+				reserve: 50,
+				logger: recorded.logger,
+				now: () => NOW_MS,
+				sleep: recorded.sleep,
+			});
+
+			nock(BASE)
+				.get('/repos/a/b')
+				.reply(404, { message: 'Not Found' }, rateHeaders(3));
+			await assert.rejects(octokit.rest.repos.get({
+				owner: 'a', repo: 'b',
+			}));
+
+			assert.equal(budget.snapshot().remaining, 3);
+		},
+	);
+
+	test(
+		'non-core rate-limit headers are ignored',
+		async () => {
+			const recorded = makeRecorded();
+			const octokit = makeOctokit();
+			const budget = createRateBudget({
+				octokit,
+				reserve: 50,
+				logger: recorded.logger,
+				now: () => NOW_MS,
+				sleep: recorded.sleep,
+			});
+
+			nock(BASE).get('/repos/a/b').reply(
+				200,
+				{},
+				rateHeaders(2, {
+					'x-ratelimit-resource': 'search',
+				}),
+			);
+			await octokit.rest.repos.get({
+				owner: 'a', repo: 'b',
+			});
+
+			await budget.acquire();
+
+			assert.deepEqual(recorded.sleeps, []);
+			assert.equal(budget.snapshot().remaining, null);
+		},
+	);
+
+	test('dispose stops observing the client', async () => {
+		const recorded = makeRecorded();
+		const octokit = makeOctokit();
+		const budget = createRateBudget({
+			octokit,
+			reserve: 50,
+			logger: recorded.logger,
+			now: () => NOW_MS,
+			sleep: recorded.sleep,
+		});
+
+		budget.dispose();
+
+		nock(BASE)
+			.get('/repos/a/b')
+			.reply(200, {}, rateHeaders(1));
+		await octokit.rest.repos.get({
+			owner: 'a', repo: 'b',
+		});
+
+		assert.equal(budget.snapshot().remaining, null);
+	});
+
+	test(
+		'a request error without a response leaves the budget unknown',
+		async () => {
+			const recorded = makeRecorded();
+			const octokit = makeOctokit();
+			const budget = createRateBudget({
+				octokit,
+				reserve: 50,
+				logger: recorded.logger,
+				now: () => NOW_MS,
+				sleep: recorded.sleep,
+			});
+
+			await assert.rejects(octokit.request('GET https://unmocked.example.com/x'));
+
+			await budget.acquire();
+
+			assert.deepEqual(recorded.sleeps, []);
+			assert.deepEqual(budget.snapshot(), {
+				remaining: null, resetAt: null,
+			});
+		},
+	);
+
+	test(
+		'a low budget without a reset timestamp pauses for the fallback window',
+		async () => {
+			const recorded = makeRecorded();
+			const octokit = makeOctokit();
+			const budget = createRateBudget({
+				octokit,
+				reserve: 50,
+				logger: recorded.logger,
+				now: () => NOW_MS,
+				sleep: recorded.sleep,
+			});
+
+			nock(BASE).get('/repos/a/b').reply(
+				200,
+				{},
+				{ 'x-ratelimit-remaining': '5' },
+			);
+			await octokit.rest.repos.get({
+				owner: 'a', repo: 'b',
+			});
+
+			await budget.acquire();
+
+			assert.deepEqual(recorded.sleeps, [ 60_000 ]);
+			assert.match(recorded.warnings[0], /~1m 0s/);
+		},
+	);
+
+	test('the default sleep waits on a real timer', async (t) => {
+		const recorded = makeRecorded();
+		const octokit = makeOctokit();
+		const budget = createRateBudget({
+			octokit,
+			reserve: 50,
+			logger: recorded.logger,
+			now: () => RESET_EPOCH_S * 1000,
+		});
+
+		nock(BASE)
+			.get('/repos/a/b')
+			.reply(200, {}, rateHeaders(5));
+		await octokit.rest.repos.get({
+			owner: 'a', repo: 'b',
+		});
+
+		t.mock.timers.enable({ apis: [ 'setTimeout' ] });
+		const pending = budget.acquire();
+
+		t.mock.timers.tick(2_000);
+		await pending;
+
+		assert.match(recorded.warnings[0], /~2s/);
+	});
+});
+
+function noop() {
+	/* intentional no-op */
+}
 
 function makeRecorded(): Recorded {
 	const warnings: string[] = [];
@@ -54,7 +329,9 @@ function makeRecorded(): Recorded {
 }
 
 function makeOctokit(): Octokit {
-	return new Octokit({ auth: 'test-token', request: { retries: 0 } });
+	return new Octokit({
+		auth: 'test-token', request: { retries: 0 },
+	});
 }
 
 function rateHeaders(
@@ -66,235 +343,4 @@ function rateHeaders(
 		'x-ratelimit-reset': String(RESET_EPOCH_S),
 		...extra,
 	};
-}
-
-beforeEach(disableNet);
-afterEach(restoreNet);
-
-test('acquire passes through before any headers are observed', testPassThroughUnknown);
-
-async function testPassThroughUnknown() {
-	const recorded = makeRecorded();
-	const budget = createRateBudget({
-		octokit: makeOctokit(),
-		reserve: 50,
-		logger: recorded.logger,
-		now: () => NOW_MS,
-		sleep: recorded.sleep,
-	});
-
-	await budget.acquire();
-
-	assert.deepEqual(recorded.sleeps, []);
-	assert.deepEqual(budget.snapshot(), { remaining: null, resetAt: null });
-}
-
-test('acquire passes through while remaining is at or above the reserve', testPassThroughHealthy);
-
-async function testPassThroughHealthy() {
-	const recorded = makeRecorded();
-	const octokit = makeOctokit();
-	const budget = createRateBudget({
-		octokit,
-		reserve: 50,
-		logger: recorded.logger,
-		now: () => NOW_MS,
-		sleep: recorded.sleep,
-	});
-
-	nock(BASE).get('/repos/a/b').reply(200, {}, rateHeaders(4000));
-	await octokit.rest.repos.get({ owner: 'a', repo: 'b' });
-
-	await budget.acquire();
-
-	assert.deepEqual(recorded.sleeps, []);
-	assert.equal(budget.snapshot().remaining, 4000);
-}
-
-test('acquire pauses until reset when the budget drops below the reserve', testPausesUntilReset);
-
-async function testPausesUntilReset() {
-	const recorded = makeRecorded();
-	const octokit = makeOctokit();
-	const budget = createRateBudget({
-		octokit,
-		reserve: 50,
-		logger: recorded.logger,
-		now: () => NOW_MS,
-		sleep: recorded.sleep,
-	});
-
-	nock(BASE).get('/repos/a/b').reply(200, {}, rateHeaders(10));
-	await octokit.rest.repos.get({ owner: 'a', repo: 'b' });
-
-	await budget.acquire();
-
-	// 100s until reset + 2s skew.
-	assert.deepEqual(recorded.sleeps, [ 102_000 ]);
-	assert.equal(recorded.warnings.length, 1);
-	assert.match(recorded.warnings[0], /rate budget low \(10 remaining < reserve 50\)/);
-
-	// After the pause the budget is unknown again — no further sleeping.
-	await budget.acquire();
-	assert.deepEqual(recorded.sleeps, [ 102_000 ]);
-	assert.deepEqual(budget.snapshot(), { remaining: null, resetAt: null });
-}
-
-test('concurrent acquires share a single pause', testSharedPause);
-
-async function testSharedPause() {
-	const recorded = makeRecorded();
-	const octokit = makeOctokit();
-	const budget = createRateBudget({
-		octokit,
-		reserve: 50,
-		logger: recorded.logger,
-		now: () => NOW_MS,
-		sleep: recorded.sleep,
-	});
-
-	nock(BASE).get('/repos/a/b').reply(200, {}, rateHeaders(1));
-	await octokit.rest.repos.get({ owner: 'a', repo: 'b' });
-
-	await Promise.all([
-		budget.acquire(),
-		budget.acquire(),
-		budget.acquire(),
-	]);
-
-	assert.equal(recorded.sleeps.length, 1);
-	assert.equal(recorded.warnings.length, 1);
-}
-
-test('rate-limit headers on error responses update the budget', testErrorHeaders);
-
-async function testErrorHeaders() {
-	const recorded = makeRecorded();
-	const octokit = makeOctokit();
-	const budget = createRateBudget({
-		octokit,
-		reserve: 50,
-		logger: recorded.logger,
-		now: () => NOW_MS,
-		sleep: recorded.sleep,
-	});
-
-	nock(BASE).get('/repos/a/b').reply(404, { message: 'Not Found' }, rateHeaders(3));
-	await assert.rejects(octokit.rest.repos.get({ owner: 'a', repo: 'b' }));
-
-	assert.equal(budget.snapshot().remaining, 3);
-}
-
-test('non-core rate-limit headers are ignored', testNonCoreIgnored);
-
-async function testNonCoreIgnored() {
-	const recorded = makeRecorded();
-	const octokit = makeOctokit();
-	const budget = createRateBudget({
-		octokit,
-		reserve: 50,
-		logger: recorded.logger,
-		now: () => NOW_MS,
-		sleep: recorded.sleep,
-	});
-
-	nock(BASE).get('/repos/a/b')
-		.reply(200, {}, rateHeaders(2, { 'x-ratelimit-resource': 'search' }));
-	await octokit.rest.repos.get({ owner: 'a', repo: 'b' });
-
-	await budget.acquire();
-
-	assert.deepEqual(recorded.sleeps, []);
-	assert.equal(budget.snapshot().remaining, null);
-}
-
-test('dispose stops observing the client', testDispose);
-
-async function testDispose() {
-	const recorded = makeRecorded();
-	const octokit = makeOctokit();
-	const budget = createRateBudget({
-		octokit,
-		reserve: 50,
-		logger: recorded.logger,
-		now: () => NOW_MS,
-		sleep: recorded.sleep,
-	});
-
-	budget.dispose();
-
-	nock(BASE).get('/repos/a/b').reply(200, {}, rateHeaders(1));
-	await octokit.rest.repos.get({ owner: 'a', repo: 'b' });
-
-	assert.equal(budget.snapshot().remaining, null);
-}
-
-test('a request error without a response leaves the budget unknown', testErrorWithoutResponse);
-
-async function testErrorWithoutResponse() {
-	const recorded = makeRecorded();
-	const octokit = makeOctokit();
-	const budget = createRateBudget({
-		octokit,
-		reserve: 50,
-		logger: recorded.logger,
-		now: () => NOW_MS,
-		sleep: recorded.sleep,
-	});
-
-	// Connection refused by nock: the error carries no response headers.
-	await assert.rejects(octokit.request('GET https://unmocked.example.com/x'));
-
-	await budget.acquire();
-
-	assert.deepEqual(recorded.sleeps, []);
-	assert.deepEqual(budget.snapshot(), { remaining: null, resetAt: null });
-}
-
-test('a low budget without a reset timestamp pauses for the fallback window', testFallbackPause);
-
-async function testFallbackPause() {
-	const recorded = makeRecorded();
-	const octokit = makeOctokit();
-	const budget = createRateBudget({
-		octokit,
-		reserve: 50,
-		logger: recorded.logger,
-		now: () => NOW_MS,
-		sleep: recorded.sleep,
-	});
-
-	nock(BASE).get('/repos/a/b').reply(200, {}, { 'x-ratelimit-remaining': '5' });
-	await octokit.rest.repos.get({ owner: 'a', repo: 'b' });
-
-	await budget.acquire();
-
-	assert.deepEqual(recorded.sleeps, [ 60_000 ]);
-	assert.match(recorded.warnings[0], /~1m 0s/);
-}
-
-test('the default sleep waits on a real timer', testDefaultSleep);
-
-async function testDefaultSleep(t: TestContext) {
-	const recorded = makeRecorded();
-	const octokit = makeOctokit();
-	const budget = createRateBudget({
-		octokit,
-		reserve: 50,
-		logger: recorded.logger,
-
-		// Clock sits exactly at the reset: the pause is only the skew margin.
-		now: () => RESET_EPOCH_S * 1000,
-	});
-
-	nock(BASE).get('/repos/a/b').reply(200, {}, rateHeaders(5));
-	await octokit.rest.repos.get({ owner: 'a', repo: 'b' });
-
-	t.mock.timers.enable({ apis: [ 'setTimeout' ] });
-	const pending = budget.acquire();
-
-	t.mock.timers.tick(2_000);
-	await pending;
-
-	assert.match(recorded.warnings[0], /~2s/);
 }

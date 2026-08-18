@@ -1,4 +1,5 @@
 import {
+	describe,
 	test,
 	beforeEach,
 	afterEach,
@@ -16,68 +17,60 @@ import { makeOrgResponse } from '../../../helpers/fixtures.ts';
 
 const ENDPOINT = '/orgs/silverwalls-labs';
 
-beforeEach(disableNet);
-afterEach(restoreNet);
+describe('org/members-cannot-create-public-pages', () => {
+	beforeEach(disableNet);
+	afterEach(restoreNet);
 
-test('reports no findings when public pages are not allowed', passCase);
+	test('reports no findings when public pages are not allowed', async () => {
+		nock('https://api.github.com')
+			.get(ENDPOINT)
+			.reply(200, makeOrgResponse({ membersCanCreatePublicPages: false }));
 
-async function passCase() {
-	nock('https://api.github.com')
-		.get(ENDPOINT)
-		.reply(200, makeOrgResponse({ membersCanCreatePublicPages: false }));
+		const findings = await rule.check(makeOrgContext());
 
-	const findings = await rule.check(makeOrgContext());
+		assert.equal(findings.length, 0);
+	});
 
-	assert.equal(findings.length, 0);
-}
+	test('reports no findings when pages creation is disabled entirely', async () => {
+		nock('https://api.github.com')
+			.get(ENDPOINT)
+			.reply(200, makeOrgResponse({
+				membersCanCreatePages: false,
+				membersCanCreatePublicPages: true,
+			}));
 
-test('reports no findings when pages creation is disabled entirely', pagesOffCase);
+		const findings = await rule.check(makeOrgContext());
 
-async function pagesOffCase() {
-	nock('https://api.github.com')
-		.get(ENDPOINT)
-		.reply(200, makeOrgResponse({
-			membersCanCreatePages: false,
-			membersCanCreatePublicPages: true,
-		}));
+		assert.equal(findings.length, 0);
+	});
 
-	const findings = await rule.check(makeOrgContext());
+	test('reports a finding when members can publish public pages', async () => {
+		nock('https://api.github.com')
+			.get(ENDPOINT)
+			.reply(200, makeOrgResponse({ membersCanCreatePublicPages: true }));
 
-	assert.equal(findings.length, 0);
-}
+		const findings = await rule.check(makeOrgContext());
 
-test('reports a finding when members can publish public pages', findingCase);
+		assert.equal(findings.length, 1);
+		assert.equal(findings[0]?.ruleId, 'org/members-cannot-create-public-pages');
+		assert.equal(findings[0]?.severity, 'medium');
+		assert.equal(findings[0]?.org, 'silverwalls-labs');
+		assert.equal(findings[0]?.repo, undefined);
+	});
 
-async function findingCase() {
-	nock('https://api.github.com')
-		.get(ENDPOINT)
-		.reply(200, makeOrgResponse({ membersCanCreatePublicPages: true }));
+	test('skips when the field is not visible (non-owner token)', async () => {
+		nock('https://api.github.com')
+			.get(ENDPOINT)
+			.reply(200, makeOrgResponse({ privileged: false }));
 
-	const findings = await rule.check(makeOrgContext());
+		await assert.rejects(rule.check(makeOrgContext()), RuleSkipped);
+	});
 
-	assert.equal(findings.length, 1);
-	assert.equal(findings[0]?.ruleId, 'org/members-cannot-create-public-pages');
-	assert.equal(findings[0]?.severity, 'medium');
-	assert.equal(findings[0]?.org, 'silverwalls-labs');
-	assert.equal(findings[0]?.repo, undefined);
-}
+	test('propagates server errors from the API', async () => {
+		nock('https://api.github.com')
+			.get(ENDPOINT)
+			.reply(500, { message: 'Internal Server Error' });
 
-test('skips when the field is not visible (non-owner token)', hiddenCase);
-
-async function hiddenCase() {
-	nock('https://api.github.com')
-		.get(ENDPOINT)
-		.reply(200, makeOrgResponse({ privileged: false }));
-
-	await assert.rejects(rule.check(makeOrgContext()), RuleSkipped);
-}
-
-test('propagates server errors from the API', serverErrorCase);
-
-async function serverErrorCase() {
-	nock('https://api.github.com')
-		.get(ENDPOINT)
-		.reply(500, { message: 'Internal Server Error' });
-
-	await assert.rejects(rule.check(makeOrgContext()));
-}
+		await assert.rejects(rule.check(makeOrgContext()));
+	});
+});

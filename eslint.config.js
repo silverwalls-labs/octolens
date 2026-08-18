@@ -45,6 +45,41 @@ export default defineConfig([
 			parser: tseslint.parser,
 			globals: globals.node,
 		},
+
+		/*
+		 * The shared stylistic config omits ArrowFunctionExpression from
+		 * curly-newline.  Without it the rule defaults to "never" for arrow
+		 * bodies, which conflicts with multi-line test callbacks.  Re-declare
+		 * the full rule adding the missing key.
+		 */
+		'rules': {
+			'@stylistic/curly-newline': [
+				'error',
+				{
+					IfStatementConsequent: 'always',
+					IfStatementAlternative: 'always',
+					ForStatement: 'always',
+					ForInStatement: 'always',
+					ForOfStatement: 'always',
+					WhileStatement: 'always',
+					DoWhileStatement: 'always',
+					SwitchStatement: 'always',
+					SwitchCase: 'always',
+					TryStatementBlock: 'always',
+					TryStatementHandler: 'always',
+					TryStatementFinalizer: 'always',
+					BlockStatement: 'always',
+					FunctionDeclaration: 'always',
+					FunctionExpression: 'always',
+					ArrowFunctionExpression: 'always',
+					Property: 'always',
+					ClassBody: 'always',
+					StaticBlock: 'always',
+					WithStatement: 'always',
+					TSModuleBlock: 'always',
+				},
+			],
+		},
 	},
 	{
 		files: [ 'src/**/*.ts' ],

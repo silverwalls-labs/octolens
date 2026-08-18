@@ -1,4 +1,5 @@
 import {
+	describe,
 	test,
 	beforeEach,
 	afterEach,
@@ -14,53 +15,55 @@ import { makeRepoResponse } from '../../helpers/fixtures.ts';
 const RULE_ID = 'repo-config/forbid-forking-private-repos';
 const REPO = '/repos/sheplu/Octolens';
 
-beforeEach(disableNet);
-afterEach(restoreNet);
+describe('repo-config/forbid-forking-private-repos', () => {
+	beforeEach(disableNet);
+	afterEach(restoreNet);
 
-test('reports no findings when a public repo allows forking', publicCase);
+	test('reports no findings when a public repo allows forking', async () => {
+		mockMeta({ visibility: 'public', allowForking: true });
 
-async function publicCase() {
-	mockMeta({ visibility: 'public', allowForking: true });
+		const findings = await rule.check(makeContext());
 
-	const findings = await rule.check(makeContext());
+		assert.equal(findings.length, 0);
+	});
 
-	assert.equal(findings.length, 0);
-}
+	test('reports no findings when a private repo forbids forking', async () => {
+		mockMeta({ visibility: 'private', allowForking: false });
 
-test('reports no findings when a private repo forbids forking', privateNoForkCase);
+		const findings = await rule.check(makeContext());
 
-async function privateNoForkCase() {
-	mockMeta({ visibility: 'private', allowForking: false });
+		assert.equal(findings.length, 0);
+	});
 
-	const findings = await rule.check(makeContext());
+	test('reports a finding when a private repo allows forking', async () => {
+		mockMeta({ visibility: 'private', allowForking: true });
 
-	assert.equal(findings.length, 0);
-}
+		const findings = await rule.check(makeContext());
 
-test('reports a finding when a private repo allows forking', privateForkCase);
+		assert.equal(findings.length, 1);
+		assert.equal(findings[0]?.ruleId, RULE_ID);
+		assert.equal(findings[0]?.severity, 'high');
+		assert.match(findings[0]?.title ?? '', /private/);
+	});
 
-async function privateForkCase() {
-	mockMeta({ visibility: 'private', allowForking: true });
+	test('reports a finding when an internal repo allows forking', async () => {
+		mockMeta({ visibility: 'internal', allowForking: true });
 
-	const findings = await rule.check(makeContext());
+		const findings = await rule.check(makeContext());
 
-	assert.equal(findings.length, 1);
-	assert.equal(findings[0]?.ruleId, RULE_ID);
-	assert.equal(findings[0]?.severity, 'high');
-	assert.match(findings[0]?.title ?? '', /private/);
-}
+		assert.equal(findings.length, 1);
+		assert.equal(findings[0]?.ruleId, RULE_ID);
+		assert.match(findings[0]?.title ?? '', /internal/);
+	});
 
-test('reports a finding when an internal repo allows forking', internalForkCase);
+	test('propagates server errors from the API', async () => {
+		nock('https://api.github.com')
+			.get(REPO)
+			.reply(500, { message: 'Internal Server Error' });
 
-async function internalForkCase() {
-	mockMeta({ visibility: 'internal', allowForking: true });
-
-	const findings = await rule.check(makeContext());
-
-	assert.equal(findings.length, 1);
-	assert.equal(findings[0]?.ruleId, RULE_ID);
-	assert.match(findings[0]?.title ?? '', /internal/);
-}
+		await assert.rejects(rule.check(makeContext()));
+	});
+});
 
 function mockMeta(opts: {
 	visibility: 'public' | 'private' | 'internal';
@@ -72,14 +75,4 @@ function mockMeta(opts: {
 			visibility: opts.visibility,
 			allowForking: opts.allowForking,
 		}));
-}
-
-test('propagates server errors from the API', serverErrorCase);
-
-async function serverErrorCase() {
-	nock('https://api.github.com')
-		.get(REPO)
-		.reply(500, { message: 'Internal Server Error' });
-
-	await assert.rejects(rule.check(makeContext()));
 }
