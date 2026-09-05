@@ -6,7 +6,7 @@ import {
 } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-	mkdtempSync, readFileSync, rmSync,
+	mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -37,8 +37,15 @@ describe('cli scan flows', () => {
 		saved.GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 		saved.OCTOLENS_TOKEN = process.env.OCTOLENS_TOKEN;
 		saved.PATH = process.env.PATH;
+		saved.XDG_CONFIG_HOME = process.env.XDG_CONFIG_HOME;
 		delete process.env.GITHUB_TOKEN;
 		delete process.env.OCTOLENS_TOKEN;
+
+		// Keep a developer's real ~/.config/octolens/config.json out of the runs.
+		const configHome = mkdtempSync(join(tmpdir(), 'octolens-xdg-'));
+
+		tempDirs.push(configHome);
+		process.env.XDG_CONFIG_HOME = configHome;
 	});
 
 	afterEach(() => {
@@ -50,6 +57,7 @@ describe('cli scan flows', () => {
 			'GITHUB_TOKEN',
 			'OCTOLENS_TOKEN',
 			'PATH',
+			'XDG_CONFIG_HOME',
 		]) {
 			if (saved[name] === undefined) {
 				delete process.env[name];
@@ -307,6 +315,124 @@ describe('cli scan flows', () => {
 		assert.equal(report.target.type, 'org-fleet');
 		assert.equal(report.repos.length, 1);
 	});
+
+	test(
+		'home and project config files merge into the scan',
+		async () => {
+			const { stdoutChunks } = captureOutput();
+
+			mockFlaggedRepo();
+
+			// Home level (via the XDG dir pinned in beforeEach), as JSON5.
+			const homeDir = join(process.env.XDG_CONFIG_HOME as string, 'octolens');
+
+			mkdirSync(homeDir, { recursive: true });
+			writeFileSync(join(homeDir, 'config.json5'), [
+				'{',
+				"  rules: { 'repo-config/topics-present': 'off' },",
+				'  org: { concurrency: 2 },',
+				'}',
+			].join('\n'));
+
+			// Project level as JSONC, in a chdir'ed working directory.
+			const cwd = mkdtempSync(join(tmpdir(), 'octolens-smoke-cwd-'));
+
+			tempDirs.push(cwd);
+			writeFileSync(join(cwd, 'octolens.config.jsonc'), [
+				'{',
+				'  // this sandbox is intentionally unprotected',
+				'  "rules": { "repo-config/branch-protection-required": "off" },',
+				'  "ignore": {',
+				'    "repos": [ "acme/sandbox", ], "archived": true, "forks": false,',
+				'  },',
+				'}',
+			].join('\n'));
+
+			const previous = process.cwd();
+
+			process.chdir(cwd);
+			let code;
+
+			try {
+				code = await main(scanArgs('--format', 'json'));
+			} finally {
+				process.chdir(previous);
+			}
+
+			assert.ok(code === 0 || code === 1);
+
+			const report = JSON.parse(stdoutChunks.join('')) as JsonReport;
+
+			assert.ok(!report.runs.some(isBranchProtectionFinding));
+			assert.ok(!report.runs.some((run) => run.ruleId === 'repo-config/topics-present'));
+		},
+	);
+
+	test(
+		'a package.json octolens key configures the scan',
+		async () => {
+			const { stdoutChunks } = captureOutput();
+
+			mockFlaggedRepo();
+
+			const cwd = mkdtempSync(join(tmpdir(), 'octolens-smoke-cwd-'));
+
+			tempDirs.push(cwd);
+			writeFileSync(join(cwd, 'package.json'), JSON.stringify({
+				name: 'app',
+				octolens: { rules: { 'repo-config/branch-protection-required': 'off' } },
+			}));
+
+			const previous = process.cwd();
+
+			process.chdir(cwd);
+			let code;
+
+			try {
+				code = await main(scanArgs('--format', 'json'));
+			} finally {
+				process.chdir(previous);
+			}
+
+			assert.ok(code === 0 || code === 1);
+
+			const report = JSON.parse(stdoutChunks.join('')) as JsonReport;
+
+			assert.ok(!report.runs.some(isBranchProtectionFinding));
+		},
+	);
+
+	test(
+		'an invalid config file fails the scan with exit 2',
+		async () => {
+			const { stderrChunks } = captureOutput();
+
+			const cwd = mkdtempSync(join(tmpdir(), 'octolens-smoke-cwd-'));
+
+			tempDirs.push(cwd);
+			writeFileSync(
+				join(cwd, 'octolens.config.jsonc'),
+				'{\n  "rules": nope\n}',
+			);
+
+			const previous = process.cwd();
+
+			process.chdir(cwd);
+			let code;
+
+			try {
+				code = await main(scanArgs());
+			} finally {
+				process.chdir(previous);
+			}
+
+			assert.equal(code, 2);
+			assert.match(
+				stderrChunks.join(''),
+				/octolens\.config\.jsonc: invalid JSONC \(.+ at \d+:\d+\)/,
+			);
+		},
+	);
 });
 
 function mockCatchAll(): void {

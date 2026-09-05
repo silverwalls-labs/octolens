@@ -16,6 +16,8 @@ const FUNCTION_EXPORTS = [
 	'exitCodeFor',
 	'exitCodeForReport',
 	'createLogger',
+	'loadConfig',
+	'ConfigError',
 	'createOctokit',
 	'resolveAuth',
 	'AuthError',

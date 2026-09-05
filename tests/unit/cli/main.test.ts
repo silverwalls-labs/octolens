@@ -6,7 +6,7 @@ import {
 } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-	mkdtempSync, readFileSync, rmSync,
+	mkdtempSync, readFileSync, rmSync, writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -65,8 +65,15 @@ describe('cli main', () => {
 		saved.GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 		saved.OCTOLENS_TOKEN = process.env.OCTOLENS_TOKEN;
 		saved.PATH = process.env.PATH;
+		saved.XDG_CONFIG_HOME = process.env.XDG_CONFIG_HOME;
 		delete process.env.GITHUB_TOKEN;
 		delete process.env.OCTOLENS_TOKEN;
+
+		// Keep a developer's real ~/.config/octolens/config.json out of the runs.
+		const configHome = mkdtempSync(join(tmpdir(), 'octolens-xdg-'));
+
+		tempDirs.push(configHome);
+		process.env.XDG_CONFIG_HOME = configHome;
 	});
 
 	afterEach(() => {
@@ -79,6 +86,7 @@ describe('cli main', () => {
 			'GITHUB_TOKEN',
 			'OCTOLENS_TOKEN',
 			'PATH',
+			'XDG_CONFIG_HOME',
 		]) {
 			if (saved[name] === undefined) {
 				delete process.env[name];
@@ -417,12 +425,214 @@ describe('cli main', () => {
 			assert.ok(report.findings.some(isVisibilityFinding));
 		},
 	);
+
+	test(
+		'a project config file disables a rule',
+		async () => {
+			captureOutput();
+			mockRepoScan();
+			const cwd = makeConfigDir({
+				rules: { 'repo-config/branch-protection-required': 'off' },
+			});
+
+			const code = await inDir(cwd, () => main([
+				'scan',
+				'--repo',
+				'sheplu/Octolens',
+				'--token',
+				't',
+				'--format',
+				'json',
+				'--verbose',
+			]));
+
+			assert.ok(code === 0 || code === 1);
+			assert.match(stderrText(), /\[debug\] config loaded from .*octolens\.config\.json/);
+
+			const report = JSON.parse(stdoutText()) as {
+				findings: { ruleId: string; }[];
+				runs: { ruleId: string; }[];
+			};
+
+			assert.ok(!report.findings.some(isBranchProtectionFinding));
+			assert.ok(!report.runs.some(isBranchProtectionFinding));
+		},
+	);
+
+	test(
+		'a project config.jsonc with comments disables a rule',
+		async () => {
+			captureOutput();
+			mockRepoScan();
+			const cwd = mkdtempSync(join(tmpdir(), 'octolens-cwd-'));
+
+			tempDirs.push(cwd);
+			writeFileSync(join(cwd, 'octolens.config.jsonc'), [
+				'{',
+				'  // deliberately unprotected sandbox repo',
+				'  "rules": { "repo-config/branch-protection-required": "off", },',
+				'}',
+			].join('\n'));
+
+			const code = await inDir(cwd, () => main([
+				'scan',
+				'--repo',
+				'sheplu/Octolens',
+				'--token',
+				't',
+				'--format',
+				'json',
+			]));
+
+			assert.ok(code === 0 || code === 1);
+
+			const report = JSON.parse(stdoutText()) as {
+				runs: { ruleId: string; }[];
+			};
+
+			assert.ok(!report.runs.some(isBranchProtectionFinding));
+		},
+	);
+
+	test(
+		'ambiguous config sources exit 2, listing every source',
+		async () => {
+			captureOutput();
+			const cwd = makeConfigDir({});
+
+			writeFileSync(join(cwd, 'octolens.config.json5'), '{}');
+
+			const code = await inDir(cwd, () => main([
+				'scan',
+				'--repo',
+				'sheplu/Octolens',
+			]));
+
+			assert.equal(code, 2);
+			assert.match(stderrText(), /multiple config sources/);
+			assert.match(stderrText(), /octolens\.config\.json\b/);
+			assert.match(stderrText(), /octolens\.config\.json5/);
+		},
+	);
+
+	test(
+		'an invalid config file exits 2 with a message naming the file',
+		async () => {
+			captureOutput();
+			const cwd = makeConfigDir({ output: { format: 'md' } });
+
+			const code = await inDir(cwd, () => main([
+				'scan',
+				'--repo',
+				'sheplu/Octolens',
+			]));
+
+			assert.equal(code, 2);
+			assert.match(stderrText(), /octolens\.config\.json.*unknown key "output"/);
+		},
+	);
+
+	test(
+		'--include-archived overrides a config ignore.archived',
+		async () => {
+			captureOutput();
+			mockArchivedRepoScan();
+			const cwd = makeConfigDir({ ignore: { archived: true } });
+
+			const code = await inDir(cwd, () => main([
+				'scan',
+				'--repo',
+				'sheplu/Octolens',
+				'--token',
+				't',
+				'--format',
+				'json',
+				'--include-archived',
+			]));
+
+			assert.equal(code, 1);
+
+			const report = JSON.parse(stdoutText()) as {
+				summary: { rulesRun: number; };
+			};
+
+			assert.ok(report.summary.rulesRun > 0);
+		},
+	);
+
+	test(
+		'a config ignore.archived skips an archived repo without the flag',
+		async () => {
+			captureOutput();
+			mockArchivedRepoScan();
+			const cwd = makeConfigDir({ ignore: { archived: true } });
+
+			const code = await inDir(cwd, () => main([
+				'scan',
+				'--repo',
+				'sheplu/Octolens',
+				'--token',
+				't',
+				'--format',
+				'json',
+			]));
+
+			assert.equal(code, 0);
+
+			const report = JSON.parse(stdoutText()) as {
+				summary: { rulesRun: number; rulesSkipped: number; };
+			};
+
+			assert.equal(report.summary.rulesRun, 0);
+			assert.ok(report.summary.rulesSkipped > 0);
+		},
+	);
 });
+
+/** Create a temp working directory holding an `octolens.config.json`. */
+function makeConfigDir(config: unknown): string {
+	const dir = mkdtempSync(join(tmpdir(), 'octolens-cwd-'));
+
+	tempDirs.push(dir);
+	writeFileSync(join(dir, 'octolens.config.json'), JSON.stringify(config));
+
+	return dir;
+}
+
+/** Run a callback with the process chdir'ed into `dir`, restoring after. */
+async function inDir<T>(dir: string, fn: () => Promise<T>): Promise<T> {
+	const previous = process.cwd();
+
+	process.chdir(dir);
+	try {
+		return await fn();
+	} finally {
+		process.chdir(previous);
+	}
+}
 
 function mockRepoScan(): void {
 	nock(BASE)
 		.get('/repos/sheplu/Octolens')
 		.reply(200, makeRepoResponse());
+	nock(BASE)
+		.get('/repos/sheplu/Octolens/branches/main/protection')
+		.reply(404, { message: 'Branch not protected' });
+	nock(BASE).persist()
+		.get(/\/repos\/sheplu\/Octolens\//)
+		.reply(200, []);
+	nock(BASE).persist()
+		.head(/\/repos\/sheplu\/Octolens\//)
+		.reply(204);
+	nock(BASE).persist()
+		.get(/\/orgs\//)
+		.reply(404, { message: 'Not Found' });
+}
+
+function mockArchivedRepoScan(): void {
+	nock(BASE).persist()
+		.get('/repos/sheplu/Octolens')
+		.reply(200, { ...makeRepoResponse(), archived: true });
 	nock(BASE)
 		.get('/repos/sheplu/Octolens/branches/main/protection')
 		.reply(404, { message: 'Branch not protected' });

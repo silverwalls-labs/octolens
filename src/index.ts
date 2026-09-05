@@ -50,6 +50,11 @@ export type {
 } from './engine/index.ts';
 export type { ExitCodeOptions } from './engine/exit-code.ts';
 
+export {
+	loadConfig, ConfigError, PROJECT_CONFIG_FILES, HOME_CONFIG_FILES,
+} from './config/index.ts';
+export type { LoadConfigOptions, LoadedConfig } from './config/index.ts';
+
 export { createOctokit } from './github/client.ts';
 export type { ClientOptions } from './github/client.ts';
 export type { OrgRepoListing, RepoVisibility } from './github/queries.ts';
