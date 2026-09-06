@@ -30,6 +30,14 @@ Options:
   -v, --version              Print version
   -h, --help                 Show this help
 
+Configuration:
+  Settings are read from $XDG_CONFIG_HOME/octolens/config.{json,jsonc,json5}
+  (default under ~/.config), then ./octolens.config.{json,jsonc,json5} or an
+  "octolens" key in ./package.json, merged in that order (the project source
+  wins per key). Each location accepts at most one source; several at once is
+  an error. Explicitly typed CLI flags override config values. See the README
+  for the schema
+
 Exit codes:
   0  no findings at or above the threshold (and, with --fail-on-skip, full coverage)
   1  findings at or above the threshold, or incomplete coverage under --fail-on-skip

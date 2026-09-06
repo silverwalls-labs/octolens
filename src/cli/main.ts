@@ -8,7 +8,10 @@ import { allRules, allOrgRules } from '../rules/index.ts';
 import {
 	formatJson, formatMarkdown, formatMarkdownReport, formatPretty, formatPrettyReport,
 } from '../output/index.ts';
-import type { OrgScanReport, ScanResult } from '../types/index.ts';
+import { loadConfig, ConfigError } from '../config/index.ts';
+import type {
+	OctolensConfig, OrgScanReport, ScanResult,
+} from '../types/index.ts';
 import {
 	parseArgs, CliUsageError, type Format, type ScanCommandArgs,
 } from './parse-args.ts';
@@ -67,6 +70,24 @@ async function runScanCommand(args: ScanCommandArgs): Promise<number> {
 			'info' :
 			'warn');
 
+	let loaded;
+
+	try {
+		loaded = loadConfig();
+	} catch (err) {
+		// loadConfig only throws ConfigError; the guard is defensive.
+		if (!(err instanceof ConfigError)) throw err;
+
+		process.stderr.write(`${err.message}\n`);
+
+		return 2;
+	}
+	logger.debug(loaded.sources.length > 0 ?
+		`config loaded from ${loaded.sources.join(', ')}` :
+		'no config file found');
+
+	const config = applyCliOverrides(loaded.config, args);
+
 	let auth;
 
 	try {
@@ -102,7 +123,7 @@ async function runScanCommand(args: ScanCommandArgs): Promise<number> {
 			octokit,
 			logger,
 			threshold: args.severity,
-			config: { ignore: { archived: !args.includeArchived } },
+			config,
 			ruleConfig,
 			concurrency: args.concurrency,
 		});
@@ -119,6 +140,7 @@ async function runScanCommand(args: ScanCommandArgs): Promise<number> {
 			octokit,
 			logger,
 			threshold: args.severity,
+			config,
 		}) :
 		await scanRepo({
 			// parseArgs guarantees exactly one of repo/org is set.
@@ -127,13 +149,33 @@ async function runScanCommand(args: ScanCommandArgs): Promise<number> {
 			octokit,
 			logger,
 			threshold: args.severity,
-			config: { ignore: { archived: !args.includeArchived } },
+			config,
 			ruleConfig,
 		});
 
 	emitOutput(result, args.formats, args.out);
 
 	return exitCodeFor(result, { failOnIncomplete: args.failOnSkip });
+}
+
+/**
+ * Layer explicitly typed CLI flags over the file configuration.
+ *
+ * Flags the user did not type leave file values (and built-in defaults)
+ * untouched: `--include-archived` is only present when typed, and
+ * `--concurrency` is forwarded separately and already beats
+ * `config.org.concurrency` downstream.
+ *
+ * @param config - Configuration loaded from disk.
+ * @param args   - Parsed scan command arguments.
+ * @returns      The configuration with CLI overrides applied.
+ */
+function applyCliOverrides(config: OctolensConfig, args: ScanCommandArgs): OctolensConfig {
+	if (!args.includeArchived) {
+		return config;
+	}
+
+	return { ...config, ignore: { ...config.ignore, archived: false } };
 }
 
 /**
