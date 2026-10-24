@@ -113,6 +113,32 @@ describe('scan pipeline', () => {
 		assert.equal(exitCodeFor(result), 0);
 	});
 
+	test('config severity overrides remap findings end to end', async () => {
+		mockRepoMetadata();
+		nock(BASE)
+			.get('/repos/sheplu/Octolens/branches/main/protection')
+			.reply(404, { message: 'Branch not protected' });
+		mockCatchAll();
+
+		const result = await scanRepo({
+			repo: { owner: 'sheplu', name: 'Octolens' },
+			rules: [ ...allRules ],
+			octokit: makeOctokit(),
+			logger: silentLogger(),
+			threshold: 'low',
+			config: { rules: { 'repo-config/branch-protection-required': 'low' } },
+		});
+
+		const ruleId = 'repo-config/branch-protection-required';
+		const finding = result.findings.find((f) => f.ruleId === ruleId);
+		const run = result.runs.find((r) => r.ruleId === ruleId);
+
+		assert.ok(finding);
+		assert.equal(finding.severity, 'low');
+		assert.equal(result.summary.findingsBySeverity.low > 0, true);
+		assert.ok(run?.findings.every((f) => f.severity === 'low'));
+	});
+
 	test('--fail-on-skip: exitCodeFor returns 1 when rules skipped', async () => {
 		mockRepoMetadata();
 		nock(BASE)

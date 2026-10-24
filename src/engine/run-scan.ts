@@ -59,6 +59,8 @@ export type ScanRepoOptions = {
  * @returns       The complete scan result with findings, rule runs, and summary.
  */
 export async function scanRepo(options: ScanRepoOptions): Promise<ScanResult> {
+	const overrides = validateSeverityOverrides(options.config);
+
 	const cache = options.cache ?? createCachedFetcher();
 	const skipArchived = options.config?.ignore?.archived !== false;
 
@@ -91,7 +93,7 @@ export async function scanRepo(options: ScanRepoOptions): Promise<ScanResult> {
 		runs.push(run);
 	}
 
-	applyRunSeverityOverrides(runs, options.config);
+	applyRunSeverityOverrides(runs, overrides);
 
 	const allFindings = runs.flatMap((r) => r.findings);
 	const findings = allFindings.filter((f) => meetsThreshold(f.severity, options.threshold));
@@ -148,6 +150,7 @@ export type ScanOrgOptions = {
  * @returns       The complete scan result with findings, rule runs, and summary.
  */
 export async function scanOrg(options: ScanOrgOptions): Promise<ScanResult> {
+	const overrides = validateSeverityOverrides(options.config);
 	const cache = options.cache ?? createCachedFetcher();
 	const enabledRules = filterEnabledRules(options.rules, options.config);
 
@@ -166,7 +169,7 @@ export async function scanOrg(options: ScanOrgOptions): Promise<ScanResult> {
 		runs.push(run);
 	}
 
-	applyRunSeverityOverrides(runs, options.config);
+	applyRunSeverityOverrides(runs, overrides);
 
 	const allFindings = runs.flatMap((r) => r.findings);
 	const findings = allFindings.filter((f) => meetsThreshold(f.severity, options.threshold));
@@ -258,28 +261,41 @@ function applySeverityOverrides(
  * Apply severity overrides to every run's findings in place so that
  * `runs[].findings` and the top-level `findings` array stay consistent.
  *
- * Overrides are validated before use, per the project's fail-loud config
- * policy: a value that is neither `'off'` nor a known severity (possible
- * when a library caller builds the config object directly, bypassing
- * {@link loadConfig}) throws instead of corrupting findings downstream.
- *
- * @param  runs   - Rule runs whose findings should be updated.
- * @param  config - Optional scan configuration.
- * @throws {ConfigError} If a rule override is not a severity or `'off'`.
+ * @param runs      - Rule runs whose findings should be updated.
+ * @param overrides - Validated per-rule severity overrides.
  */
 function applyRunSeverityOverrides(
 	runs: { findings: Finding[]; }[],
-	config: OctolensConfig | undefined,
+	overrides: Record<string, Severity>,
 ): void {
-	const entries = Object.entries(config?.rules ?? {});
+	for (const run of runs) {
+		run.findings = applySeverityOverrides(run.findings, overrides);
+	}
+}
 
-	if (entries.length === 0) {
-		return;
+/**
+ * Validate the config's rule overrides and return them as a severity map.
+ *
+ * Called at scan entry, before any API request, per the project's
+ * fail-loud config policy: a value that is neither `'off'` nor a known
+ * severity (possible when a library caller builds the config object
+ * directly, bypassing {@link loadConfig}) throws instead of corrupting
+ * findings downstream. The returned map uses a null prototype so lookups
+ * by rule ID can never resolve inherited properties like `toString`.
+ *
+ * @param    config - Optional scan configuration.
+ * @returns         Rule IDs mapped to their override severities.
+ * @throws {ConfigError} If a rule override is not a severity or `'off'`.
+ */
+function validateSeverityOverrides(config: OctolensConfig | undefined): Record<string, Severity> {
+	const rules = config?.rules;
+	const overrides: Record<string, Severity> = Object.create(null);
+
+	if (rules === undefined) {
+		return overrides;
 	}
 
-	const overrides: Record<string, Severity> = {};
-
-	for (const [ id, setting ] of entries) {
+	for (const [ id, setting ] of Object.entries(rules)) {
 		if (isSeverity(setting)) {
 			overrides[id] = setting;
 		} else if (setting !== 'off') {
@@ -288,9 +304,7 @@ function applyRunSeverityOverrides(
 		}
 	}
 
-	for (const run of runs) {
-		run.findings = applySeverityOverrides(run.findings, overrides);
-	}
+	return overrides;
 }
 
 /**
