@@ -10,9 +10,11 @@ holding pen for follow-up minor releases.
   glue to attach the report to a workflow run.
 - **Markdown output format** — `--format md` for GitHub job summaries / PR
   comments. JSON and pretty are the only formats wired right now.
-- **`cosmiconfig` config discovery** — `octolens.config.{ts,js,json,yaml}` +
-  `package.json#octolens`, with severity overrides and ignore lists. Today
-  rules use their built-in defaults.
+- ~~**`cosmiconfig` config discovery**~~ — **SHIPPED** (issues #23 + #19):
+  `octolens.config.{json,jsonc,json5}` + `package.json#octolens`, with
+  per-rule severity overrides (`"off"` to disable, or any severity level to
+  remap), ignore lists, and org concurrency. The engine applies severity
+  overrides centrally after rule execution and before threshold filtering.
 - ~~**`--org <org>` repo fan-out**~~ — **SHIPPED** (issue #8) as the opt-in
   `--org <org> --all-repos` flag: streams the repo listing
   (`listOrgRepos`), filters archived / forks / `ignore.repos` at zero API

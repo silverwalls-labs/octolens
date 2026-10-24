@@ -88,6 +88,8 @@ export async function scanRepo(options: ScanRepoOptions): Promise<ScanResult> {
 		runs.push(run);
 	}
 
+	applyRunSeverityOverrides(runs, options.config);
+
 	const allFindings = runs.flatMap((r) => r.findings);
 	const findings = allFindings.filter((f) => meetsThreshold(f.severity, options.threshold));
 
@@ -161,6 +163,8 @@ export async function scanOrg(options: ScanOrgOptions): Promise<ScanResult> {
 		runs.push(run);
 	}
 
+	applyRunSeverityOverrides(runs, options.config);
+
 	const allFindings = runs.flatMap((r) => r.findings);
 	const findings = allFindings.filter((f) => meetsThreshold(f.severity, options.threshold));
 
@@ -221,6 +225,51 @@ function filterEnabledRules<R extends { id: string; }>(rules: R[], config?: Octo
 	const overrides = config?.rules ?? {};
 
 	return rules.filter((r) => overrides[r.id] !== 'off');
+}
+
+/**
+ * Replace finding severities where the config specifies an override.
+ *
+ * Rules disabled via `'off'` are already filtered out by
+ * {@link filterEnabledRules}, so only concrete severity values are applied
+ * here. Findings whose rule has no override pass through unchanged.
+ *
+ * @param findings - Findings to process.
+ * @param config   - Optional scan configuration.
+ * @returns        A new array with overridden severities where applicable.
+ */
+function applySeverityOverrides(findings: Finding[], config?: OctolensConfig): Finding[] {
+	const overrides = config?.rules ?? {};
+
+	if (Object.keys(overrides).length === 0) {
+		return findings;
+	}
+
+	return findings.map((f) => {
+		const override = overrides[f.ruleId];
+
+		if (override != null && override !== 'off') {
+			return { ...f, severity: override };
+		}
+
+		return f;
+	});
+}
+
+/**
+ * Apply severity overrides to every run's findings in place so that
+ * `runs[].findings` and the top-level `findings` array stay consistent.
+ *
+ * @param runs   - Rule runs whose findings should be updated.
+ * @param config - Optional scan configuration.
+ */
+function applyRunSeverityOverrides(
+	runs: { findings: Finding[]; }[],
+	config?: OctolensConfig,
+): void {
+	for (const run of runs) {
+		run.findings = applySeverityOverrides(run.findings, config);
+	}
 }
 
 /**

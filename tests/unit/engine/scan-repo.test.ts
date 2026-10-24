@@ -67,6 +67,83 @@ describe('scanRepo', () => {
 		},
 	);
 
+	test('severity override changes finding severity', async () => {
+		mockRepoMetadata();
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens/vulnerability-alerts')
+			.reply(404, { message: 'Not Found' });
+
+		const result = await scanRepo({
+			repo: { owner: 'sheplu', name: 'Octolens' },
+			rules: [ dependabotAlertsEnabled ],
+			octokit: makeOctokit(),
+			logger: silentLogger(),
+			threshold: 'info',
+			config: {
+				rules: {
+					'security/dependabot-alerts-enabled': 'low',
+				},
+			},
+		});
+
+		assert.equal(result.findings.length, 1);
+		assert.equal(result.findings[0]?.severity, 'low');
+		assert.equal(result.summary.findingsBySeverity.low, 1);
+		assert.equal(result.summary.findingsBySeverity.high, 0);
+		assert.equal(
+			result.runs[0]?.findings[0]?.severity,
+			'low',
+			'run findings must reflect the override',
+		);
+	});
+
+	test('downgraded finding is excluded by threshold', async () => {
+		mockRepoMetadata();
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens/vulnerability-alerts')
+			.reply(404, { message: 'Not Found' });
+
+		const result = await scanRepo({
+			repo: { owner: 'sheplu', name: 'Octolens' },
+			rules: [ dependabotAlertsEnabled ],
+			octokit: makeOctokit(),
+			logger: silentLogger(),
+			threshold: 'medium',
+			config: {
+				rules: {
+					'security/dependabot-alerts-enabled': 'low',
+				},
+			},
+		});
+
+		assert.equal(result.findings.length, 0);
+		assert.equal(result.summary.findingsTotal, 0);
+	});
+
+	test('severity upgrade includes finding above threshold', async () => {
+		mockRepoMetadata();
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens/vulnerability-alerts')
+			.reply(404, { message: 'Not Found' });
+
+		const result = await scanRepo({
+			repo: { owner: 'sheplu', name: 'Octolens' },
+			rules: [ dependabotAlertsEnabled ],
+			octokit: makeOctokit(),
+			logger: silentLogger(),
+			threshold: 'critical',
+			config: {
+				rules: {
+					'security/dependabot-alerts-enabled': 'critical',
+				},
+			},
+		});
+
+		assert.equal(result.findings.length, 1);
+		assert.equal(result.findings[0]?.severity, 'critical');
+		assert.equal(result.summary.findingsBySeverity.critical, 1);
+	});
+
 	test('disabled rules in config are skipped', async () => {
 		mockRepoMetadata();
 		const result = await scanRepo({

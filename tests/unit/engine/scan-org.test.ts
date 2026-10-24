@@ -77,6 +77,61 @@ describe('scanOrg', () => {
 		},
 	);
 
+	test('severity override changes org finding severity', async () => {
+		nock('https://api.github.com')
+			.get('/orgs/silverwalls-labs')
+			.reply(200, makeOrgResponse({
+				twoFactorRequirementEnabled: false,
+			}));
+
+		const result = await scanOrg({
+			org: 'silverwalls-labs',
+			rules: [ twoFactorRequired ],
+			octokit: makeOctokit(),
+			logger: silentLogger(),
+			threshold: 'info',
+			config: {
+				rules: {
+					'org/two-factor-required': 'low',
+				},
+			},
+		});
+
+		assert.equal(result.findings.length, 1);
+		assert.equal(result.findings[0]?.severity, 'low');
+		assert.equal(result.summary.findingsBySeverity.low, 1);
+		assert.equal(result.summary.findingsBySeverity.high, 0);
+		assert.equal(
+			result.runs[0]?.findings[0]?.severity,
+			'low',
+			'run findings must reflect the override',
+		);
+	});
+
+	test('downgraded org finding is excluded by threshold', async () => {
+		nock('https://api.github.com')
+			.get('/orgs/silverwalls-labs')
+			.reply(200, makeOrgResponse({
+				twoFactorRequirementEnabled: false,
+			}));
+
+		const result = await scanOrg({
+			org: 'silverwalls-labs',
+			rules: [ twoFactorRequired ],
+			octokit: makeOctokit(),
+			logger: silentLogger(),
+			threshold: 'medium',
+			config: {
+				rules: {
+					'org/two-factor-required': 'low',
+				},
+			},
+		});
+
+		assert.equal(result.findings.length, 0);
+		assert.equal(result.summary.findingsTotal, 0);
+	});
+
 	test('disabled org rules in config are skipped', async () => {
 		const result = await scanOrg({
 			org: 'silverwalls-labs',
