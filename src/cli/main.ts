@@ -88,6 +88,14 @@ async function runScanCommand(args: ScanCommandArgs): Promise<number> {
 
 	const config = applyCliOverrides(loaded.config, args);
 
+	const unknown = unknownRuleIds(config);
+
+	if (unknown.length > 0) {
+		process.stderr.write(`unknown rule ID(s) in config "rules": ${unknown.join(', ')}\n`);
+
+		return 2;
+	}
+
 	let auth;
 
 	try {
@@ -156,6 +164,29 @@ async function runScanCommand(args: ScanCommandArgs): Promise<number> {
 	emitOutput(result, args.formats, args.out);
 
 	return exitCodeFor(result, { failOnIncomplete: args.failOnSkip });
+}
+
+/**
+ * Collect rule IDs from the config that match no built-in rule.
+ *
+ * The config loader validates override values but cannot validate rule
+ * IDs, since it does not know the rule universe. Per the project's
+ * fail-loud config policy, the CLI aborts rather than silently ignoring
+ * a typo'd ID: a rule the user believes is disabled or remapped must not
+ * quietly keep its built-in severity.
+ *
+ * @param config - Configuration loaded from disk.
+ * @returns      The config rule IDs that match no known rule.
+ */
+function unknownRuleIds(config: OctolensConfig): string[] {
+	if (config.rules === undefined) {
+		return [];
+	}
+
+	const knownIds = [ ...allRules, ...allOrgRules ].map((rule) => rule.id);
+	const known = new Set(knownIds);
+
+	return Object.keys(config.rules).filter((id) => !known.has(id));
 }
 
 /**

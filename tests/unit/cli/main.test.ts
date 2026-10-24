@@ -495,6 +495,36 @@ describe('cli main', () => {
 	);
 
 	test(
+		'an unknown rule id in config exits 2 without scanning',
+		async () => {
+			captureOutput();
+			mockRepoScan();
+			const cwd = makeConfigDir({
+				rules: { 'security/dependabot-alert-enabled': 'off' },
+			});
+
+			const code = await inDir(cwd, () => main([
+				'scan',
+				'--repo',
+				'sheplu/Octolens',
+				'--token',
+				't',
+				'--format',
+				'json',
+			]));
+
+			assert.equal(code, 2);
+
+			assert.equal(
+				stderrText(),
+				'unknown rule ID(s) in config "rules": security/dependabot-alert-enabled\n',
+			);
+
+			assert.equal(stdoutText(), '', 'no scan output on a config error');
+		},
+	);
+
+	test(
 		'ambiguous config sources exit 2, listing every source',
 		async () => {
 			captureOutput();

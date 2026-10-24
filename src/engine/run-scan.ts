@@ -1,7 +1,10 @@
 import type { Octokit } from '@octokit/rest';
 import { createCachedFetcher } from '../github/fetcher.ts';
+import { ConfigError } from '../config/index.ts';
 import { getRepoMetadata } from '../github/queries.ts';
-import { meetsThreshold } from '../types/severity.ts';
+import {
+	isSeverity, meetsThreshold, SEVERITIES,
+} from '../types/severity.ts';
 import type {
 	CachedFetcher,
 	Finding,
@@ -234,25 +237,20 @@ function filterEnabledRules<R extends { id: string; }>(rules: R[], config?: Octo
  * {@link filterEnabledRules}, so only concrete severity values are applied
  * here. Findings whose rule has no override pass through unchanged.
  *
- * @param findings - Findings to process.
- * @param config   - Optional scan configuration.
- * @returns        A new array with overridden severities where applicable.
+ * @param findings  - Findings to process.
+ * @param overrides - Validated per-rule severity overrides.
+ * @returns         A new array with overridden severities where applicable.
  */
-function applySeverityOverrides(findings: Finding[], config?: OctolensConfig): Finding[] {
-	const overrides = config?.rules ?? {};
-
-	if (Object.keys(overrides).length === 0) {
-		return findings;
-	}
-
+function applySeverityOverrides(
+	findings: Finding[],
+	overrides: Record<string, Severity>,
+): Finding[] {
 	return findings.map((f) => {
 		const override = overrides[f.ruleId];
 
-		if (override != null && override !== 'off') {
-			return { ...f, severity: override };
-		}
-
-		return f;
+		return override === undefined ?
+			f :
+			{ ...f, severity: override };
 	});
 }
 
@@ -260,15 +258,38 @@ function applySeverityOverrides(findings: Finding[], config?: OctolensConfig): F
  * Apply severity overrides to every run's findings in place so that
  * `runs[].findings` and the top-level `findings` array stay consistent.
  *
- * @param runs   - Rule runs whose findings should be updated.
- * @param config - Optional scan configuration.
+ * Overrides are validated before use, per the project's fail-loud config
+ * policy: a value that is neither `'off'` nor a known severity (possible
+ * when a library caller builds the config object directly, bypassing
+ * {@link loadConfig}) throws instead of corrupting findings downstream.
+ *
+ * @param  runs   - Rule runs whose findings should be updated.
+ * @param  config - Optional scan configuration.
+ * @throws {ConfigError} If a rule override is not a severity or `'off'`.
  */
 function applyRunSeverityOverrides(
 	runs: { findings: Finding[]; }[],
-	config?: OctolensConfig,
+	config: OctolensConfig | undefined,
 ): void {
+	const entries = Object.entries(config?.rules ?? {});
+
+	if (entries.length === 0) {
+		return;
+	}
+
+	const overrides: Record<string, Severity> = {};
+
+	for (const [ id, setting ] of entries) {
+		if (isSeverity(setting)) {
+			overrides[id] = setting;
+		} else if (setting !== 'off') {
+			throw new ConfigError(`rules.${id}: severity override must be one of ` +
+				`${SEVERITIES.join(' | ')} | off, got ${JSON.stringify(setting)}`);
+		}
+	}
+
 	for (const run of runs) {
-		run.findings = applySeverityOverrides(run.findings, config);
+		run.findings = applySeverityOverrides(run.findings, overrides);
 	}
 }
 

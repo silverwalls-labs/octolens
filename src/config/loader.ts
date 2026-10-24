@@ -33,7 +33,9 @@ const MAX_CONCURRENCY = 32;
 /**
  * Thrown by {@link loadConfig} when a config file exists but cannot be
  * read, is not valid JSON, or does not match the {@link OctolensConfig}
- * schema. The message always names the offending file.
+ * schema. The message always names the offending file. The scan engine
+ * also throws it when a programmatically supplied config carries a rule
+ * override that is neither a severity nor `'off'`.
  */
 export class ConfigError extends Error {
 	/**

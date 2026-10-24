@@ -152,7 +152,8 @@ Each location accepts **at most one source**: finding several (say, a
 `package.json` key) aborts with exit code 2 listing every source found —
 nothing is silently picked. Explicitly typed CLI flags override config
 values; config values override built-in defaults. An invalid source
-(malformed syntax, unknown keys, wrong types) also aborts with exit
+(malformed syntax, unknown keys, wrong types, or a `rules` entry whose
+ID matches no built-in rule) also aborts with exit
 code 2 and a message naming the source and the offending key.
 
 **Example:**
@@ -175,8 +176,9 @@ code 2 and a message naming the source and the offending key.
 ```
 
 - `rules` — map a rule ID to `"off"` to disable it, or to a severity
-  (`critical` | `high` | `medium` | `low` | `info`). Today only `"off"`
-  changes behavior; severity remapping is reserved for a future release.
+  (`critical` | `high` | `medium` | `low` | `info`) to remap the rule's
+  findings; remapped severities respect the `--severity` threshold. A rule
+  ID that matches no built-in rule aborts with exit code 2.
 - `ignore.repos` — repositories (`owner/name`) skipped in `--all-repos` scans.
 - `ignore.archived` — skip archived repositories (default `true`;
   `--include-archived` forces it to `false`).

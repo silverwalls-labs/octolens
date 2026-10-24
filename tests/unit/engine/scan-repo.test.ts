@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 import nock from 'nock';
 import { Octokit } from '@octokit/rest';
 import { scanRepo, exitCodeFor } from '../../../src/engine/index.ts';
+import { ConfigError } from '../../../src/config/index.ts';
 import {
 	rule as dependabotAlertsEnabled,
 } from '../../../src/rules/security/dependabot-alerts-enabled.ts';
@@ -142,6 +143,31 @@ describe('scanRepo', () => {
 		assert.equal(result.findings.length, 1);
 		assert.equal(result.findings[0]?.severity, 'critical');
 		assert.equal(result.summary.findingsBySeverity.critical, 1);
+	});
+
+	test('invalid severity override throws a ConfigError', async () => {
+		mockRepoMetadata();
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens/vulnerability-alerts')
+			.reply(404, { message: 'Not Found' });
+
+		const config = {
+			rules: { 'security/dependabot-alerts-enabled': 'urgent' },
+		} as unknown as Parameters<typeof scanRepo>[0]['config'];
+
+		await assert.rejects(
+			scanRepo({
+				repo: { owner: 'sheplu', name: 'Octolens' },
+				rules: [ dependabotAlertsEnabled ],
+				octokit: makeOctokit(),
+				logger: silentLogger(),
+				threshold: 'info',
+				config,
+			}),
+			(err: unknown) => err instanceof ConfigError &&
+				(/rules\.security\/dependabot-alerts-enabled: severity override must be one of/).test(err.message) &&
+				(/got "urgent"/).test(err.message),
+		);
 	});
 
 	test('disabled rules in config are skipped', async () => {
