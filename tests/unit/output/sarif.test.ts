@@ -296,13 +296,19 @@ describe('formatSarif', () => {
 				ruleId: 'b/rule',
 				severity: 'medium',
 				repo: { owner: ORG, name: 'zeta' },
+				title: 'B',
 			}),
-			makeFinding({ ruleId: 'z/rule', severity: 'critical' }),
-			makeFinding({ ruleId: 'a/rule', severity: 'medium' }),
+			makeFinding({
+				ruleId: 'z/rule', severity: 'critical', title: 'Z',
+			}),
+			makeFinding({
+				ruleId: 'a/rule', severity: 'medium', title: 'A',
+			}),
 			makeFinding({
 				ruleId: 'b/rule',
 				severity: 'medium',
 				repo: { owner: ORG, name: 'alpha' },
+				title: 'B',
 			}),
 		];
 		const run = firstRun(makeResult(findings));
@@ -310,21 +316,25 @@ describe('formatSarif', () => {
 		assert.deepEqual(
 			run.results.map((r) => r.partialFingerprints['octolensSubject/v1']),
 			[
-				'z/rule:silverwalls-labs/review:0',
-				'a/rule:silverwalls-labs/review:0',
-				'b/rule:acme/alpha:0',
-				'b/rule:acme/zeta:0',
+				'z/rule:silverwalls-labs/review:Z:0',
+				'a/rule:silverwalls-labs/review:A:0',
+				'b/rule:acme/alpha:B:0',
+				'b/rule:acme/zeta:B:0',
 			],
 		);
 	});
 
-	test('numbers fingerprints per rule and subject', () => {
+	test('keeps fingerprints stable across sibling findings of one rule', () => {
 		const findings = [
-			makeFinding({ ruleId: 'access/webhooks-use-https', severity: 'medium' }),
 			makeFinding({
-				ruleId: 'access/webhooks-use-https',
+				ruleId: 'access/required-custom-properties',
 				severity: 'medium',
-				title: 'Second webhook',
+				title: "Property 'a' unset",
+			}),
+			makeFinding({
+				ruleId: 'access/required-custom-properties',
+				severity: 'medium',
+				title: "Property 'b' unset",
 			}),
 		];
 		const run = firstRun(makeResult(findings));
@@ -332,8 +342,28 @@ describe('formatSarif', () => {
 		assert.deepEqual(
 			run.results.map((r) => r.partialFingerprints['octolensSubject/v1']),
 			[
-				'access/webhooks-use-https:silverwalls-labs/review:0',
-				'access/webhooks-use-https:silverwalls-labs/review:1',
+				"access/required-custom-properties:silverwalls-labs/review:Property 'a' unset:0",
+				"access/required-custom-properties:silverwalls-labs/review:Property 'b' unset:0",
+			],
+		);
+	});
+
+	test('numbers exact duplicate findings per rule, subject, and title', () => {
+		const findings = [
+			makeFinding({
+				ruleId: 'access/webhooks-use-https', severity: 'medium', title: 'Same title',
+			}),
+			makeFinding({
+				ruleId: 'access/webhooks-use-https', severity: 'medium', title: 'Same title',
+			}),
+		];
+		const run = firstRun(makeResult(findings));
+
+		assert.deepEqual(
+			run.results.map((r) => r.partialFingerprints['octolensSubject/v1']),
+			[
+				'access/webhooks-use-https:silverwalls-labs/review:Same title:0',
+				'access/webhooks-use-https:silverwalls-labs/review:Same title:1',
 			],
 		);
 	});
@@ -477,6 +507,25 @@ describe('formatSarif', () => {
 		]);
 	});
 
+	test('reports an incomplete fleet listing as a failed invocation', () => {
+		const report = makeReport();
+
+		report.summary.listingComplete = false;
+
+		const invocation = firstRun(report).invocations[0];
+
+		assert.equal(invocation.executionSuccessful, false);
+		assert.deepEqual(invocation.toolExecutionNotifications, [
+			{
+				level: 'error',
+				message: {
+					text: 'acme: repository listing incomplete: ' +
+						'some repositories may be missing from this report',
+				},
+			},
+		]);
+	});
+
 	test('renders an empty scan as a valid document with no results', () => {
 		const run = firstRun(makeResult([]));
 
@@ -504,7 +553,7 @@ describe('formatSarif', () => {
 		assert.equal(run.results[0].message.text, 'Strange finding');
 		assert.equal(
 			run.results[0].partialFingerprints['octolensSubject/v1'],
-			'custom/mystery::0',
+			'custom/mystery::Strange finding:0',
 		);
 	});
 });

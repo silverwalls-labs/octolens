@@ -172,6 +172,13 @@ Notes:
   findings into one run, with each alert message prefixed by
   `owner/name`. Upload it to a dedicated audit repository rather than a
   regular code repository.
+- GitHub rejects SARIF uploads over 10 MB (gzip-compressed) or 25,000
+  results, and displays only the top 5,000 results per category,
+  prioritized by severity. Very large fleet reports should raise
+  `--severity` to stay within the limits.
+- Repositories excluded by fleet filters (archived, fork, or on the
+  ignore list) contribute no results, so alerts previously uploaded for
+  them are closed on the next upload.
 
 ## 🛠 Configuration
 

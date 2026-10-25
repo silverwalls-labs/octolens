@@ -199,13 +199,31 @@ function compareEntries(a: Entry, b: Entry): number {
 		return bySeverity;
 	}
 
-	const byRule = a.finding.ruleId.localeCompare(b.finding.ruleId);
+	const byRule = compareStrings(a.finding.ruleId, b.finding.ruleId);
 
 	if (byRule !== 0) {
 		return byRule;
 	}
 
-	return a.subject.localeCompare(b.subject);
+	return compareStrings(a.subject, b.subject);
+}
+
+/**
+ * Locale-independent string comparator (plain code-unit ordering).
+ *
+ * `localeCompare` varies with the runtime locale / ICU collation, which
+ * would make the emitted byte order environment-dependent.
+ *
+ * @param a - First string to compare.
+ * @param b - Second string to compare.
+ * @returns Negative, zero, or positive per comparator contract.
+ */
+function compareStrings(a: string, b: string): number {
+	return a < b ?
+		- 1 :
+		a > b ?
+			1 :
+			0;
 }
 
 /**
@@ -228,13 +246,19 @@ function buildRules(entries: Entry[]): SarifRule[] {
 	}
 
 	return [ ...representatives.entries() ]
-		.sort(([ a ], [ b ]) => a.localeCompare(b))
+		.sort(([ a ], [ b ]) => compareStrings(a, b))
 		.map(([ id, finding ]) => toRuleDescriptor(id, finding));
 }
 
 /**
  * Build the SARIF results for all entries, assigning per-rule indexes
- * and occurrence-stable fingerprints.
+ * and stable fingerprints.
+ *
+ * Fingerprints combine rule ID, subject, title, and an occurrence index
+ * that only counts exact duplicates (same rule, subject, and title).
+ * Sibling findings of one rule therefore keep their fingerprints when
+ * other siblings are added or removed, so code-scanning alerts survive
+ * unrelated changes instead of being closed and reopened.
  *
  * @param entries - Entries sorted by {@link compareEntries}.
  * @param ruleIds - Rule IDs in `tool.driver.rules` order.
@@ -245,7 +269,7 @@ function buildResults(entries: Entry[], ruleIds: string[], fleet: boolean): Sari
 	const occurrences = new Map<string, number>();
 
 	return entries.map((entry) => {
-		const key = `${entry.finding.ruleId}:${entry.subject}`;
+		const key = `${entry.finding.ruleId}:${entry.subject}:${entry.finding.title}`;
 		const occurrence = occurrences.get(key) ?? 0;
 
 		occurrences.set(key, occurrence + 1);
@@ -312,7 +336,7 @@ function withReferences(base: string, lines: string[]): string {
  *
  * @param entry      - The finding and its subject label.
  * @param ruleIndex  - Index of the rule in `tool.driver.rules`.
- * @param occurrence - 0-based index among results sharing rule and subject.
+ * @param occurrence - 0-based index among exact duplicates (same rule, subject, and title).
  * @param fleet      - Whether to prefix the message with the subject.
  * @returns          The SARIF result.
  */
@@ -344,13 +368,20 @@ function toResult(
 				},
 			},
 		],
-		partialFingerprints: { 'octolensSubject/v1': `${finding.ruleId}:${subject}:${occurrence}` },
+		partialFingerprints: {
+			'octolensSubject/v1': `${finding.ruleId}:${subject}:${finding.title}:${occurrence}`,
+		},
 	};
 }
 
 /**
  * Build the invocation record: whether every rule ran cleanly, plus one
  * notification per errored rule, skipped rule, and failed repository.
+ *
+ * A fleet whose repository listing aborted mid-stream is reported as a
+ * failed invocation: consumers (and code-scanning alert tracking) must
+ * not treat the partial result set as the complete picture, because
+ * alerts for missing repositories would be closed as fixed.
  *
  * @param result - Scan result to inspect.
  * @returns      The SARIF invocation.
@@ -363,6 +394,9 @@ function buildInvocation(result: ScanResult | OrgScanReport): SarifInvocation {
 	const failures = fleet ?
 		result.failures :
 		[];
+	const listingComplete = fleet ?
+		result.summary.listingComplete :
+		true;
 
 	const notifications: SarifNotification[] = [];
 
@@ -387,10 +421,20 @@ function buildInvocation(result: ScanResult | OrgScanReport): SarifInvocation {
 		});
 	}
 
+	if (fleet && !result.summary.listingComplete) {
+		notifications.push({
+			level: 'error',
+			message: {
+				text: `${result.target.org}: repository listing incomplete: ` +
+					'some repositories may be missing from this report',
+			},
+		});
+	}
+
 	const errored = scans.some((scan) => scan.runs.some((run) => run.status === 'error'));
 
 	return {
-		executionSuccessful: !errored && failures.length === 0,
+		executionSuccessful: listingComplete && !errored && failures.length === 0,
 		toolExecutionNotifications: notifications,
 	};
 }
