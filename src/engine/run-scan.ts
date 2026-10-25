@@ -1,7 +1,10 @@
 import type { Octokit } from '@octokit/rest';
 import { createCachedFetcher } from '../github/fetcher.ts';
+import { ConfigError } from '../config/index.ts';
 import { getRepoMetadata } from '../github/queries.ts';
-import { meetsThreshold } from '../types/severity.ts';
+import {
+	isSeverity, meetsThreshold, SEVERITIES,
+} from '../types/severity.ts';
 import type {
 	CachedFetcher,
 	Finding,
@@ -56,6 +59,8 @@ export type ScanRepoOptions = {
  * @returns       The complete scan result with findings, rule runs, and summary.
  */
 export async function scanRepo(options: ScanRepoOptions): Promise<ScanResult> {
+	const overrides = validateSeverityOverrides(options.config);
+
 	const cache = options.cache ?? createCachedFetcher();
 	const skipArchived = options.config?.ignore?.archived !== false;
 
@@ -87,6 +92,8 @@ export async function scanRepo(options: ScanRepoOptions): Promise<ScanResult> {
 
 		runs.push(run);
 	}
+
+	applyRunSeverityOverrides(runs, overrides);
 
 	const allFindings = runs.flatMap((r) => r.findings);
 	const findings = allFindings.filter((f) => meetsThreshold(f.severity, options.threshold));
@@ -143,6 +150,7 @@ export type ScanOrgOptions = {
  * @returns       The complete scan result with findings, rule runs, and summary.
  */
 export async function scanOrg(options: ScanOrgOptions): Promise<ScanResult> {
+	const overrides = validateSeverityOverrides(options.config);
 	const cache = options.cache ?? createCachedFetcher();
 	const enabledRules = filterEnabledRules(options.rules, options.config);
 
@@ -160,6 +168,8 @@ export async function scanOrg(options: ScanOrgOptions): Promise<ScanResult> {
 
 		runs.push(run);
 	}
+
+	applyRunSeverityOverrides(runs, overrides);
 
 	const allFindings = runs.flatMap((r) => r.findings);
 	const findings = allFindings.filter((f) => meetsThreshold(f.severity, options.threshold));
@@ -221,6 +231,80 @@ function filterEnabledRules<R extends { id: string; }>(rules: R[], config?: Octo
 	const overrides = config?.rules ?? {};
 
 	return rules.filter((r) => overrides[r.id] !== 'off');
+}
+
+/**
+ * Replace finding severities where the config specifies an override.
+ *
+ * Rules disabled via `'off'` are already filtered out by
+ * {@link filterEnabledRules}, so only concrete severity values are applied
+ * here. Findings whose rule has no override pass through unchanged.
+ *
+ * @param findings  - Findings to process.
+ * @param overrides - Validated per-rule severity overrides.
+ * @returns         A new array with overridden severities where applicable.
+ */
+function applySeverityOverrides(
+	findings: Finding[],
+	overrides: Record<string, Severity>,
+): Finding[] {
+	return findings.map((f) => {
+		const override = overrides[f.ruleId];
+
+		return override === undefined ?
+			f :
+			{ ...f, severity: override };
+	});
+}
+
+/**
+ * Apply severity overrides to every run's findings in place so that
+ * `runs[].findings` and the top-level `findings` array stay consistent.
+ *
+ * @param runs      - Rule runs whose findings should be updated.
+ * @param overrides - Validated per-rule severity overrides.
+ */
+function applyRunSeverityOverrides(
+	runs: { findings: Finding[]; }[],
+	overrides: Record<string, Severity>,
+): void {
+	for (const run of runs) {
+		run.findings = applySeverityOverrides(run.findings, overrides);
+	}
+}
+
+/**
+ * Validate the config's rule overrides and return them as a severity map.
+ *
+ * Called at scan entry, before any API request, per the project's
+ * fail-loud config policy: a value that is neither `'off'` nor a known
+ * severity (possible when a library caller builds the config object
+ * directly, bypassing {@link loadConfig}) throws instead of corrupting
+ * findings downstream. The returned map uses a null prototype so lookups
+ * by rule ID can never resolve inherited properties like `toString`.
+ *
+ * @param    config - Optional scan configuration.
+ * @returns         Rule IDs mapped to their override severities.
+ * @throws {ConfigError} If a rule override is not a severity or `'off'`.
+ */
+function validateSeverityOverrides(config: OctolensConfig | undefined): Record<string, Severity> {
+	const rules = config?.rules;
+	const overrides: Record<string, Severity> = Object.create(null);
+
+	if (rules === undefined) {
+		return overrides;
+	}
+
+	for (const [ id, setting ] of Object.entries(rules)) {
+		if (isSeverity(setting)) {
+			overrides[id] = setting;
+		} else if (setting !== 'off') {
+			throw new ConfigError(`rules.${id}: severity override must be one of ` +
+				`${SEVERITIES.join(' | ')} | off, got ${JSON.stringify(setting)}`);
+		}
+	}
+
+	return overrides;
 }
 
 /**

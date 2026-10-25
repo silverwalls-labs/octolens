@@ -8,6 +8,8 @@ import assert from 'node:assert/strict';
 import nock from 'nock';
 import { Octokit } from '@octokit/rest';
 import { scanRepo, exitCodeFor } from '../../../src/engine/index.ts';
+import { ConfigError } from '../../../src/config/index.ts';
+import type { Rule } from '../../../src/types/index.ts';
 import {
 	rule as dependabotAlertsEnabled,
 } from '../../../src/rules/security/dependabot-alerts-enabled.ts';
@@ -66,6 +68,153 @@ describe('scanRepo', () => {
 			assert.equal(exitCodeFor(result), 0);
 		},
 	);
+
+	test('severity override changes finding severity', async () => {
+		mockRepoMetadata();
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens/vulnerability-alerts')
+			.reply(404, { message: 'Not Found' });
+
+		const result = await scanRepo({
+			repo: { owner: 'sheplu', name: 'Octolens' },
+			rules: [ dependabotAlertsEnabled ],
+			octokit: makeOctokit(),
+			logger: silentLogger(),
+			threshold: 'info',
+			config: {
+				rules: {
+					'security/dependabot-alerts-enabled': 'low',
+				},
+			},
+		});
+
+		assert.equal(result.findings.length, 1);
+		assert.equal(result.findings[0]?.severity, 'low');
+		assert.equal(result.summary.findingsBySeverity.low, 1);
+		assert.equal(result.summary.findingsBySeverity.high, 0);
+		assert.equal(
+			result.runs[0]?.findings[0]?.severity,
+			'low',
+			'run findings must reflect the override',
+		);
+	});
+
+	test('downgraded finding is excluded by threshold', async () => {
+		mockRepoMetadata();
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens/vulnerability-alerts')
+			.reply(404, { message: 'Not Found' });
+
+		const result = await scanRepo({
+			repo: { owner: 'sheplu', name: 'Octolens' },
+			rules: [ dependabotAlertsEnabled ],
+			octokit: makeOctokit(),
+			logger: silentLogger(),
+			threshold: 'medium',
+			config: {
+				rules: {
+					'security/dependabot-alerts-enabled': 'low',
+				},
+			},
+		});
+
+		assert.equal(result.findings.length, 0);
+		assert.equal(result.summary.findingsTotal, 0);
+	});
+
+	test('severity upgrade includes finding above threshold', async () => {
+		mockRepoMetadata();
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens/vulnerability-alerts')
+			.reply(404, { message: 'Not Found' });
+
+		const result = await scanRepo({
+			repo: { owner: 'sheplu', name: 'Octolens' },
+			rules: [ dependabotAlertsEnabled ],
+			octokit: makeOctokit(),
+			logger: silentLogger(),
+			threshold: 'critical',
+			config: {
+				rules: {
+					'security/dependabot-alerts-enabled': 'critical',
+				},
+			},
+		});
+
+		assert.equal(result.findings.length, 1);
+		assert.equal(result.findings[0]?.severity, 'critical');
+		assert.equal(result.summary.findingsBySeverity.critical, 1);
+	});
+
+	test('invalid severity override throws a ConfigError before any scan work', async () => {
+		const config = {
+			rules: { 'security/dependabot-alerts-enabled': 'urgent' },
+		} as unknown as Parameters<typeof scanRepo>[0]['config'];
+
+		await assert.rejects(
+			scanRepo({
+				repo: { owner: 'sheplu', name: 'Octolens' },
+				rules: [ dependabotAlertsEnabled ],
+				octokit: makeOctokit(),
+				logger: silentLogger(),
+				threshold: 'info',
+				config,
+			}),
+			(err: unknown) => err instanceof ConfigError &&
+				(/rules\.security\/dependabot-alerts-enabled: severity override must be one of/).test(err.message) &&
+				(/got "urgent"/).test(err.message),
+		);
+	});
+
+	test('invalid severity override throws even for archived repositories', async () => {
+		mockRepoMetadata(true);
+
+		const config = {
+			rules: { 'security/dependabot-alerts-enabled': 'urgent' },
+		} as unknown as Parameters<typeof scanRepo>[0]['config'];
+
+		await assert.rejects(
+			scanRepo({
+				repo: { owner: 'sheplu', name: 'Octolens' },
+				rules: [ dependabotAlertsEnabled ],
+				octokit: makeOctokit(),
+				logger: silentLogger(),
+				threshold: 'info',
+				config,
+			}),
+			(err: unknown) => err instanceof ConfigError,
+		);
+	});
+
+	test('rule ids shadowing Object.prototype members keep their severity', async () => {
+		mockRepoMetadata();
+
+		const collidingRule: Rule = {
+			id: 'toString',
+			category: 'repo-config',
+			defaultSeverity: 'high',
+			summary: 'test rule with a colliding id',
+			docs: 'test rule',
+			check: async () => [
+				{
+					ruleId: 'toString', severity: 'high', title: 'finding from a colliding rule id',
+				},
+			],
+		};
+
+		const result = await scanRepo({
+			repo: { owner: 'sheplu', name: 'Octolens' },
+			rules: [ collidingRule ],
+			octokit: makeOctokit(),
+			logger: silentLogger(),
+			threshold: 'high',
+			config: { rules: { 'security/dependabot-alerts-enabled': 'low' } },
+		});
+
+		assert.equal(result.findings.length, 1);
+		assert.equal(result.findings[0]?.severity, 'high');
+		assert.equal(result.runs[0]?.findings[0]?.severity, 'high');
+	});
 
 	test('disabled rules in config are skipped', async () => {
 		mockRepoMetadata();
