@@ -184,7 +184,7 @@ Notes:
   `owner/name`. Upload it to a dedicated audit repository rather than a
   regular code repository.
 - GitHub rejects SARIF uploads over 10 MB (gzip-compressed) or 25,000
-  results, and displays only the top 5,000 results per category,
+  results per run, and displays only the top 5,000 results per run,
   prioritized by severity. Large fleet reports should raise
   `--severity` to stay within the limits.
 - Repositories excluded by fleet filters (archived, fork, or on the
