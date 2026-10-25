@@ -3,8 +3,10 @@ import { resolveAuth, AuthError } from '../github/auth.ts';
 import { createOctokit } from '../github/client.ts';
 import {
 	createLogger, scanRepo, scanOrg, scanOrgAllRepos, exitCodeFor, exitCodeForReport,
+	filterRulesByGlob, unmatchedPatterns,
 } from '../engine/index.ts';
 import { allRules, allOrgRules } from '../rules/index.ts';
+import type { OrgRule, Rule } from '../types/index.ts';
 import {
 	formatJson, formatMarkdown, formatMarkdownReport, formatPretty, formatPrettyReport, formatSarif,
 } from '../output/index.ts';
@@ -100,6 +102,50 @@ async function runScanCommand(args: ScanCommandArgs): Promise<number> {
 		return 2;
 	}
 
+	const globPatterns = { only: args.onlyRules, skip: args.skipRules };
+	const hasGlobs = args.onlyRules.length > 0 || args.skipRules.length > 0;
+
+	/*
+	 * Determine which rule sets are relevant for the scan mode:
+	 * --repo → repo rules only, --org → org rules only,
+	 * --org --all-repos → both.
+	 */
+	const useRepoRules = args.repo !== undefined || args.allRepos;
+	const useOrgRules = args.org !== undefined;
+
+	if (hasGlobs) {
+		const relevant = useRepoRules && useOrgRules ?
+			[ ...allRules, ...allOrgRules ] :
+			useRepoRules ?
+				[ ...allRules ] :
+				[ ...allOrgRules ];
+		const relevantIds = relevant.map((r) => r.id);
+
+		const bad = [
+			...unmatchedPatterns(relevantIds, args.onlyRules),
+			...unmatchedPatterns(relevantIds, args.skipRules),
+		];
+
+		if (bad.length > 0) {
+			process.stderr.write(`glob pattern(s) matched no known rule ID: ${bad.join(', ')}\n`);
+
+			return 2;
+		}
+	}
+
+	const filteredRules: Rule[] = useRepoRules ?
+		filterRulesByGlob(allRules, globPatterns) :
+		[];
+	const filteredOrgRules: OrgRule[] = useOrgRules ?
+		filterRulesByGlob(allOrgRules, globPatterns) :
+		[];
+
+	if (hasGlobs && filteredRules.length === 0 && filteredOrgRules.length === 0) {
+		process.stderr.write('no rules remain after --only-rules / --skip-rules filtering\n');
+
+		return 2;
+	}
+
 	let auth;
 
 	try {
@@ -130,8 +176,8 @@ async function runScanCommand(args: ScanCommandArgs): Promise<number> {
 	if (args.org !== undefined && args.allRepos) {
 		const report = await scanOrgAllRepos({
 			org: args.org,
-			orgRules: [ ...allOrgRules ],
-			repoRules: [ ...allRules ],
+			orgRules: [ ...filteredOrgRules ],
+			repoRules: [ ...filteredRules ],
 			octokit,
 			logger,
 			threshold: args.severity,
@@ -148,7 +194,7 @@ async function runScanCommand(args: ScanCommandArgs): Promise<number> {
 	const result = args.org !== undefined ?
 		await scanOrg({
 			org: args.org,
-			rules: [ ...allOrgRules ],
+			rules: [ ...filteredOrgRules ],
 			octokit,
 			logger,
 			threshold: args.severity,
@@ -157,7 +203,7 @@ async function runScanCommand(args: ScanCommandArgs): Promise<number> {
 		await scanRepo({
 			// parseArgs guarantees exactly one of repo/org is set.
 			repo: args.repo as { owner: string; name: string; },
-			rules: [ ...allRules ],
+			rules: [ ...filteredRules ],
 			octokit,
 			logger,
 			threshold: args.severity,

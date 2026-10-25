@@ -26,6 +26,11 @@ Options:
   --include-archived         Run rules against archived repositories (skipped by default).
                              Applies to --repo and --org --all-repos scans
   --fail-on-skip             Exit non-zero if any rule was skipped or errored (incomplete coverage)
+  --only-rules <glob>        Only run rules whose ID matches the glob. Repeatable;
+                             patterns are OR'd. Rule IDs use category/name format
+                             (e.g. "security/*", "org/two-*")
+  --skip-rules <glob>        Skip rules whose ID matches the glob. Repeatable;
+                             patterns are OR'd. Applied after --only-rules narrowing
   --allow-public <repo>      Repo (owner/name) approved to be public. Repeatable
   --allow-internal <repo>    Repo (owner/name) approved to be internal. Repeatable
   -v, --version              Print version

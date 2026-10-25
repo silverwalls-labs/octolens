@@ -467,6 +467,94 @@ describe('parseArgs', () => {
 		},
 	);
 
+	test('--only-rules collects repeatable values', () => {
+		const result = parseArgs([
+			'scan',
+			'--repo',
+			'a/b',
+			'--only-rules',
+			'security/*',
+			'--only-rules',
+			'org/*',
+		]);
+
+		if (result.command !== 'scan') {
+			throw new Error('expected scan');
+		}
+		assert.deepEqual(result.onlyRules, [ 'security/*', 'org/*' ]);
+	});
+
+	test('--skip-rules collects repeatable values', () => {
+		const result = parseArgs([
+			'scan',
+			'--repo',
+			'a/b',
+			'--skip-rules',
+			'repo-config/*',
+		]);
+
+		if (result.command !== 'scan') {
+			throw new Error('expected scan');
+		}
+		assert.deepEqual(result.skipRules, [ 'repo-config/*' ]);
+	});
+
+	test('--only-rules and --skip-rules together are accepted', () => {
+		const result = parseArgs([
+			'scan',
+			'--repo',
+			'a/b',
+			'--only-rules',
+			'security/*',
+			'--skip-rules',
+			'*/dependabot-*',
+		]);
+
+		if (result.command !== 'scan') {
+			throw new Error('expected scan');
+		}
+		assert.deepEqual(result.onlyRules, [ 'security/*' ]);
+		assert.deepEqual(result.skipRules, [ '*/dependabot-*' ]);
+	});
+
+	test('--only-rules defaults to empty array', () => {
+		const result = parseArgs([
+			'scan',
+			'--repo',
+			'a/b',
+		]);
+
+		if (result.command !== 'scan') {
+			throw new Error('expected scan');
+		}
+		assert.deepEqual(result.onlyRules, []);
+		assert.deepEqual(result.skipRules, []);
+	});
+
+	test('--only-rules without a value is rejected', () => {
+		assert.throws(
+			() => parseArgs([
+				'scan',
+				'--repo',
+				'a/b',
+				'--only-rules',
+			]),
+			CliUsageError,
+		);
+	});
+
+	test('--skip-rules without a value is rejected', () => {
+		assert.throws(
+			() => parseArgs([
+				'scan',
+				'--repo',
+				'a/b',
+				'--skip-rules',
+			]),
+			CliUsageError,
+		);
+	});
+
 	test('unknown command is rejected', () => {
 		assert.throws(
 			() => parseArgs([ 'audit' ]),

@@ -27,6 +27,8 @@ export type ScanCommandArgs = {
 	allowPublic: string[];
 	allowInternal: string[];
 	failOnSkip: boolean;
+	onlyRules: string[];
+	skipRules: string[];
 };
 
 /** Parsed arguments for `--help`. */
@@ -85,6 +87,8 @@ export function parseArgs(argv: string[]): ParsedArgs {
 	const formats: Format[] = [];
 	const allowPublic: string[] = [];
 	const allowInternal: string[] = [];
+	const onlyRules: string[] = [];
+	const skipRules: string[] = [];
 
 	for (let i = 1; i < argv.length; i++) {
 		const arg = argv[i];
@@ -128,6 +132,12 @@ export function parseArgs(argv: string[]): ParsedArgs {
 				break;
 			case '--allow-internal':
 				allowInternal.push(parseAllowSpec(readValue(argv, ++i, arg), arg));
+				break;
+			case '--only-rules':
+				onlyRules.push(readValue(argv, ++i, arg));
+				break;
+			case '--skip-rules':
+				skipRules.push(readValue(argv, ++i, arg));
 				break;
 			case '-h':
 			case '--help':
@@ -191,6 +201,8 @@ export function parseArgs(argv: string[]): ParsedArgs {
 		allowPublic,
 		allowInternal,
 		failOnSkip,
+		onlyRules,
+		skipRules,
 	};
 }
 
