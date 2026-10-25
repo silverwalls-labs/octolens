@@ -146,6 +146,23 @@ async function runScanCommand(args: ScanCommandArgs): Promise<number> {
 		return 2;
 	}
 
+	/*
+	 * A fleet scan fans out over every repository even when no repo rule
+	 * survives the filters, and still evaluates org rules when none survive.
+	 * Both are legal but surprising, so surface them instead of reporting
+	 * silently empty rule runs.
+	 */
+	if (args.org !== undefined && args.allRepos && hasGlobs) {
+		if (filteredRules.length === 0) {
+			logger.warn('glob filtering left no repo rules; ' +
+				'repositories will be scanned without rules');
+		}
+		if (filteredOrgRules.length === 0) {
+			logger.warn('glob filtering left no org rules; ' +
+				'organization settings will not be checked');
+		}
+	}
+
 	let auth;
 
 	try {

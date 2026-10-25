@@ -734,6 +734,95 @@ describe('cli main', () => {
 	);
 
 	test(
+		'a negated --only-rules pattern exits 2 with a usage error',
+		async () => {
+			captureOutput();
+
+			const code = await main([
+				'scan',
+				'--repo',
+				'sheplu/Octolens',
+				'--token',
+				't',
+				'--only-rules',
+				'!security/*',
+			]);
+
+			assert.equal(code, 2);
+			assert.match(stderrText(), /Negated patterns are not supported/);
+			assert.match(stderrText(), /Usage/i);
+		},
+	);
+
+	test(
+		'an empty --skip-rules value exits 2 with a usage error',
+		async () => {
+			captureOutput();
+
+			const code = await main([
+				'scan',
+				'--repo',
+				'sheplu/Octolens',
+				'--token',
+				't',
+				'--skip-rules',
+				'',
+			]);
+
+			assert.equal(code, 2);
+			assert.match(stderrText(), /Expected a glob pattern/);
+		},
+	);
+
+	test(
+		'a fleet scan warns when filtering leaves no repo rules',
+		async () => {
+			captureOutput();
+			mockEmptyFleet();
+
+			const code = await main([
+				'scan',
+				'--org',
+				'silverwalls-labs',
+				'--all-repos',
+				'--token',
+				't',
+				'--format',
+				'json',
+				'--only-rules',
+				'org/*',
+			]);
+
+			assert.equal(code, 0);
+			assert.match(stderrText(), /\[warn\] glob filtering left no repo rules/);
+		},
+	);
+
+	test(
+		'a fleet scan warns when filtering leaves no org rules',
+		async () => {
+			captureOutput();
+			mockEmptyFleet();
+
+			const code = await main([
+				'scan',
+				'--org',
+				'silverwalls-labs',
+				'--all-repos',
+				'--token',
+				't',
+				'--format',
+				'json',
+				'--only-rules',
+				'security/*',
+			]);
+
+			assert.equal(code, 0);
+			assert.match(stderrText(), /\[warn\] glob filtering left no org rules/);
+		},
+	);
+
+	test(
 		'ambiguous config sources exit 2, listing every source',
 		async () => {
 			captureOutput();

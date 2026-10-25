@@ -555,6 +555,58 @@ describe('parseArgs', () => {
 		);
 	});
 
+	test('--only-rules with an empty value is rejected', () => {
+		assert.throws(
+			() => parseArgs([
+				'scan',
+				'--repo',
+				'a/b',
+				'--only-rules',
+				'',
+			]),
+			CliUsageError,
+		);
+	});
+
+	test('--skip-rules with a whitespace-only value is rejected', () => {
+		assert.throws(
+			() => parseArgs([
+				'scan',
+				'--repo',
+				'a/b',
+				'--skip-rules',
+				'   ',
+			]),
+			CliUsageError,
+		);
+	});
+
+	test('--only-rules with a negated pattern is rejected', () => {
+		assert.throws(
+			() => parseArgs([
+				'scan',
+				'--repo',
+				'a/b',
+				'--only-rules',
+				'!security/*',
+			]),
+			/Negated patterns are not supported/,
+		);
+	});
+
+	test('--skip-rules with a negated pattern is rejected', () => {
+		assert.throws(
+			() => parseArgs([
+				'scan',
+				'--repo',
+				'a/b',
+				'--skip-rules',
+				'!security/*',
+			]),
+			/Negated patterns are not supported/,
+		);
+	});
+
 	test('unknown command is rejected', () => {
 		assert.throws(
 			() => parseArgs([ 'audit' ]),
