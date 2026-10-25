@@ -27,6 +27,8 @@ export type ScanCommandArgs = {
 	allowPublic: string[];
 	allowInternal: string[];
 	failOnSkip: boolean;
+	onlyRules: string[];
+	skipRules: string[];
 };
 
 /** Parsed arguments for `--help`. */
@@ -85,6 +87,8 @@ export function parseArgs(argv: string[]): ParsedArgs {
 	const formats: Format[] = [];
 	const allowPublic: string[] = [];
 	const allowInternal: string[] = [];
+	const onlyRules: string[] = [];
+	const skipRules: string[] = [];
 
 	for (let i = 1; i < argv.length; i++) {
 		const arg = argv[i];
@@ -128,6 +132,12 @@ export function parseArgs(argv: string[]): ParsedArgs {
 				break;
 			case '--allow-internal':
 				allowInternal.push(parseAllowSpec(readValue(argv, ++i, arg), arg));
+				break;
+			case '--only-rules':
+				onlyRules.push(parseRulePattern(readValue(argv, ++i, arg), arg));
+				break;
+			case '--skip-rules':
+				skipRules.push(parseRulePattern(readValue(argv, ++i, arg), arg));
 				break;
 			case '-h':
 			case '--help':
@@ -191,6 +201,8 @@ export function parseArgs(argv: string[]): ParsedArgs {
 		allowPublic,
 		allowInternal,
 		failOnSkip,
+		onlyRules,
+		skipRules,
 	};
 }
 
@@ -211,6 +223,36 @@ function readValue(argv: string[], index: number, flag: string): string {
 	}
 
 	return value;
+}
+
+/**
+ * Validate a `--only-rules` / `--skip-rules` glob pattern.
+ *
+ * Rejects negated patterns: picomatch compiles `!pattern` into "matches
+ * everything that is not `pattern`", so a negation inside the OR'd pattern
+ * list silently inverts the filter (e.g. `--skip-rules '!security/*'`
+ * removes every non-security rule). Exclusions are expressed by combining
+ * `--only-rules` with `--skip-rules` instead.
+ *
+ * @param    spec - Raw command-line value to parse.
+ * @param    flag - Flag name used in error messages.
+ * @returns       The validated pattern.
+ * @throws {CliUsageError} When the pattern is empty or negated.
+ */
+function parseRulePattern(spec: string, flag: string): string {
+	if (spec.trim() === '') {
+		throw new CliUsageError(`Invalid ${flag} value. Expected a glob pattern.`);
+	}
+
+	if (spec.startsWith('!')) {
+		const message = `Invalid ${flag} value "${spec}". ` +
+			'Negated patterns are not supported; ' +
+			'combine --only-rules with --skip-rules to exclude rules.';
+
+		throw new CliUsageError(message);
+	}
+
+	return spec;
 }
 
 /**

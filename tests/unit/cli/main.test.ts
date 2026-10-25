@@ -586,6 +586,243 @@ describe('cli main', () => {
 	);
 
 	test(
+		'--only-rules with an unmatched pattern exits 2',
+		async () => {
+			captureOutput();
+
+			const code = await main([
+				'scan',
+				'--repo',
+				'sheplu/Octolens',
+				'--token',
+				't',
+				'--only-rules',
+				'nonexistent/*',
+			]);
+
+			assert.equal(code, 2);
+			assert.match(stderrText(), /glob pattern\(s\) matched no known rule ID/);
+			assert.match(stderrText(), /nonexistent\/\*/);
+		},
+	);
+
+	test(
+		'--skip-rules with an unmatched pattern exits 2',
+		async () => {
+			captureOutput();
+
+			const code = await main([
+				'scan',
+				'--repo',
+				'sheplu/Octolens',
+				'--token',
+				't',
+				'--skip-rules',
+				'bogus/*',
+			]);
+
+			assert.equal(code, 2);
+			assert.match(stderrText(), /glob pattern\(s\) matched no known rule ID/);
+		},
+	);
+
+	test(
+		'--only-rules combined with --skip-rules that excludes all rules exits 2',
+		async () => {
+			captureOutput();
+
+			const code = await main([
+				'scan',
+				'--repo',
+				'sheplu/Octolens',
+				'--token',
+				't',
+				'--only-rules',
+				'security/*',
+				'--skip-rules',
+				'security/*',
+			]);
+
+			assert.equal(code, 2);
+			assert.match(stderrText(), /no rules remain/);
+		},
+	);
+
+	test(
+		'--only-rules narrows a repo scan to matching rules',
+		async () => {
+			captureOutput();
+			mockRepoScan();
+
+			const code = await main([
+				'scan',
+				'--repo',
+				'sheplu/Octolens',
+				'--token',
+				't',
+				'--format',
+				'json',
+				'--only-rules',
+				'repo-config/branch-*',
+			]);
+
+			assert.ok(code === 0 || code === 1);
+
+			const report = JSON.parse(stdoutText()) as {
+				runs: { ruleId: string; }[];
+			};
+
+			assert.ok(report.runs.length > 0);
+			assert.ok(report.runs.every((r) => r.ruleId.startsWith('repo-config/branch-')));
+		},
+	);
+
+	test(
+		'--skip-rules excludes matching rules from a repo scan',
+		async () => {
+			captureOutput();
+			mockRepoScan();
+
+			const code = await main([
+				'scan',
+				'--repo',
+				'sheplu/Octolens',
+				'--token',
+				't',
+				'--format',
+				'json',
+				'--skip-rules',
+				'repo-config/*',
+			]);
+
+			assert.ok(code === 0 || code === 1);
+
+			const report = JSON.parse(stdoutText()) as {
+				runs: { ruleId: string; }[];
+			};
+
+			assert.ok(!report.runs.some((r) => r.ruleId.startsWith('repo-config/')));
+		},
+	);
+
+	test(
+		'--only-rules scoped to org rules passes for --org scan',
+		async () => {
+			captureOutput();
+			mockOrgScan();
+
+			const code = await main([
+				'scan',
+				'--org',
+				'silverwalls-labs',
+				'--token',
+				't',
+				'--format',
+				'json',
+				'--only-rules',
+				'org/two-*',
+			]);
+
+			assert.equal(code, 0);
+
+			const report = JSON.parse(stdoutText()) as {
+				runs: { ruleId: string; }[];
+			};
+
+			assert.ok(report.runs.every((r) => r.ruleId.startsWith('org/two-')));
+		},
+	);
+
+	test(
+		'a negated --only-rules pattern exits 2 with a usage error',
+		async () => {
+			captureOutput();
+
+			const code = await main([
+				'scan',
+				'--repo',
+				'sheplu/Octolens',
+				'--token',
+				't',
+				'--only-rules',
+				'!security/*',
+			]);
+
+			assert.equal(code, 2);
+			assert.match(stderrText(), /Negated patterns are not supported/);
+			assert.match(stderrText(), /Usage/i);
+		},
+	);
+
+	test(
+		'an empty --skip-rules value exits 2 with a usage error',
+		async () => {
+			captureOutput();
+
+			const code = await main([
+				'scan',
+				'--repo',
+				'sheplu/Octolens',
+				'--token',
+				't',
+				'--skip-rules',
+				'',
+			]);
+
+			assert.equal(code, 2);
+			assert.match(stderrText(), /Expected a glob pattern/);
+		},
+	);
+
+	test(
+		'a fleet scan warns when filtering leaves no repo rules',
+		async () => {
+			captureOutput();
+			mockEmptyFleet();
+
+			const code = await main([
+				'scan',
+				'--org',
+				'silverwalls-labs',
+				'--all-repos',
+				'--token',
+				't',
+				'--format',
+				'json',
+				'--only-rules',
+				'org/*',
+			]);
+
+			assert.equal(code, 0);
+			assert.match(stderrText(), /\[warn\] glob filtering left no repo rules/);
+		},
+	);
+
+	test(
+		'a fleet scan warns when filtering leaves no org rules',
+		async () => {
+			captureOutput();
+			mockEmptyFleet();
+
+			const code = await main([
+				'scan',
+				'--org',
+				'silverwalls-labs',
+				'--all-repos',
+				'--token',
+				't',
+				'--format',
+				'json',
+				'--only-rules',
+				'security/*',
+			]);
+
+			assert.equal(code, 0);
+			assert.match(stderrText(), /\[warn\] glob filtering left no org rules/);
+		},
+	);
+
+	test(
 		'ambiguous config sources exit 2, listing every source',
 		async () => {
 			captureOutput();
