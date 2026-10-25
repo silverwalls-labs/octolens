@@ -6,7 +6,7 @@ import {
 } from '../engine/index.ts';
 import { allRules, allOrgRules } from '../rules/index.ts';
 import {
-	formatJson, formatMarkdown, formatMarkdownReport, formatPretty, formatPrettyReport,
+	formatJson, formatMarkdown, formatMarkdownReport, formatPretty, formatPrettyReport, formatSarif,
 } from '../output/index.ts';
 import { loadConfig, ConfigError } from '../config/index.ts';
 import type {
@@ -245,6 +245,9 @@ function emitOutput(
  * @returns      The rendered document.
  */
 function render(result: ScanResult | OrgScanReport, format: Format): string {
+	if (format === 'sarif') {
+		return formatSarif(result);
+	}
 	if (isFleetReport(result)) {
 		switch (format) {
 			case 'json':

@@ -6,10 +6,13 @@ holding pen for follow-up minor releases.
 
 ## Deferred from the original `new-major` scope
 
-- **SARIF output + GitHub code-scanning upload** — `--format sarif` and the
-  glue to attach the report to a workflow run.
-- **Markdown output format** — `--format md` for GitHub job summaries / PR
-  comments. JSON and pretty are the only formats wired right now.
+- ~~**SARIF output + GitHub code-scanning upload**~~ — **SHIPPED**
+  (issue #17): `--format sarif` emits a SARIF 2.1.0 run with per-rule
+  file locations, GitHub `security-severity` scores, stable
+  fingerprints, and invocation notifications for skipped/errored rules;
+  the README documents the `upload-sarif` workflow glue.
+- ~~**Markdown output format**~~ — **SHIPPED**: `--format md` renders a
+  full Markdown report for single scans and fleet reports.
 - ~~**`cosmiconfig` config discovery**~~ — **SHIPPED** (issues #23 + #19):
   `octolens.config.{json,jsonc,json5}` + `package.json#octolens`, with
   per-rule severity overrides (`"off"` to disable, or any severity level to

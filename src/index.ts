@@ -71,6 +71,6 @@ export {
 } from './rules/index.ts';
 
 export {
-	formatJson, formatPretty, formatPrettyReport, formatMarkdown, formatMarkdownReport,
+	formatJson, formatPretty, formatPrettyReport, formatMarkdown, formatMarkdownReport, formatSarif,
 } from './output/index.ts';
-export type { PrettyOptions } from './output/index.ts';
+export type { PrettyOptions, SarifOptions } from './output/index.ts';

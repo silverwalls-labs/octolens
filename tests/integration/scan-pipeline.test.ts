@@ -16,6 +16,7 @@ import {
 	formatJson,
 	formatMarkdown,
 	formatPretty,
+	formatSarif,
 } from '../../src/output/index.ts';
 import { makeRepoResponse } from '../helpers/fixtures.ts';
 import type { ScanResult } from '../../src/types/index.ts';
@@ -158,6 +159,41 @@ describe('scan pipeline', () => {
 		assert.equal(exitCodeFor(result, { failOnIncomplete: true }), 1);
 	});
 
+	test(
+		'SARIF formatter produces a valid code-scanning run from full scan',
+		async () => {
+			mockRepoMetadata();
+			nock(BASE)
+				.get('/repos/sheplu/Octolens/branches/main/protection')
+				.reply(404, { message: 'Branch not protected' });
+			mockCatchAll();
+
+			const result = await runFullScan();
+			const doc = JSON.parse(formatSarif(result)) as SarifLog;
+
+			assert.equal(doc.version, '2.1.0');
+			assert.equal(doc.runs.length, 1);
+
+			const run = doc.runs[0];
+
+			assert.equal(run.automationDetails.id, 'octolens/repo/sheplu/Octolens/');
+			assert.equal(run.results.length, result.findings.length);
+			assert.equal(
+				run.invocations[0].executionSuccessful,
+				result.summary.rulesErrored === 0,
+			);
+
+			const hashes = run.results.map((r) => r.partialFingerprints['primaryLocationLineHash']);
+
+			assert.equal(new Set(hashes).size, hashes.length);
+
+			for (const sarifResult of run.results) {
+				assert.equal(run.tool.driver.rules[sarifResult.ruleIndex].id, sarifResult.ruleId);
+				assert.ok(sarifResult.partialFingerprints['octolensSubject/v1']);
+			}
+		},
+	);
+
 	test('500 from all endpoints produces errored rules, not a crash', async () => {
 		nock(BASE).persist().get(/.*/)
 			.reply(500, { message: 'Internal Server Error' });
@@ -168,6 +204,12 @@ describe('scan pipeline', () => {
 
 		assert.ok(result.summary.rulesErrored > 0);
 		assert.ok(result.summary.rulesRun > 0);
+
+		const doc = JSON.parse(formatSarif(result)) as SarifLog;
+		const invocation = doc.runs[0].invocations[0];
+
+		assert.equal(invocation.executionSuccessful, false);
+		assert.ok(invocation.toolExecutionNotifications.length > 0);
 	});
 
 	test('archived repo is skipped by default', async () => {
@@ -338,6 +380,24 @@ describe('scan pipeline', () => {
 function noop() {
 	/* intentional no-op */
 }
+
+/** Minimal shape of the SARIF document asserted by these tests. */
+type SarifLog = {
+	version: string;
+	runs: {
+		automationDetails: { id: string; };
+		invocations: {
+			executionSuccessful: boolean;
+			toolExecutionNotifications: unknown[];
+		}[];
+		results: {
+			ruleId: string;
+			ruleIndex: number;
+			partialFingerprints: Record<string, string>;
+		}[];
+		tool: { driver: { rules: { id: string; }[]; }; };
+	}[];
+};
 
 function silentLogger() {
 	return {

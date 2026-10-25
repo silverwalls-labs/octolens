@@ -128,6 +128,35 @@ describe('cli scan flows', () => {
 		assert.doesNotMatch(stdoutChunks.join(''), /undefined/);
 	});
 
+	test('SARIF output renders a code-scanning document', async () => {
+		const { stdoutChunks } = captureOutput();
+
+		mockFlaggedRepo();
+
+		const code = await main(scanArgs('--format', 'sarif'));
+
+		assert.equal(code, 1);
+
+		const doc = JSON.parse(stdoutChunks.join('')) as {
+			version: string;
+			runs: {
+				automationDetails: { id: string; };
+				results: {
+					ruleId: string;
+					partialFingerprints: Record<string, string>;
+				}[];
+			}[];
+		};
+
+		assert.equal(doc.version, '2.1.0');
+		assert.equal(doc.runs[0].automationDetails.id, 'octolens/repo/sheplu/Octolens/');
+		assert.ok(doc.runs[0].results.some(isBranchProtectionFinding));
+
+		for (const sarifResult of doc.runs[0].results) {
+			assert.ok(sarifResult.partialFingerprints['primaryLocationLineHash']);
+		}
+	});
+
 	test(
 		'multiple formats are emitted in order on stdout',
 		async () => {

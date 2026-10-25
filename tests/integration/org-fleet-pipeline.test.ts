@@ -17,6 +17,7 @@ import {
 	formatJson,
 	formatMarkdownReport,
 	formatPrettyReport,
+	formatSarif,
 } from '../../src/output/index.ts';
 import {
 	makeOrgActionsPermissionsResponse,
@@ -119,7 +120,7 @@ describe('org fleet pipeline', () => {
 		},
 	);
 
-	test('all three formatters render the fleet report', async () => {
+	test('all four formatters render the fleet report', async () => {
 		mockCompliantOrg();
 		mockListing([ { name: 'app' } ]);
 		mockScannableRepo('app');
@@ -145,6 +146,22 @@ describe('org fleet pipeline', () => {
 			/Octolens scan — silverwalls-labs \(organization \+ 1 repositories\)/,
 		);
 		assert.match(pretty, /Repositories: 1 scanned/);
+
+		const sarif = JSON.parse(formatSarif(report)) as {
+			version: string;
+			runs: {
+				automationDetails: { id: string; };
+				results: { message: { text: string; }; }[];
+			}[];
+		};
+
+		assert.equal(sarif.version, '2.1.0');
+		assert.equal(sarif.runs[0].automationDetails.id, 'octolens/org-fleet/silverwalls-labs/');
+		assert.equal(sarif.runs[0].results.length, report.summary.findingsTotal);
+
+		for (const sarifResult of sarif.runs[0].results) {
+			assert.ok(sarifResult.message.text.startsWith('silverwalls-labs'));
+		}
 	});
 
 	test(

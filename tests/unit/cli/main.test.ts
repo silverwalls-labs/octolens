@@ -158,6 +158,38 @@ describe('cli main', () => {
 	);
 
 	test(
+		'a repo scan renders SARIF and exits 1 on findings',
+		async () => {
+			captureOutput();
+			mockRepoScan();
+
+			const code = await main([
+				'scan',
+				'--repo',
+				'sheplu/Octolens',
+				'--token',
+				't',
+				'--format',
+				'sarif',
+			]);
+
+			assert.equal(code, 1);
+
+			const doc = JSON.parse(stdoutText()) as {
+				version: string;
+				runs: {
+					tool: { driver: { name: string; }; };
+					results: { ruleId: string; }[];
+				}[];
+			};
+
+			assert.equal(doc.version, '2.1.0');
+			assert.equal(doc.runs[0].tool.driver.name, 'octolens');
+			assert.ok(doc.runs[0].results.some(isBranchProtectionFinding));
+		},
+	);
+
+	test(
 		'--out writes the last format to a file, earlier ones to stdout',
 		async () => {
 			captureOutput();
@@ -367,6 +399,35 @@ describe('cli main', () => {
 			assert.doesNotMatch(stdoutText(), /undefined/);
 		},
 	);
+
+	test('a fleet scan renders a SARIF report', async () => {
+		captureOutput();
+		mockEmptyFleet();
+
+		const code = await main([
+			'scan',
+			'--org',
+			'silverwalls-labs',
+			'--all-repos',
+			'--token',
+			't',
+			'--format',
+			'sarif',
+		]);
+
+		assert.equal(code, 0);
+
+		const doc = JSON.parse(stdoutText()) as {
+			version: string;
+			runs: { automationDetails: { id: string; }; }[];
+		};
+
+		assert.equal(doc.version, '2.1.0');
+		assert.equal(
+			doc.runs[0].automationDetails.id,
+			'octolens/org-fleet/silverwalls-labs/',
+		);
+	});
 
 	test(
 		'--allow-public suppresses the visibility finding',
