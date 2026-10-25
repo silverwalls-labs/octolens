@@ -88,6 +88,7 @@ export type CustomPropertyDefinition = {
 
 /** Whether the repository has code scanning analyses. */
 export type CodeScanningStatus = {
+	checked: boolean;
 	hasAnalyses: boolean;
 };
 
@@ -355,12 +356,14 @@ export const ORG_SCOPED_CACHE_PREFIXES = [ 'org-property-schema:' ] as const;
 
 /** GitHub Actions permission settings for a repository. */
 export type ActionsPermissions = {
+	checked: boolean;
 	enabled: boolean;
 	allowedActions: 'all' | 'local_only' | 'selected' | null;
 };
 
 /** Default GITHUB_TOKEN permissions and PR approval setting. */
 export type DefaultWorkflowPermissions = {
+	checked: boolean;
 	defaultPermissions: 'read' | 'write' | null;
 	canApprovePullRequestReviews: boolean;
 };
@@ -1394,10 +1397,13 @@ async function fetchCodeScanningStatus(
 			per_page: 1,
 		});
 
-		return { hasAnalyses: response.data.length > 0 };
+		return { checked: true, hasAnalyses: response.data.length > 0 };
 	} catch (err: unknown) {
-		if (isHttpStatus(err, 404) || isForbiddenNotRateLimited(err)) {
-			return { hasAnalyses: false };
+		if (isHttpStatus(err, 404)) {
+			return { checked: true, hasAnalyses: false };
+		}
+		if (isForbiddenNotRateLimited(err)) {
+			return { checked: false, hasAnalyses: false };
 		}
 		throw err;
 	}
@@ -1474,12 +1480,24 @@ async function fetchActionsPermissions(
 		});
 
 		return {
+			checked: true,
 			enabled: response.data.enabled === true,
 			allowedActions: response.data.allowed_actions ?? null,
 		};
 	} catch (err: unknown) {
 		if (isHttpStatus(err, 404)) {
-			return { enabled: false, allowedActions: null };
+			return {
+				checked: true,
+				enabled: false,
+				allowedActions: null,
+			};
+		}
+		if (isForbiddenNotRateLimited(err)) {
+			return {
+				checked: false,
+				enabled: false,
+				allowedActions: null,
+			};
 		}
 		throw err;
 	}
@@ -1496,16 +1514,28 @@ async function fetchDefaultWorkflowPermissions(
 	octokit: Octokit,
 	repo: RepoRef,
 ): Promise<DefaultWorkflowPermissions> {
-	const actionsApi = octokit.rest.actions;
-	const response = await actionsApi.getGithubActionsDefaultWorkflowPermissionsRepository({
-		owner: repo.owner,
-		repo: repo.name,
-	});
+	try {
+		const actionsApi = octokit.rest.actions;
+		const response = await actionsApi.getGithubActionsDefaultWorkflowPermissionsRepository({
+			owner: repo.owner,
+			repo: repo.name,
+		});
 
-	return {
-		defaultPermissions: response.data.default_workflow_permissions ?? null,
-		canApprovePullRequestReviews: response.data.can_approve_pull_request_reviews === true,
-	};
+		return {
+			checked: true,
+			defaultPermissions: response.data.default_workflow_permissions ?? null,
+			canApprovePullRequestReviews: response.data.can_approve_pull_request_reviews === true,
+		};
+	} catch (err: unknown) {
+		if (isHttpStatus(err, 404) || isForbiddenNotRateLimited(err)) {
+			return {
+				checked: false,
+				defaultPermissions: null,
+				canApprovePullRequestReviews: false,
+			};
+		}
+		throw err;
+	}
 }
 
 /**

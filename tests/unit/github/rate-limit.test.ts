@@ -9,6 +9,7 @@ import nock from 'nock';
 import { Octokit } from '@octokit/rest';
 import { createCachedFetcher } from '../../../src/github/fetcher.ts';
 import {
+	getActionsPermissions, getCodeScanningStatus, getDefaultWorkflowPermissions,
 	getOrgActionsPermissions, getRepoTeams,
 } from '../../../src/github/queries.ts';
 import { disableNet, restoreNet } from '../../helpers/context.ts';
@@ -130,6 +131,61 @@ describe('rate-limit handling', () => {
 				.reply(429, { message: 'Too Many Requests' });
 
 			await assert.rejects(getOrgActionsPermissions(octokit(), createCachedFetcher(), ORG));
+		},
+	);
+
+	test(
+		'code scanning: a rate-limit 403 (header) propagates as an error',
+		async () => {
+			nock('https://api.github.com')
+				.get('/repos/sheplu/Octolens/code-scanning/analyses')
+				.query(true)
+				.reply(
+					403,
+					{ message: 'API rate limit exceeded' },
+					{ 'x-ratelimit-remaining': '0' },
+				);
+
+			await assert.rejects(
+				getCodeScanningStatus(octokit(), createCachedFetcher(), REPO),
+				/rate limit/i,
+			);
+		},
+	);
+
+	test(
+		'actions permissions: a rate-limit 403 (header) propagates as an error',
+		async () => {
+			nock('https://api.github.com')
+				.get('/repos/sheplu/Octolens/actions/permissions')
+				.reply(
+					403,
+					{ message: 'API rate limit exceeded' },
+					{ 'x-ratelimit-remaining': '0' },
+				);
+
+			await assert.rejects(
+				getActionsPermissions(octokit(), createCachedFetcher(), REPO),
+				/rate limit/i,
+			);
+		},
+	);
+
+	test(
+		'default workflow permissions: a rate-limit 403 (header) propagates as an error',
+		async () => {
+			nock('https://api.github.com')
+				.get('/repos/sheplu/Octolens/actions/permissions/workflow')
+				.reply(
+					403,
+					{ message: 'API rate limit exceeded' },
+					{ 'x-ratelimit-remaining': '0' },
+				);
+
+			await assert.rejects(
+				getDefaultWorkflowPermissions(octokit(), createCachedFetcher(), REPO),
+				/rate limit/i,
+			);
 		},
 	);
 });

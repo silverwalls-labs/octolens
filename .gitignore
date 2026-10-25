@@ -165,3 +165,5 @@ report.md
 .kiro/
 .trae/
 .factory/
+# Terminal session recordings (asciinema)
+*.cast

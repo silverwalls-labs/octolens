@@ -7,6 +7,7 @@ import {
 import assert from 'node:assert/strict';
 import nock from 'nock';
 import { rule } from '../../../src/rules/security/code-scanning-enabled.ts';
+import { RuleSkipped } from '../../../src/types/index.ts';
 import {
 	disableNet, makeContext, restoreNet,
 } from '../../helpers/context.ts';
@@ -50,15 +51,13 @@ describe('security/code-scanning-enabled', () => {
 		assert.equal(findings.length, 1);
 	});
 
-	test('reports a finding when code scanning endpoint returns 403', async () => {
+	test('skips when code scanning endpoint returns a permission 403', async () => {
 		nock('https://api.github.com')
 			.get('/repos/sheplu/Octolens/code-scanning/analyses')
 			.query(true)
 			.reply(403, { message: 'Resource not accessible by integration' });
 
-		const findings = await rule.check(makeContext());
-
-		assert.equal(findings.length, 1);
+		await assert.rejects(rule.check(makeContext()), RuleSkipped);
 	});
 
 	test('propagates server errors from the API', async () => {
