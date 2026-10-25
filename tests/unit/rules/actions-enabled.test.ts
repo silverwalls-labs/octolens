@@ -7,6 +7,7 @@ import {
 import assert from 'node:assert/strict';
 import nock from 'nock';
 import { rule } from '../../../src/rules/cicd/actions-enabled.ts';
+import { RuleSkipped } from '../../../src/types/index.ts';
 import {
 	disableNet, makeContext, restoreNet,
 } from '../../helpers/context.ts';
@@ -45,6 +46,14 @@ describe('cicd/actions-enabled', () => {
 		const findings = await rule.check(makeContext());
 
 		assert.equal(findings.length, 1);
+	});
+
+	test('skips when permissions endpoint returns a permission 403', async () => {
+		nock('https://api.github.com')
+			.get('/repos/sheplu/Octolens/actions/permissions')
+			.reply(403, { message: 'Resource not accessible by integration' });
+
+		await assert.rejects(rule.check(makeContext()), RuleSkipped);
 	});
 
 	test('propagates server errors from the API', async () => {

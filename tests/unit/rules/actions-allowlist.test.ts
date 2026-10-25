@@ -7,6 +7,7 @@ import {
 import assert from 'node:assert/strict';
 import nock from 'nock';
 import { rule } from '../../../src/rules/cicd/actions-allowlist.ts';
+import { RuleSkipped } from '../../../src/types/index.ts';
 import {
 	disableNet, makeContext, restoreNet,
 } from '../../helpers/context.ts';
@@ -47,6 +48,14 @@ describe('cicd/actions-allowlist', () => {
 		assert.equal(findings.length, 1);
 		assert.equal(findings[0]?.ruleId, 'cicd/actions-allowlist');
 		assert.equal(findings[0]?.severity, 'medium');
+	});
+
+	test('skips when permissions endpoint returns a permission 403', async () => {
+		nock('https://api.github.com')
+			.get(ENDPOINT)
+			.reply(403, { message: 'Resource not accessible by integration' });
+
+		await assert.rejects(rule.check(makeContext()), RuleSkipped);
 	});
 
 	test('propagates server errors from the API', async () => {

@@ -1,4 +1,5 @@
 import { getCodeScanningStatus } from '../../github/queries.ts';
+import { skip } from '../../types/index.ts';
 import type { Finding, Rule } from '../../types/index.ts';
 
 const RULE_ID = 'security/code-scanning-enabled';
@@ -21,6 +22,10 @@ export const rule: Rule = {
 
 	async check(ctx) {
 		const status = await getCodeScanningStatus(ctx.octokit, ctx.cache, ctx.repo);
+
+		if (!status.checked) {
+			return skip('could not read code scanning status (no permission)');
+		}
 
 		if (status.hasAnalyses) {
 			return [];

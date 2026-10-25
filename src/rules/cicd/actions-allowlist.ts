@@ -1,4 +1,5 @@
 import { getActionsPermissions } from '../../github/queries.ts';
+import { skip } from '../../types/index.ts';
 import type { Finding, Rule } from '../../types/index.ts';
 
 const RULE_ID = 'cicd/actions-allowlist';
@@ -24,6 +25,10 @@ export const rule: Rule = {
 
 	async check(ctx) {
 		const perms = await getActionsPermissions(ctx.octokit, ctx.cache, ctx.repo);
+
+		if (!perms.checked) {
+			return skip('could not read Actions permissions (no permission)');
+		}
 
 		if (!perms.enabled) {
 			return [];
