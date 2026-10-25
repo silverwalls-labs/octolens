@@ -1,7 +1,7 @@
 import { isSeverity, type Severity } from '../types/severity.ts';
 
 /** Supported output format. */
-export type Format = 'pretty' | 'json' | 'md';
+export type Format = 'pretty' | 'json' | 'md' | 'sarif';
 
 /** Parsed arguments for the scan command. */
 export type ScanCommandArgs = {
@@ -276,8 +276,8 @@ function parseConcurrency(value: string): number {
  * @throws {CliUsageError} When the format is unsupported.
  */
 function parseFormat(value: string): Format {
-	if (value === 'pretty' || value === 'json' || value === 'md') {
+	if (value === 'pretty' || value === 'json' || value === 'md' || value === 'sarif') {
 		return value;
 	}
-	throw new CliUsageError(`Unknown --format "${value}". Supported: pretty, json, md.`);
+	throw new CliUsageError(`Unknown --format "${value}". Supported: pretty, json, md, sarif.`);
 }

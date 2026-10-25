@@ -18,7 +18,8 @@ Options:
   --concurrency <n>          With --all-repos: repositories scanned in parallel (1-32).
                              Default: 4
   --token <value>            GitHub token. Falls back to $GITHUB_TOKEN, then \`gh auth token\`
-  --format <pretty|json|md>  Output format (repeatable). Default: pretty
+  --format <format>          Output format: pretty | json | md | sarif (repeatable).
+                             sarif targets GitHub code-scanning upload. Default: pretty
   --out <file>               Write output to a file instead of stdout
   --severity <level>         Threshold: critical | high | medium | low | info. Default: high
   --verbose                  Enable debug logging on stderr

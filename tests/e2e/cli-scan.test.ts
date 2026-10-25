@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { Octokit } from '@octokit/rest';
 import { scanRepo, exitCodeFor } from '../../src/engine/index.ts';
 import { allRules } from '../../src/rules/index.ts';
+import { formatSarif } from '../../src/output/index.ts';
 import type { ScanResult } from '../../src/types/index.ts';
 
 const token = process.env['OCTOLENS_E2E_TOKEN'] ??
@@ -28,6 +29,23 @@ describe('e2e scan', () => {
 		assert.equal(result.target.name, 'review');
 		assert.ok(result.summary.rulesRun >= 40);
 		assert.equal(result.summary.rulesErrored, 0);
+	});
+
+	test('renders the scan as SARIF', { timeout: 60_000 }, async () => {
+		const result = await scanReview();
+		const doc = JSON.parse(formatSarif(result)) as {
+			version: string;
+			runs: {
+				results: { locations: unknown[]; }[];
+			}[];
+		};
+
+		assert.equal(doc.version, '2.1.0');
+		assert.equal(doc.runs.length, 1);
+		assert.ok(doc.runs[0].results.length > 0);
+		for (const sarifResult of doc.runs[0].results) {
+			assert.equal(sarifResult.locations.length, 1);
+		}
 	});
 
 	test('reports branch-protection-required', { timeout: 60_000 }, async () => {

@@ -31,6 +31,7 @@ const FUNCTION_EXPORTS = [
 	'formatPrettyReport',
 	'formatMarkdown',
 	'formatMarkdownReport',
+	'formatSarif',
 ] as const;
 
 describe('index exports', () => {

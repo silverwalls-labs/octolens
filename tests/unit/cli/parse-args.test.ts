@@ -36,6 +36,21 @@ describe('parseArgs', () => {
 		assert.deepEqual(result.formats, [ 'pretty', 'json' ]);
 	});
 
+	test('--format sarif is accepted', () => {
+		const result = parseArgs([
+			'scan',
+			'--repo',
+			'a/b',
+			'--format',
+			'sarif',
+		]);
+
+		if (result.command !== 'scan') {
+			throw new Error('expected scan');
+		}
+		assert.deepEqual(result.formats, [ 'sarif' ]);
+	});
+
 	test('invalid severity is rejected', () => {
 		assert.throws(
 			() => parseArgs([
@@ -213,6 +228,16 @@ describe('parseArgs', () => {
 				'csv',
 			]),
 			CliUsageError,
+		);
+		assert.throws(
+			() => parseArgs([
+				'scan',
+				'--repo',
+				'a/b',
+				'--format',
+				'csv',
+			]),
+			/Supported: pretty, json, md, sarif/u,
 		);
 	});
 

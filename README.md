@@ -13,7 +13,7 @@ Whether you’re running a compliance audit, reviewing security health, or ensur
 ## ✨ Features
 
 - 🔍 **Full-Org Scanning** – Audit one, multiple, or all repositories in a GitHub organization.
-- 📋 **Detailed Reports** – Export findings in human-readable or machine-consumable formats (JSON, Markdown, HTML).
+- 📋 **Detailed Reports** – Export findings in human-readable or machine-consumable formats (JSON, Markdown, SARIF).
 - 🛡 **Security Checks** – Detect risky settings, missing protections, and potential vulnerabilities.
 - ⚙ **Configuration Review** – Validate settings against good practices and compliance requirements.
 - 🧭 **Customizable Rules** – Extend or override checks to match your own standards.
@@ -123,14 +123,55 @@ Rules in the `org` category audit the organization's own settings:
 - `org/limit-private-fork-pr-workflows` – no write tokens/secrets for private fork PR runs.
 - `org/webhooks-use-https` – org webhooks must use HTTPS with SSL verification.
 
-Scanning all repositories of an organization with the repository checks
-(fan-out) is planned and will extend `--org` in a future release.
-
 ## 📂 Output Formats
 
+- Pretty (default) – Colorized terminal output.
 - JSON – For automation and CI pipelines.
-- Markdown – For reports and documentation.
-- HTML – For compliance reviews.
+- Markdown – For reports, job summaries, and documentation.
+- SARIF – For GitHub code-scanning upload.
+
+`--format` is repeatable; with `--out <file>` the last format goes to the
+file and the others to stdout.
+
+### Uploading to GitHub code scanning
+
+`--format sarif` emits a [SARIF 2.1.0](https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html)
+report that GitHub code scanning accepts, so findings appear as alerts
+under **Security → Code scanning** (category `octolens/...`):
+
+```yaml
+permissions:
+  contents: read
+  security-events: write
+
+steps:
+  - uses: actions/checkout@v4
+  - name: Octolens scan
+    run: >
+      npx @silverwalls-labs/octolens scan --repo ${{ github.repository }}
+      --format sarif --out octolens.sarif
+    env:
+      GITHUB_TOKEN: ${{ secrets.OCTOLENS_TOKEN }}
+    # octolens exits 1 when it finds issues; let the upload step still run
+    continue-on-error: true
+  - uses: github/codeql-action/upload-sarif@v4
+    with:
+      sarif_file: octolens.sarif
+```
+
+Notes:
+
+- The workflow's default `GITHUB_TOKEN` lacks the admin-read scopes many
+  rules need — those rules are reported as skipped. Use a PAT (stored as
+  a secret) for full coverage.
+- Octolens findings describe repository/organization *settings*, not
+  files, so alerts point at a representative file (`.github/CODEOWNERS`,
+  `SECURITY.md`, `LICENSE`, or `README.md` as fallback) — which may not
+  exist in the repository; the alert is still created and tracked.
+- A fleet report (`--org X --all-repos`) flattens every repository's
+  findings into one run, with each alert message prefixed by
+  `owner/name`. Upload it to a dedicated audit repository rather than a
+  regular code repository.
 
 ## 🛠 Configuration
 
