@@ -47,7 +47,10 @@ type SarifResult = {
 			region: { startLine: number; };
 		};
 	}[];
-	partialFingerprints: { 'octolensSubject/v1': string; };
+	partialFingerprints: {
+		'primaryLocationLineHash': string;
+		'octolensSubject/v1': string;
+	};
 };
 
 type SarifNotification = {
@@ -324,28 +327,29 @@ describe('formatSarif', () => {
 		);
 	});
 
-	test('keeps fingerprints stable across sibling findings of one rule', () => {
-		const findings = [
-			makeFinding({
-				ruleId: 'access/required-custom-properties',
-				severity: 'medium',
-				title: "Property 'a' unset",
-			}),
-			makeFinding({
-				ruleId: 'access/required-custom-properties',
-				severity: 'medium',
-				title: "Property 'b' unset",
-			}),
-		];
-		const run = firstRun(makeResult(findings));
+	test('keeps primaryLocationLineHash stable across sibling changes', () => {
+		const sibling = (title: string) => makeFinding({
+			ruleId: 'access/required-custom-properties',
+			severity: 'medium',
+			title,
+		});
+		const before = firstRun(makeResult([
+			sibling("Property 'a' unset"),
+			sibling("Property 'b' unset"),
+		]));
+		const after = firstRun(makeResult([
+			sibling("Property 'a' unset"),
+			sibling("Property 'b' unset"),
+			sibling("Property 'c' unset"),
+		]));
+		const beforeHashes = before.results
+			.map((r) => r.partialFingerprints['primaryLocationLineHash']);
+		const afterHashes = after.results
+			.map((r) => r.partialFingerprints['primaryLocationLineHash']);
 
-		assert.deepEqual(
-			run.results.map((r) => r.partialFingerprints['octolensSubject/v1']),
-			[
-				"access/required-custom-properties:silverwalls-labs/review:Property 'a' unset:0",
-				"access/required-custom-properties:silverwalls-labs/review:Property 'b' unset:0",
-			],
-		);
+		assert.equal(afterHashes.length, 3);
+		assert.equal(new Set(afterHashes).size, 3);
+		assert.deepEqual(afterHashes.slice(0, 2), beforeHashes);
 	});
 
 	test('numbers exact duplicate findings per rule, subject, and title', () => {
@@ -358,14 +362,16 @@ describe('formatSarif', () => {
 			}),
 		];
 		const run = firstRun(makeResult(findings));
+		const readable = run.results.map((r) => r.partialFingerprints['octolensSubject/v1']);
 
-		assert.deepEqual(
-			run.results.map((r) => r.partialFingerprints['octolensSubject/v1']),
-			[
-				'access/webhooks-use-https:silverwalls-labs/review:Same title:0',
-				'access/webhooks-use-https:silverwalls-labs/review:Same title:1',
-			],
-		);
+		assert.deepEqual(readable, [
+			'access/webhooks-use-https:silverwalls-labs/review:Same title:0',
+			'access/webhooks-use-https:silverwalls-labs/review:Same title:1',
+		]);
+
+		const hashes = run.results.map((r) => r.partialFingerprints['primaryLocationLineHash']);
+
+		assert.notEqual(hashes[0], hashes[1]);
 	});
 
 	test('flattens a fleet report into one subject-prefixed run', () => {
@@ -554,6 +560,10 @@ describe('formatSarif', () => {
 		assert.equal(
 			run.results[0].partialFingerprints['octolensSubject/v1'],
 			'custom/mystery::Strange finding:0',
+		);
+		assert.match(
+			run.results[0].partialFingerprints['primaryLocationLineHash'],
+			/^[0-9a-f]{16}$/u,
 		);
 	});
 });

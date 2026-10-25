@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { compareSeverity } from '../types/severity.ts';
 import type {
 	Finding, OrgScanReport, RuleRun, ScanResult, Severity,
@@ -39,7 +40,10 @@ type SarifResult = {
 			region: { startLine: number; };
 		};
 	}[];
-	partialFingerprints: { 'octolensSubject/v1': string; };
+	partialFingerprints: {
+		'primaryLocationLineHash': string;
+		'octolensSubject/v1': string;
+	};
 };
 
 /** A tool execution notification (errored or skipped rule, failed repo). */
@@ -260,6 +264,12 @@ function buildRules(entries: Entry[]): SarifRule[] {
  * other siblings are added or removed, so code-scanning alerts survive
  * unrelated changes instead of being closed and reopened.
  *
+ * GitHub code scanning consumes only the `primaryLocationLineHash`
+ * partial fingerprint; octolens hashes the finding identity into that
+ * key so findings sharing a synthetic file location stay distinct.
+ * The human-readable `octolensSubject/v1` key is kept for direct
+ * SARIF consumers and is ignored by GitHub.
+ *
  * @param entries - Entries sorted by {@link compareEntries}.
  * @param ruleIds - Rule IDs in `tool.driver.rules` order.
  * @param fleet   - Whether messages should be prefixed with the subject.
@@ -347,6 +357,7 @@ function toResult(
 	fleet: boolean,
 ): SarifResult {
 	const { finding, subject } = entry;
+	const identity = `${finding.ruleId}:${subject}:${finding.title}:${occurrence}`;
 	const body = finding.detail ?
 		`${finding.title}\n\n${finding.detail}` :
 		finding.title;
@@ -369,9 +380,28 @@ function toResult(
 			},
 		],
 		partialFingerprints: {
-			'octolensSubject/v1': `${finding.ruleId}:${subject}:${finding.title}:${occurrence}`,
+			'primaryLocationLineHash': stableHash(identity),
+			'octolensSubject/v1': identity,
 		},
 	};
+}
+
+/**
+ * Deterministic hash of a finding identity for the fingerprint that
+ * GitHub code scanning consumes.
+ *
+ * GitHub only reads the `primaryLocationLineHash` partial fingerprint
+ * and treats it as an opaque string, so a short digest of the full
+ * identity (rule, subject, title, duplicate index) gives every result
+ * a stable, unique fingerprint even when several findings share the
+ * same synthetic file location.
+ *
+ * @param value - Identity string to hash.
+ * @returns     16-hex-character SHA-256 prefix.
+ */
+function stableHash(value: string): string {
+	return createHash('sha256').update(value).digest('hex')
+		.slice(0, 16);
 }
 
 /**
