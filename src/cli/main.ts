@@ -91,7 +91,11 @@ async function runScanCommand(args: ScanCommandArgs): Promise<number> {
 	const unknown = unknownRuleIds(config);
 
 	if (unknown.length > 0) {
-		process.stderr.write(`unknown rule ID(s) in config "rules": ${unknown.join(', ')}\n`);
+		const sources = loaded.sources.join(', ');
+		const ids = unknown.join(', ');
+		const message = `unknown rule ID(s) in config "rules" (${sources}): ${ids}\n`;
+
+		process.stderr.write(message);
 
 		return 2;
 	}

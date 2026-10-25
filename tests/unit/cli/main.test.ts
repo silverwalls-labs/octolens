@@ -515,9 +515,9 @@ describe('cli main', () => {
 
 			assert.equal(code, 2);
 
-			assert.equal(
+			assert.match(
 				stderrText(),
-				'unknown rule ID(s) in config "rules": security/dependabot-alert-enabled\n',
+				/unknown rule ID\(s\) in config "rules" \(.*octolens\.config\.json\): security\/dependabot-alert-enabled\n/,
 			);
 
 			assert.equal(stdoutText(), '', 'no scan output on a config error');
