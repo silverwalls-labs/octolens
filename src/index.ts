@@ -43,10 +43,18 @@ export {
 	exitCodeFor,
 	exitCodeForReport,
 	createLogger,
+	fingerprint,
+	diffFindings,
+	filterScanResult,
+	filterOrgScanReport,
+	loadBaseline,
+	assertBaselineCompatible,
+	BaselineError,
 } from './engine/index.ts';
 
 export type {
 	LogLevel, ScanRepoOptions, ScanOrgOptions, ScanOrgAllReposOptions,
+	DiffSummary, DiffOutcome, Baseline, BaselineTargetType,
 } from './engine/index.ts';
 export type { ExitCodeOptions } from './engine/exit-code.ts';
 

@@ -5,11 +5,20 @@ import {
 	afterEach,
 } from 'node:test';
 import assert from 'node:assert/strict';
+import {
+	writeFileSync, mkdtempSync, rmSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import nock from 'nock';
 import { Octokit } from '@octokit/rest';
 import {
 	scanRepo,
 	exitCodeFor,
+	diffFindings,
+	filterScanResult,
+	loadBaseline,
+	assertBaselineCompatible,
 } from '../../src/engine/index.ts';
 import { allRules } from '../../src/rules/index.ts';
 import {
@@ -373,6 +382,48 @@ describe('scan pipeline', () => {
 			const branchRules = result.runs.filter((r) => r.skipReason === reason);
 
 			assert.ok(branchRules.length >= 9);
+		},
+	);
+
+	test(
+		'baseline diff: identical scan produces zero new findings',
+		async () => {
+			mockRepoMetadata();
+			nock(BASE)
+				.get('/repos/sheplu/Octolens/branches/main/protection')
+				.reply(404, { message: 'Branch not protected' });
+			mockCatchAll();
+
+			const result = await runFullScan();
+
+			assert.ok(result.findings.length > 0);
+
+			// Save as baseline, reload, and diff against the same result.
+			const dir = mkdtempSync(join(tmpdir(), 'octolens-int-'));
+			const baselinePath = join(dir, 'baseline.json');
+
+			writeFileSync(baselinePath, formatJson(result));
+
+			const baseline = loadBaseline(baselinePath);
+
+			assertBaselineCompatible(baseline, 'repo');
+
+			const { added, summary } = diffFindings(
+				baseline.findings,
+				result.findings,
+			);
+
+			assert.equal(added.length, 0);
+			assert.equal(summary.added, 0);
+			assert.equal(summary.unchanged, result.findings.length);
+
+			const filtered = filterScanResult(result, added);
+
+			assert.equal(filtered.findings.length, 0);
+			assert.equal(filtered.summary.findingsTotal, 0);
+			assert.equal(exitCodeFor(filtered), 0);
+
+			rmSync(dir, { recursive: true, force: true });
 		},
 	);
 });

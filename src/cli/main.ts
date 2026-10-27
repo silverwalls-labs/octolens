@@ -3,8 +3,12 @@ import { resolveAuth, AuthError } from '../github/auth.ts';
 import { createOctokit } from '../github/client.ts';
 import {
 	createLogger, scanRepo, scanOrg, scanOrgAllRepos, exitCodeFor, exitCodeForReport,
-	filterRulesByGlob, unmatchedPatterns,
+	filterRulesByGlob, unmatchedPatterns, diffFindings, filterScanResult, filterOrgScanReport,
 } from '../engine/index.ts';
+import {
+	loadBaseline, assertBaselineCompatible, BaselineError,
+} from '../engine/index.ts';
+import type { Baseline, BaselineTargetType } from '../engine/index.ts';
 import { allRules, allOrgRules } from '../rules/index.ts';
 import type { OrgRule, Rule } from '../types/index.ts';
 import {
@@ -65,10 +69,10 @@ export async function main(argv: string[]): Promise<number> {
  * @returns    Process exit code for the scan.
  */
 async function runScanCommand(args: ScanCommandArgs): Promise<number> {
-	// Fleet scans can run for a long time; surface progress by default.
+	// Fleet scans and baseline diffs surface progress by default.
 	const logger = createLogger(args.verbose ?
 		'debug' :
-		args.allRepos ?
+		args.allRepos || args.baseline !== undefined ?
 			'info' :
 			'warn');
 
@@ -147,6 +151,34 @@ async function runScanCommand(args: ScanCommandArgs): Promise<number> {
 	}
 
 	/*
+	 * Load and validate the baseline early so a bad file is caught before
+	 * spending API calls on the scan.
+	 */
+	let baseline: Baseline | undefined;
+
+	if (args.baseline !== undefined) {
+		const expectedType: BaselineTargetType = args.org !== undefined && args.allRepos ?
+			'org-fleet' :
+			args.org !== undefined ?
+				'org' :
+				'repo';
+
+		try {
+			baseline = loadBaseline(args.baseline);
+			assertBaselineCompatible(baseline, expectedType);
+		} catch (err) {
+			if (!(err instanceof BaselineError)) throw err;
+
+			process.stderr.write(`${err.message}\n`);
+
+			return 2;
+		}
+
+		logger.debug(`baseline loaded from ${args.baseline}` +
+			` (${baseline.findings.length} findings)`);
+	}
+
+	/*
 	 * A fleet scan fans out over every repository even when no repo rule
 	 * survives the filters, and still evaluates org rules when none survive.
 	 * Both are legal but surprising, so surface them instead of reporting
@@ -203,6 +235,31 @@ async function runScanCommand(args: ScanCommandArgs): Promise<number> {
 			concurrency: args.concurrency,
 		});
 
+		if (baseline !== undefined) {
+			const allFindings = [ ...report.org.findings ];
+
+			for (const repo of report.repos) {
+				allFindings.push(...repo.findings);
+			}
+			const { added, summary: diff } = diffFindings(baseline.findings, allFindings);
+
+			logger.info(`baseline: ${diff.added} new, ` +
+				`${diff.removed} resolved, ` +
+				`${diff.unchanged} unchanged`);
+
+			const filtered = filterOrgScanReport(report, added);
+
+			emitOutput(filtered, args.formats, args.out);
+
+			if (args.failOnSkip && exitCodeForReport(filtered, { failOnIncomplete: true }) === 1) {
+				return 1;
+			}
+
+			return added.length > 0 ?
+				1 :
+				0;
+		}
+
 		emitOutput(report, args.formats, args.out);
 
 		return exitCodeForReport(report, { failOnIncomplete: args.failOnSkip });
@@ -227,6 +284,27 @@ async function runScanCommand(args: ScanCommandArgs): Promise<number> {
 			config,
 			ruleConfig,
 		});
+
+	if (baseline !== undefined) {
+		const { added, summary: diff } = diffFindings(baseline.findings, result.findings);
+
+		const msg = `baseline: ${diff.added} new, ` +
+			`${diff.removed} resolved, ${diff.unchanged} unchanged`;
+
+		logger.info(msg);
+
+		const filtered = filterScanResult(result, added);
+
+		emitOutput(filtered, args.formats, args.out);
+
+		if (args.failOnSkip && exitCodeFor(filtered, { failOnIncomplete: true }) === 1) {
+			return 1;
+		}
+
+		return added.length > 0 ?
+			1 :
+			0;
+	}
 
 	emitOutput(result, args.formats, args.out);
 

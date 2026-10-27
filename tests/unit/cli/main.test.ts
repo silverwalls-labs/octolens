@@ -823,6 +823,349 @@ describe('cli main', () => {
 	);
 
 	test(
+		'--baseline exits 0 when all current findings match the baseline',
+		async () => {
+			captureOutput();
+			mockRepoScan();
+
+			// First run: capture the full JSON report as a baseline.
+			const code1 = await main([
+				'scan',
+				'--repo',
+				'sheplu/Octolens',
+				'--token',
+				't',
+				'--format',
+				'json',
+			]);
+
+			assert.equal(code1, 1);
+			const baselineData = stdoutText();
+			const dir = mkdtempSync(join(tmpdir(), 'octolens-bl-'));
+
+			tempDirs.push(dir);
+			const baselinePath = join(dir, 'baseline.json');
+
+			writeFileSync(baselinePath, baselineData);
+
+			// Second run: same scan against the baseline → exit 0.
+			nock.cleanAll();
+			captureOutput();
+			mockRepoScan();
+
+			const code2 = await main([
+				'scan',
+				'--repo',
+				'sheplu/Octolens',
+				'--token',
+				't',
+				'--format',
+				'json',
+				'--baseline',
+				baselinePath,
+			]);
+
+			assert.equal(code2, 0);
+			assert.match(stderrText(), /baseline:.*0 new/);
+
+			const report = JSON.parse(stdoutText()) as {
+				findings: unknown[];
+			};
+
+			assert.equal(report.findings.length, 0);
+		},
+	);
+
+	test(
+		'--baseline exits 1 when new findings appear',
+		async () => {
+			captureOutput();
+
+			// Create a baseline with no findings.
+			const baseline = {
+				schemaVersion: 1,
+				target: {
+					type: 'repo', owner: 'sheplu', name: 'Octolens',
+				},
+				threshold: 'high',
+				runs: [],
+				findings: [],
+				summary: {
+					rulesRun: 0,
+					rulesErrored: 0,
+					rulesSkipped: 0,
+					findingsTotal: 0,
+					findingsBySeverity: {
+						critical: 0, high: 0, medium: 0, low: 0, info: 0,
+					},
+				},
+			};
+			const dir = mkdtempSync(join(tmpdir(), 'octolens-bl-'));
+
+			tempDirs.push(dir);
+			const baselinePath = join(dir, 'baseline.json');
+
+			writeFileSync(baselinePath, JSON.stringify(baseline));
+
+			mockRepoScan();
+
+			const code = await main([
+				'scan',
+				'--repo',
+				'sheplu/Octolens',
+				'--token',
+				't',
+				'--format',
+				'json',
+				'--baseline',
+				baselinePath,
+			]);
+
+			assert.equal(code, 1);
+			assert.match(stderrText(), /baseline:.*new/);
+
+			const report = JSON.parse(stdoutText()) as {
+				findings: { ruleId: string; }[];
+			};
+
+			assert.ok(report.findings.length > 0);
+		},
+	);
+
+	test(
+		'--baseline with a missing file exits 2',
+		async () => {
+			captureOutput();
+
+			const code = await main([
+				'scan',
+				'--repo',
+				'sheplu/Octolens',
+				'--token',
+				't',
+				'--baseline',
+				'/tmp/octolens-does-not-exist.json',
+			]);
+
+			assert.equal(code, 2);
+			assert.match(stderrText(), /Cannot read baseline file/);
+		},
+	);
+
+	test(
+		'--baseline with wrong target type exits 2',
+		async () => {
+			captureOutput();
+			const baseline = {
+				schemaVersion: 1,
+				target: { type: 'org', org: 'silverwalls-labs' },
+				threshold: 'high',
+				runs: [],
+				findings: [],
+				summary: {
+					rulesRun: 0,
+					rulesErrored: 0,
+					rulesSkipped: 0,
+					findingsTotal: 0,
+					findingsBySeverity: {
+						critical: 0, high: 0, medium: 0, low: 0, info: 0,
+					},
+				},
+			};
+			const dir = mkdtempSync(join(tmpdir(), 'octolens-bl-'));
+
+			tempDirs.push(dir);
+			const baselinePath = join(dir, 'baseline.json');
+
+			writeFileSync(baselinePath, JSON.stringify(baseline));
+
+			const code = await main([
+				'scan',
+				'--repo',
+				'sheplu/Octolens',
+				'--token',
+				't',
+				'--baseline',
+				baselinePath,
+			]);
+
+			assert.equal(code, 2);
+			assert.match(stderrText(), /does not match/);
+		},
+	);
+
+	test(
+		'--baseline with --fail-on-skip exits 1 on incomplete coverage even when no new findings',
+		async () => {
+			captureOutput();
+			mockOrgScan();
+
+			// Create an org baseline with the same skipped findings.
+			const baseline = {
+				schemaVersion: 1,
+				target: { type: 'org', org: 'silverwalls-labs' },
+				threshold: 'high',
+				runs: [],
+				findings: [],
+				summary: {
+					rulesRun: 0,
+					rulesErrored: 0,
+					rulesSkipped: 0,
+					findingsTotal: 0,
+					findingsBySeverity: {
+						critical: 0, high: 0, medium: 0, low: 0, info: 0,
+					},
+				},
+			};
+			const dir = mkdtempSync(join(tmpdir(), 'octolens-bl-'));
+
+			tempDirs.push(dir);
+			const baselinePath = join(dir, 'baseline.json');
+
+			writeFileSync(baselinePath, JSON.stringify(baseline));
+
+			const code = await main([
+				'scan',
+				'--org',
+				'silverwalls-labs',
+				'--token',
+				't',
+				'--format',
+				'json',
+				'--baseline',
+				baselinePath,
+				'--fail-on-skip',
+			]);
+
+			// The org scan skips rules due to 404, so --fail-on-skip triggers exit 1.
+			assert.equal(code, 1);
+		},
+	);
+
+	test(
+		'--baseline on a fleet scan with --fail-on-skip exits 1 on incomplete coverage',
+		async () => {
+			captureOutput();
+
+			// Create a fleet baseline with no findings.
+			const baseline = {
+				schemaVersion: 1,
+				target: { type: 'org-fleet', org: 'silverwalls-labs' },
+				threshold: 'high',
+				org: {
+					schemaVersion: 1,
+					target: { type: 'org', org: 'silverwalls-labs' },
+					threshold: 'high',
+					runs: [],
+					findings: [],
+					summary: {
+						rulesRun: 0,
+						rulesErrored: 0,
+						rulesSkipped: 0,
+						findingsTotal: 0,
+						findingsBySeverity: {
+							critical: 0, high: 0, medium: 0, low: 0, info: 0,
+						},
+					},
+				},
+				repos: [],
+				skipped: [],
+				failures: [],
+				summary: {
+					reposDiscovered: 0,
+					reposScanned: 0,
+					reposSkipped: 0,
+					reposFailed: 0,
+					listingComplete: true,
+					rulesRun: 0,
+					rulesErrored: 0,
+					rulesSkipped: 0,
+					findingsTotal: 0,
+					findingsBySeverity: {
+						critical: 0, high: 0, medium: 0, low: 0, info: 0,
+					},
+				},
+			};
+			const dir = mkdtempSync(join(tmpdir(), 'octolens-bl-'));
+
+			tempDirs.push(dir);
+			const baselinePath = join(dir, 'baseline.json');
+
+			writeFileSync(baselinePath, JSON.stringify(baseline));
+
+			mockEmptyFleet();
+
+			// The fleet scan skips all org rules (404), so --fail-on-skip → exit 1.
+			const code = await main([
+				'scan',
+				'--org',
+				'silverwalls-labs',
+				'--all-repos',
+				'--token',
+				't',
+				'--format',
+				'json',
+				'--baseline',
+				baselinePath,
+				'--fail-on-skip',
+			]);
+
+			assert.equal(code, 1);
+			assert.match(stderrText(), /baseline:.*0 new/);
+		},
+	);
+
+	test(
+		'--baseline on a fleet scan exits 0 when no new findings',
+		async () => {
+			captureOutput();
+			mockFleetWithOneRepo();
+
+			// First run: capture the fleet JSON report.
+			const code1 = await main([
+				'scan',
+				'--org',
+				'silverwalls-labs',
+				'--all-repos',
+				'--token',
+				't',
+				'--format',
+				'json',
+			]);
+
+			assert.equal(code1, 1);
+			const baselineData = stdoutText();
+			const dir = mkdtempSync(join(tmpdir(), 'octolens-bl-'));
+
+			tempDirs.push(dir);
+			const baselinePath = join(dir, 'baseline.json');
+
+			writeFileSync(baselinePath, baselineData);
+
+			// Second run: same scan against the baseline → exit 0.
+			nock.cleanAll();
+			captureOutput();
+			mockFleetWithOneRepo();
+
+			const code2 = await main([
+				'scan',
+				'--org',
+				'silverwalls-labs',
+				'--all-repos',
+				'--token',
+				't',
+				'--format',
+				'json',
+				'--baseline',
+				baselinePath,
+			]);
+
+			assert.equal(code2, 0);
+			assert.match(stderrText(), /baseline:.*0 new/);
+		},
+	);
+
+	test(
 		'ambiguous config sources exit 2, listing every source',
 		async () => {
 			captureOutput();
@@ -986,6 +1329,37 @@ function mockEmptyFleet(): void {
 		.get('/orgs/silverwalls-labs/repos')
 		.query(true)
 		.reply(200, []);
+	nock(BASE).persist()
+		.get(/\/orgs\/silverwalls-labs/)
+		.reply(404, { message: 'Not Found' });
+}
+
+function mockFleetWithOneRepo(): void {
+	const repo = {
+		...makeRepoResponse(),
+		'name': 'test-repo',
+		'full_name': 'silverwalls-labs/test-repo',
+		'owner': { login: 'silverwalls-labs' },
+		'private': true,
+		'visibility': 'private',
+	};
+
+	nock(BASE)
+		.get('/orgs/silverwalls-labs/repos')
+		.query(true)
+		.reply(200, [ repo ]);
+	nock(BASE)
+		.get('/repos/silverwalls-labs/test-repo')
+		.reply(200, repo);
+	nock(BASE)
+		.get('/repos/silverwalls-labs/test-repo/branches/main/protection')
+		.reply(404, { message: 'Branch not protected' });
+	nock(BASE).persist()
+		.get(/\/repos\/silverwalls-labs\/test-repo\//)
+		.reply(200, []);
+	nock(BASE).persist()
+		.head(/\/repos\/silverwalls-labs\/test-repo\//)
+		.reply(204);
 	nock(BASE).persist()
 		.get(/\/orgs\/silverwalls-labs/)
 		.reply(404, { message: 'Not Found' });

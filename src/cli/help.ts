@@ -21,6 +21,9 @@ Options:
   --format <format>          Output format: pretty | json | md | sarif (repeatable).
                              sarif targets GitHub code-scanning upload. Default: pretty
   --out <file>               Write output to a file instead of stdout
+  --baseline <file>          Compare against a prior JSON report and exit non-zero
+                             only on new findings. The file must have been produced
+                             by a prior octolens scan with --format json
   --severity <level>         Threshold: critical | high | medium | low | info. Default: high
   --verbose                  Enable debug logging on stderr
   --include-archived         Run rules against archived repositories (skipped by default).
@@ -45,7 +48,7 @@ Configuration:
   for the schema
 
 Exit codes:
-  0  no findings at or above the threshold (and, with --fail-on-skip, full coverage)
-  1  findings at or above the threshold, or incomplete coverage under --fail-on-skip
-  2  usage / configuration / authentication error
+  0  no findings at threshold (or no new findings with --baseline), full coverage if --fail-on-skip
+  1  findings at threshold (or new findings with --baseline), or incomplete under --fail-on-skip
+  2  usage / configuration / authentication / baseline error
 `;
