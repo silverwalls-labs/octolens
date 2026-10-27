@@ -28,6 +28,8 @@ npm install -g @silverwalls-labs/octolens
 npx @silverwalls-labs/octolens <command>
 ```
 
+Requires Node.js 24 or later.
+
 ## 🏃 Usage
 
 ```bash
