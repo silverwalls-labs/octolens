@@ -237,7 +237,7 @@ describe('loadBaseline', () => {
 		assert.throws(
 			() => loadBaseline(path),
 			(err: unknown) => err instanceof BaselineError &&
-				err.message.includes('no "findings" array'),
+				err.message.includes('Baseline findings is not an array'),
 		);
 	});
 
@@ -255,20 +255,23 @@ describe('loadBaseline', () => {
 		);
 	});
 
-	test('throws when fleet baseline org has no findings array', () => {
-		const path = tmpFile('fleet-org-no-findings.json', JSON.stringify({
-			schemaVersion: 1,
-			target: { type: 'org-fleet', org: 'acme' },
-			org: { runs: [] },
-			repos: [],
-		}));
+	test(
+		'throws when fleet baseline org has no findings array',
+		() => {
+			const path = tmpFile('fleet-org-no-findings.json', JSON.stringify({
+				schemaVersion: 1,
+				target: { type: 'org-fleet', org: 'acme' },
+				org: { runs: [] },
+				repos: [],
+			}));
 
-		assert.throws(
-			() => loadBaseline(path),
-			(err: unknown) => err instanceof BaselineError &&
-				err.message.includes('"org" has no "findings" array'),
-		);
-	});
+			assert.throws(
+				() => loadBaseline(path),
+				(err: unknown) => err instanceof BaselineError &&
+					err.message.includes('Baseline "org" findings is not an array'),
+			);
+		},
+	);
 
 	test('throws when fleet baseline has no repos array', () => {
 		const path = tmpFile('fleet-no-repos.json', JSON.stringify({
@@ -299,29 +302,280 @@ describe('loadBaseline', () => {
 		);
 	});
 
-	test('throws when fleet baseline repo entry has no findings', () => {
-		const path = tmpFile('fleet-repo-no-findings.json', JSON.stringify({
+	test(
+		'throws when fleet baseline repo entry has no findings',
+		() => {
+			const path = tmpFile('fleet-repo-no-findings.json', JSON.stringify({
+				schemaVersion: 1,
+				target: { type: 'org-fleet', org: 'acme' },
+				org: { findings: [] },
+				repos: [ { runs: [] } ],
+			}));
+
+			assert.throws(
+				() => loadBaseline(path),
+				(err: unknown) => err instanceof BaselineError &&
+					err.message.includes('"repos[0]" findings is not an array'),
+			);
+		},
+	);
+
+	test(
+		'throws when a repo baseline target has no owner/name strings',
+		() => {
+			const path = tmpFile('no-identity.json', JSON.stringify({
+				schemaVersion: 1,
+				target: { type: 'repo' },
+				findings: [],
+			}));
+
+			assert.throws(
+				() => loadBaseline(path),
+				(err: unknown) => err instanceof BaselineError &&
+					err.message.includes('no "owner"/"name" strings'),
+			);
+		},
+	);
+
+	test(
+		'throws when an org baseline target has no org string',
+		() => {
+			const path = tmpFile('org-no-login.json', JSON.stringify({
+				schemaVersion: 1,
+				target: { type: 'org' },
+				findings: [],
+			}));
+
+			assert.throws(
+				() => loadBaseline(path),
+				(err: unknown) => err instanceof BaselineError &&
+					err.message.includes('no "org" string'),
+			);
+		},
+	);
+});
+
+describe('baseline finding validation', () => {
+	test('throws on findings entries that are not objects', () => {
+		for (const entry of [
+			null,
+			'garbage',
+			42,
+		]) {
+			const path = tmpFile('bad-entry.json', JSON.stringify({
+				schemaVersion: 1,
+				target: {
+					type: 'repo', owner: 'a', name: 'b',
+				},
+				findings: [ entry ],
+			}));
+
+			assert.throws(
+				() => loadBaseline(path),
+				(err: unknown) => err instanceof BaselineError &&
+					err.message.includes('findings[0] is not a finding object'),
+			);
+		}
+	});
+
+	test('throws when an entry has no ruleId string', () => {
+		const path = tmpFile('no-rule-id.json', JSON.stringify({
 			schemaVersion: 1,
-			target: { type: 'org-fleet', org: 'acme' },
-			org: { findings: [] },
-			repos: [ { runs: [] } ],
+			target: {
+				type: 'repo', owner: 'a', name: 'b',
+			},
+			findings: [ { severity: 'high', title: 'x' } ],
 		}));
 
 		assert.throws(
 			() => loadBaseline(path),
 			(err: unknown) => err instanceof BaselineError &&
-				err.message.includes('repo entry has no "findings" array'),
+				err.message.includes('no "ruleId" string'),
+		);
+	});
+
+	test('throws when an entry has an invalid severity', () => {
+		const path = tmpFile('bad-severity.json', JSON.stringify({
+			schemaVersion: 1,
+			target: {
+				type: 'repo', owner: 'a', name: 'b',
+			},
+			findings: [
+				{
+					ruleId: 'r/x', severity: 'urgent', title: 'x',
+				},
+			],
+		}));
+
+		assert.throws(
+			() => loadBaseline(path),
+			(err: unknown) => err instanceof BaselineError &&
+				err.message.includes('no valid "severity"'),
+		);
+	});
+
+	test('throws when an entry has no title string', () => {
+		const path = tmpFile('no-title.json', JSON.stringify({
+			schemaVersion: 1,
+			target: {
+				type: 'repo', owner: 'a', name: 'b',
+			},
+			findings: [ { ruleId: 'r/x', severity: 'high' } ],
+		}));
+
+		assert.throws(
+			() => loadBaseline(path),
+			(err: unknown) => err instanceof BaselineError &&
+				err.message.includes('no "title" string'),
+		);
+	});
+
+	test('throws when an entry has a malformed repo ref', () => {
+		for (const repo of [
+			{ owner: 'a' },
+			null,
+			'owner/name',
+		]) {
+			const path = tmpFile('bad-repo.json', JSON.stringify({
+				schemaVersion: 1,
+				target: {
+					type: 'repo', owner: 'a', name: 'b',
+				},
+				findings: [
+					{
+						ruleId: 'r/x', severity: 'high', title: 'x', repo,
+					},
+				],
+			}));
+
+			assert.throws(
+				() => loadBaseline(path),
+				(err: unknown) => err instanceof BaselineError &&
+					err.message.includes('invalid "repo"'),
+			);
+		}
+	});
+
+	test('throws when an entry has a non-string org', () => {
+		const path = tmpFile('bad-org.json', JSON.stringify({
+			schemaVersion: 1,
+			target: {
+				type: 'repo', owner: 'a', name: 'b',
+			},
+			findings: [
+				{
+					ruleId: 'r/x', severity: 'high', title: 'x', org: 42,
+				},
+			],
+		}));
+
+		assert.throws(
+			() => loadBaseline(path),
+			(err: unknown) => err instanceof BaselineError &&
+				err.message.includes('invalid "org" string'),
+		);
+	});
+
+	test('throws on a malformed finding inside a fleet repo entry', () => {
+		const path = tmpFile('fleet-bad-entry.json', JSON.stringify({
+			schemaVersion: 1,
+			target: { type: 'org-fleet', org: 'acme' },
+			org: { findings: [] },
+			repos: [ { findings: [ null ] } ],
+		}));
+
+		assert.throws(
+			() => loadBaseline(path),
+			(err: unknown) => err instanceof BaselineError &&
+				err.message.includes('"repos[0]" findings[0]'),
+		);
+	});
+
+	test('accepts a well-formed finding with optional fields', () => {
+		const path = tmpFile('good-entry.json', JSON.stringify({
+			schemaVersion: 1,
+			target: {
+				type: 'repo', owner: 'a', name: 'b',
+			},
+			findings: [
+				{
+					ruleId: 'r/x',
+					severity: 'high',
+					title: 'x',
+					repo: { owner: 'a', name: 'b' },
+					detail: 'd',
+					remediation: 'fix it',
+					references: [ { name: 'n', url: 'https://example.com' } ],
+				},
+			],
+		}));
+
+		const baseline = loadBaseline(path);
+
+		assert.equal(baseline.findings.length, 1);
+		assert.equal(baseline.findings[0].title, 'x');
+	});
+});
+
+describe('baseline threshold', () => {
+	test('returns the recorded threshold', () => {
+		const data = makeRepoBaseline([]);
+		const path = tmpFile('baseline.json', JSON.stringify(data));
+		const baseline = loadBaseline(path);
+
+		assert.equal(baseline.threshold, 'high');
+	});
+
+	test('returns undefined when the threshold is absent', () => {
+		const path = tmpFile('no-threshold.json', JSON.stringify({
+			schemaVersion: 1,
+			target: {
+				type: 'repo', owner: 'a', name: 'b',
+			},
+			findings: [],
+		}));
+		const baseline = loadBaseline(path);
+
+		assert.equal(baseline.threshold, undefined);
+	});
+
+	test('throws when the recorded threshold is not a severity', () => {
+		const path = tmpFile('bad-threshold.json', JSON.stringify({
+			schemaVersion: 1,
+			target: {
+				type: 'repo', owner: 'a', name: 'b',
+			},
+			threshold: 'urgent',
+			findings: [],
+		}));
+
+		assert.throws(
+			() => loadBaseline(path),
+			(err: unknown) => err instanceof BaselineError &&
+				err.message.includes('invalid "threshold"'),
 		);
 	});
 });
 
 describe('assertBaselineCompatible', () => {
-	test('matching types do not throw', () => {
+	test('a baseline matching the scanned target does not throw', () => {
 		const data = makeRepoBaseline([]);
 		const path = tmpFile('baseline.json', JSON.stringify(data));
 		const baseline = loadBaseline(path);
 
-		assert.doesNotThrow(() => assertBaselineCompatible(baseline, 'repo'));
+		assert.doesNotThrow(() => assertBaselineCompatible(baseline, {
+			type: 'repo', owner: 'sheplu', name: 'editorconfig',
+		}));
+	});
+
+	test('target identity comparison is case-insensitive', () => {
+		const data = makeRepoBaseline([]);
+		const path = tmpFile('baseline.json', JSON.stringify(data));
+		const baseline = loadBaseline(path);
+
+		assert.doesNotThrow(() => assertBaselineCompatible(baseline, {
+			type: 'repo', owner: 'Sheplu', name: 'EditorConfig',
+		}));
 	});
 
 	test('mismatched types throw with both types in message', () => {
@@ -330,10 +584,40 @@ describe('assertBaselineCompatible', () => {
 		const baseline = loadBaseline(path);
 
 		assert.throws(
-			() => assertBaselineCompatible(baseline, 'org-fleet'),
+			() => assertBaselineCompatible(baseline, {
+				type: 'org-fleet', org: 'acme',
+			}),
 			(err: unknown) => err instanceof BaselineError &&
 				err.message.includes('"repo"') &&
 				err.message.includes('"org-fleet"'),
+		);
+	});
+
+	test('a baseline for a different repository throws with both names', () => {
+		const data = makeRepoBaseline([]);
+		const path = tmpFile('baseline.json', JSON.stringify(data));
+		const baseline = loadBaseline(path);
+
+		assert.throws(
+			() => assertBaselineCompatible(baseline, {
+				type: 'repo', owner: 'someone-else', name: 'other-repo',
+			}),
+			(err: unknown) => err instanceof BaselineError &&
+				err.message.includes('sheplu/editorconfig') &&
+				err.message.includes('someone-else/other-repo'),
+		);
+	});
+
+	test('a baseline for a different organization throws', () => {
+		const data = makeOrgBaseline([]);
+		const path = tmpFile('baseline.json', JSON.stringify(data));
+		const baseline = loadBaseline(path);
+
+		assert.throws(
+			() => assertBaselineCompatible(baseline, { type: 'org', org: 'other-org' }),
+			(err: unknown) => err instanceof BaselineError &&
+				err.message.includes('silverwalls-labs') &&
+				err.message.includes('other-org'),
 		);
 	});
 });

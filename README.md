@@ -73,6 +73,30 @@ repo rule set against every repository in the organization:
 - Output is an aggregate report (`target.type: "org-fleet"` in JSON);
   use `--out report.json` on large organizations.
 
+### Gating CI on new findings (`--baseline`)
+
+```bash
+# Produce a baseline from a full scan
+octolens scan --repo owner/name --format json --out baseline.json
+
+# Gate: exit 1 only on findings not present in the baseline
+octolens scan --repo owner/name --format json --baseline baseline.json
+```
+
+- A finding is "new" when no baseline finding shares its `ruleId`,
+  subject, and title. Severity changes to a known finding are **not**
+  treated as new.
+- The baseline must be a JSON report of the same target (repo, org, or
+  org-fleet). A `--severity` mismatch between the two runs is warned
+  about, because the diff counts become misleading.
+- `--baseline` exits 1 when any rule errored, even without
+  `--fail-on-skip`: a scan that could not run cannot prove the absence
+  of new findings. Skipped rules remain opt-in via `--fail-on-skip`.
+- In baseline mode the output contains only the new findings. Do not
+  point `--out` at the baseline file itself — octolens refuses that,
+  because it would destroy the known findings and re-report them as new
+  on the next run.
+
 ## 🔧 Environment Variables
 
 OctoLens requires a GitHub token and the target organization to run.

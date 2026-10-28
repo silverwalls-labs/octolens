@@ -25,7 +25,16 @@ export type DiffOutcome = {
  *
  * Combines `ruleId`, the subject label (`owner/name` or org login), and
  * `title`. Does **not** include an occurrence index — that would make
- * matching fragile when sibling findings are added or removed.
+ * matching fragile when sibling findings are added or removed — and does
+ * not include `severity` or `detail`: a severity change is not a new
+ * finding, and `detail` (which often carries a location) is deliberately
+ * excluded from identity.
+ *
+ * **Contract for rule authors:** within one rule and subject, titles must
+ * uniquely identify findings — embed the distinguishing item (environment
+ * name, property name, file path, count) in the title. Two findings that
+ * differ only in `detail` are indistinguishable to the diff, so a finding
+ * that "moves" between two such locations would be reported as unchanged.
  *
  * @param finding - The finding to fingerprint.
  * @returns       A string of the form `ruleId:subject:title`.

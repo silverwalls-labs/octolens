@@ -15,4 +15,6 @@ export type { LogLevel } from './logger.ts';
 export type { ScanRepoOptions, ScanOrgOptions } from './run-scan.ts';
 export type { ScanOrgAllReposOptions } from './scan-org-repos.ts';
 export type { DiffSummary, DiffOutcome } from './diff.ts';
-export type { Baseline, BaselineTargetType } from './baseline.ts';
+export type {
+	Baseline, BaselineTarget, BaselineTargetType,
+} from './baseline.ts';

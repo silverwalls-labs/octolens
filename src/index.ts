@@ -54,7 +54,7 @@ export {
 
 export type {
 	LogLevel, ScanRepoOptions, ScanOrgOptions, ScanOrgAllReposOptions,
-	DiffSummary, DiffOutcome, Baseline, BaselineTargetType,
+	DiffSummary, DiffOutcome, Baseline, BaselineTarget, BaselineTargetType,
 } from './engine/index.ts';
 export type { ExitCodeOptions } from './engine/exit-code.ts';
 

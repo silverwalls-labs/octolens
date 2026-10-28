@@ -1121,6 +1121,11 @@ describe('cli main', () => {
 			captureOutput();
 			mockFleetWithOneRepo();
 
+			/*
+			 * Org-rule endpoints cannot be mocked without erroring the
+			 * rules, and errored rules fail the baseline gate by design.
+			 * The full-rule-set round-trip is covered by the repo test.
+			 */
 			// First run: capture the fleet JSON report.
 			const code1 = await main([
 				'scan',
@@ -1131,6 +1136,8 @@ describe('cli main', () => {
 				't',
 				'--format',
 				'json',
+				'--skip-rules',
+				'org/*',
 			]);
 
 			assert.equal(code1, 1);
@@ -1156,12 +1163,224 @@ describe('cli main', () => {
 				't',
 				'--format',
 				'json',
+				'--skip-rules',
+				'org/*',
 				'--baseline',
 				baselinePath,
 			]);
 
 			assert.equal(code2, 0);
 			assert.match(stderrText(), /baseline:.*0 new/);
+		},
+	);
+
+	test(
+		'--baseline exits 1 when a rule errored, even without --fail-on-skip',
+		async () => {
+			captureOutput();
+			mockRepoScan();
+
+			// First run: healthy scan captured as the baseline.
+			const code1 = await main([
+				'scan',
+				'--repo',
+				'sheplu/Octolens',
+				'--token',
+				't',
+				'--format',
+				'json',
+			]);
+
+			assert.equal(code1, 1);
+
+			const dir = mkdtempSync(join(tmpdir(), 'octolens-bl-'));
+
+			tempDirs.push(dir);
+			const baselinePath = join(dir, 'baseline.json');
+
+			writeFileSync(baselinePath, stdoutText());
+
+			/*
+			 * Second run: access/codeowners-valid errors on the malformed
+			 * payload (errors: undefined) while every finding is
+			 * unchanged — the gate must still fail, because an errored
+			 * rule cannot prove "no new findings". The interceptor is
+			 * registered before mockRepoScan's 404 so it wins the match;
+			 * a 500 would not work — the octokit retry plugin would
+			 * retry it and land on the 404.
+			 */
+			nock.cleanAll();
+			captureOutput();
+			nock(BASE)
+				.get('/repos/sheplu/Octolens/codeowners/errors')
+				.reply(200, []);
+			mockRepoScan();
+
+			const code2 = await main([
+				'scan',
+				'--repo',
+				'sheplu/Octolens',
+				'--token',
+				't',
+				'--format',
+				'json',
+				'--baseline',
+				baselinePath,
+			]);
+
+			assert.equal(code2, 1);
+			assert.match(stderrText(), /baseline:.*0 new/);
+			assert.match(stderrText(), /errored/);
+		},
+	);
+
+	test(
+		'--baseline on a fleet scan exits 1 when a rule errored',
+		async () => {
+			captureOutput();
+			mockFleetWithOneRepo();
+
+			// First run: healthy scan captured as the baseline.
+			const code1 = await main([
+				'scan',
+				'--org',
+				'silverwalls-labs',
+				'--all-repos',
+				'--token',
+				't',
+				'--format',
+				'json',
+				'--skip-rules',
+				'org/*',
+			]);
+
+			assert.equal(code1, 1);
+
+			const dir = mkdtempSync(join(tmpdir(), 'octolens-bl-'));
+
+			tempDirs.push(dir);
+			const baselinePath = join(dir, 'baseline.json');
+
+			writeFileSync(baselinePath, stdoutText());
+
+			nock.cleanAll();
+			captureOutput();
+
+			/*
+			 * Registered first so it wins; the malformed payload makes
+			 * access/codeowners-valid error (see the repo-mode test above).
+			 */
+			nock(BASE)
+				.get('/repos/silverwalls-labs/test-repo/codeowners/errors')
+				.reply(200, []);
+			mockFleetWithOneRepo();
+
+			const code2 = await main([
+				'scan',
+				'--org',
+				'silverwalls-labs',
+				'--all-repos',
+				'--token',
+				't',
+				'--format',
+				'json',
+				'--skip-rules',
+				'org/*',
+				'--baseline',
+				baselinePath,
+			]);
+
+			assert.equal(code2, 1);
+			assert.match(stderrText(), /baseline:.*0 new/);
+			assert.match(stderrText(), /errored/);
+		},
+	);
+
+	test(
+		'--baseline for a different repository exits 2',
+		async () => {
+			captureOutput();
+
+			const baselinePath = writeBaseline(repoBaselineData({
+				target: {
+					type: 'repo', owner: 'someone-else', name: 'other-repo',
+				},
+			}));
+
+			const code = await main([
+				'scan',
+				'--repo',
+				'sheplu/Octolens',
+				'--token',
+				't',
+				'--format',
+				'json',
+				'--baseline',
+				baselinePath,
+			]);
+
+			assert.equal(code, 2);
+			assert.match(
+				stderrText(),
+				/was produced for repo "someone-else\/other-repo"/,
+			);
+			assert.equal(stdoutText(), '', 'no scan output when the baseline is rejected');
+		},
+	);
+
+	test(
+		'--baseline warns when the baseline threshold differs from the scan',
+		async () => {
+			captureOutput();
+			mockRepoScan();
+
+			const baselinePath = writeBaseline(repoBaselineData({
+				threshold: 'low',
+			}));
+
+			const code = await main([
+				'scan',
+				'--repo',
+				'sheplu/Octolens',
+				'--token',
+				't',
+				'--format',
+				'json',
+				'--baseline',
+				baselinePath,
+			]);
+
+			assert.equal(code, 1);
+			assert.match(stderrText(), /produced with --severity low/);
+		},
+	);
+
+	test(
+		'--baseline exits 2 when --out would overwrite the baseline',
+		async () => {
+			captureOutput();
+
+			const baselinePath = writeBaseline(repoBaselineData());
+
+			const code = await main([
+				'scan',
+				'--repo',
+				'sheplu/Octolens',
+				'--token',
+				't',
+				'--format',
+				'json',
+				'--baseline',
+				baselinePath,
+				'--out',
+				baselinePath,
+			]);
+
+			assert.equal(code, 2);
+			assert.match(
+				stderrText(),
+				/--out and --baseline must not point to the same file/,
+			);
 		},
 	);
 
@@ -1270,6 +1489,44 @@ function makeConfigDir(config: unknown): string {
 	return dir;
 }
 
+/** Write a baseline JSON object into a fresh temp dir, returning its path. */
+function writeBaseline(data: unknown): string {
+	const dir = mkdtempSync(join(tmpdir(), 'octolens-bl-'));
+
+	tempDirs.push(dir);
+	const path = join(dir, 'baseline.json');
+
+	writeFileSync(path, JSON.stringify(data));
+
+	return path;
+}
+
+/** Build a valid empty repo baseline for sheplu/Octolens. */
+function repoBaselineData(options: {
+	target?: Record<string, unknown>;
+	threshold?: string;
+} = {}): Record<string, unknown> {
+	return {
+		schemaVersion: 1,
+		target: options.target ??
+			{
+				type: 'repo', owner: 'sheplu', name: 'Octolens',
+			},
+		threshold: options.threshold ?? 'high',
+		runs: [],
+		findings: [],
+		summary: {
+			rulesRun: 0,
+			rulesErrored: 0,
+			rulesSkipped: 0,
+			findingsTotal: 0,
+			findingsBySeverity: {
+				critical: 0, high: 0, medium: 0, low: 0, info: 0,
+			},
+		},
+	};
+}
+
 /** Run a callback with the process chdir'ed into `dir`, restoring after. */
 async function inDir<T>(dir: string, fn: () => Promise<T>): Promise<T> {
 	const previous = process.cwd();
@@ -1289,6 +1546,14 @@ function mockRepoScan(): void {
 	nock(BASE)
 		.get('/repos/sheplu/Octolens/branches/main/protection')
 		.reply(404, { message: 'Branch not protected' });
+
+	/*
+	 * 404 (no CODEOWNERS) skips cleanly; the catch-all's 200 [] would
+	 * make access/codeowners-valid error out instead.
+	 */
+	nock(BASE)
+		.get('/repos/sheplu/Octolens/codeowners/errors')
+		.reply(404, { message: 'Not Found' });
 	nock(BASE).persist()
 		.get(/\/repos\/sheplu\/Octolens\//)
 		.reply(200, []);
@@ -1354,6 +1619,9 @@ function mockFleetWithOneRepo(): void {
 	nock(BASE)
 		.get('/repos/silverwalls-labs/test-repo/branches/main/protection')
 		.reply(404, { message: 'Branch not protected' });
+	nock(BASE)
+		.get('/repos/silverwalls-labs/test-repo/codeowners/errors')
+		.reply(404, { message: 'Not Found' });
 	nock(BASE).persist()
 		.get(/\/repos\/silverwalls-labs\/test-repo\//)
 		.reply(200, []);

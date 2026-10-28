@@ -406,7 +406,9 @@ describe('scan pipeline', () => {
 
 			const baseline = loadBaseline(baselinePath);
 
-			assertBaselineCompatible(baseline, 'repo');
+			assertBaselineCompatible(baseline, {
+				type: 'repo', owner: 'sheplu', name: 'Octolens',
+			});
 
 			const { added, summary } = diffFindings(
 				baseline.findings,
