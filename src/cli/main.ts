@@ -1,5 +1,5 @@
 import {
-	existsSync, realpathSync, writeFileSync,
+	existsSync, statSync, writeFileSync,
 } from 'node:fs';
 import { resolve } from 'node:path';
 import { resolveAuth, AuthError } from '../github/auth.ts';
@@ -158,7 +158,7 @@ async function runScanCommand(args: ScanCommandArgs): Promise<number> {
 	let baseline: Baseline | undefined;
 
 	if (args.baseline !== undefined) {
-		if (args.out !== undefined && resolvePath(args.out) === resolvePath(args.baseline)) {
+		if (args.out !== undefined && isSameFile(args.baseline, args.out)) {
 			process.stderr.write('--out and --baseline must not point to the same file: ' +
 				'in baseline mode --out receives only the new findings and ' +
 				'writing it to the baseline would destroy the known findings.\n');
@@ -453,15 +453,23 @@ function isFleetReport(result: ScanResult | OrgScanReport): result is OrgScanRep
 }
 
 /**
- * Resolve a file path to its canonical form, following symlinks when the
- * file exists. Falls back to `resolve()` when the file does not yet exist
- * (e.g. `--out` for a new file).
+ * Check whether two paths refer to the same file.
  *
- * @param filePath - The path to resolve.
- * @returns        The canonical absolute path.
+ * When both files exist, compares device + inode so hard links and
+ * symlinks are caught. When one does not exist yet (e.g. `--out` for a
+ * new file), falls back to comparing canonical path strings.
+ *
+ * @param a - First path.
+ * @param b - Second path.
+ * @returns True when both paths identify the same file.
  */
-function resolvePath(filePath: string): string {
-	return existsSync(filePath) ?
-		realpathSync(filePath) :
-		resolve(filePath);
+function isSameFile(a: string, b: string): boolean {
+	if (existsSync(a) && existsSync(b)) {
+		const sa = statSync(a);
+		const sb = statSync(b);
+
+		return sa.dev === sb.dev && sa.ino === sb.ino;
+	}
+
+	return resolve(a) === resolve(b);
 }
