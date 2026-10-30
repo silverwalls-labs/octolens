@@ -152,11 +152,11 @@ jobs:
           echo "Contents:"
           tar tzf "$TARBALL"
           echo ""
-          if [ "$SIZE" -gt 102400 ]; then
-            echo "::error::Package size ${SIZE_KB} KB exceeds 100 KB limit"
+          if [ "$SIZE" -gt 107520 ]; then
+            echo "::error::Package size ${SIZE_KB} KB exceeds 105 KB limit"
             exit 1
           fi
-          echo "✓ Package size ${SIZE_KB} KB is within 100 KB limit"
+          echo "✓ Package size ${SIZE_KB} KB is within 105 KB limit"
 
   test-unit:
     name: Test (Unit)

@@ -432,6 +432,42 @@ describe('cli scan flows', () => {
 	);
 
 	test(
+		'--baseline filters output to new findings only',
+		async () => {
+			const { stdoutChunks } = captureOutput();
+
+			mockFlaggedRepo();
+
+			const code1 = await main(scanArgs('--format', 'json'));
+
+			assert.equal(code1, 1);
+			const baselineData = stdoutChunks.join('');
+			const dir = mkdtempSync(join(tmpdir(), 'octolens-smoke-bl-'));
+
+			tempDirs.push(dir);
+			const baselinePath = join(dir, 'baseline.json');
+
+			writeFileSync(baselinePath, baselineData);
+
+			nock.cleanAll();
+			restoreOutput();
+			const out2 = captureOutput();
+
+			mockFlaggedRepo();
+
+			await main(scanArgs('--format', 'json', '--baseline', baselinePath));
+
+			const report = JSON.parse(out2.stdoutChunks.join('')) as JsonReport;
+
+			assert.equal(
+				report.findings.length,
+				0,
+				'all findings are baselined — none should appear in output',
+			);
+		},
+	);
+
+	test(
 		'an invalid config file fails the scan with exit 2',
 		async () => {
 			const { stderrChunks } = captureOutput();
