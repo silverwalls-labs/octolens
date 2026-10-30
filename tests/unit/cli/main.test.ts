@@ -1385,6 +1385,37 @@ describe('cli main', () => {
 	);
 
 	test(
+		'--baseline allows --out to a different non-existent path',
+		async () => {
+			captureOutput();
+			mockRepoScan();
+
+			const baselinePath = writeBaseline(repoBaselineData());
+			const dir = mkdtempSync(join(tmpdir(), 'octolens-bl-'));
+
+			tempDirs.push(dir);
+			const outPath = join(dir, 'new-report.json');
+
+			const code = await main([
+				'scan',
+				'--repo',
+				'sheplu/Octolens',
+				'--token',
+				't',
+				'--format',
+				'json',
+				'--baseline',
+				baselinePath,
+				'--out',
+				outPath,
+			]);
+
+			assert.ok(code === 0 || code === 1);
+			assert.doesNotMatch(stderrText(), /must not point to the same file/);
+		},
+	);
+
+	test(
 		'ambiguous config sources exit 2, listing every source',
 		async () => {
 			captureOutput();

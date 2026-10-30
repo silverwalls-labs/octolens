@@ -109,24 +109,7 @@ export function diffFindings(
  * @returns        A new `ScanResult` with filtered findings and updated summary.
  */
 export function filterScanResult(result: ScanResult, findings: Finding[]): ScanResult {
-	const kept = new Set(findings);
-
-	const runs = result.runs.map((run) => ({
-		...run,
-		findings: run.findings.filter((f) => kept.has(f)),
-	}));
-
-	const filtered = result.findings.filter((f) => kept.has(f));
-
-	return {
-		...result,
-		runs,
-		findings: filtered,
-		summary: {
-			...result.summary,
-			...countFindings(filtered),
-		},
-	};
+	return filterSubResult(result, new Set(findings));
 }
 
 /**

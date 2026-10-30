@@ -220,7 +220,7 @@ function parseTargetIdentity(
 function parseThreshold(obj: Record<string, unknown>, path: string): Severity | undefined {
 	const raw = obj['threshold'];
 
-	if (raw === undefined) {
+	if (raw === undefined || raw === null) {
 		return undefined;
 	}
 
@@ -367,7 +367,8 @@ function validateFinding(
 			`(expected { owner, name } strings): ${path}`);
 	}
 
-	if (obj['org'] !== undefined && typeof obj['org'] !== 'string') {
+	if (obj['org'] !== undefined &&
+		(typeof obj['org'] !== 'string' || obj['org'] === '')) {
 		throw new BaselineError(`${at} has an invalid "org" string: ${path}`);
 	}
 

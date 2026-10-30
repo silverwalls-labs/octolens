@@ -1,12 +1,12 @@
-import { writeFileSync } from 'node:fs';
+import {
+	existsSync, realpathSync, writeFileSync,
+} from 'node:fs';
 import { resolve } from 'node:path';
 import { resolveAuth, AuthError } from '../github/auth.ts';
 import { createOctokit } from '../github/client.ts';
 import {
 	createLogger, scanRepo, scanOrg, scanOrgAllRepos, exitCodeFor, exitCodeForReport,
 	filterRulesByGlob, unmatchedPatterns, diffFindings, filterScanResult, filterOrgScanReport,
-} from '../engine/index.ts';
-import {
 	loadBaseline, assertBaselineCompatible, BaselineError,
 } from '../engine/index.ts';
 import type { Baseline, BaselineTarget } from '../engine/index.ts';
@@ -158,7 +158,7 @@ async function runScanCommand(args: ScanCommandArgs): Promise<number> {
 	let baseline: Baseline | undefined;
 
 	if (args.baseline !== undefined) {
-		if (args.out !== undefined && resolve(args.out) === resolve(args.baseline)) {
+		if (args.out !== undefined && resolvePath(args.out) === resolvePath(args.baseline)) {
 			process.stderr.write('--out and --baseline must not point to the same file: ' +
 				'in baseline mode --out receives only the new findings and ' +
 				'writing it to the baseline would destroy the known findings.\n');
@@ -255,11 +255,10 @@ async function runScanCommand(args: ScanCommandArgs): Promise<number> {
 		});
 
 		if (baseline !== undefined) {
-			const allFindings = [ ...report.org.findings ];
-
-			for (const repo of report.repos) {
-				allFindings.push(...repo.findings);
-			}
+			const allFindings = [
+				...report.org.findings,
+				...report.repos.flatMap((r) => r.findings),
+			];
 			const { added, summary: diff } = diffFindings(baseline.findings, allFindings);
 
 			logger.info(`baseline: ${diff.added} new, ` +
@@ -451,4 +450,18 @@ function render(result: ScanResult | OrgScanReport, format: Format): string {
  */
 function isFleetReport(result: ScanResult | OrgScanReport): result is OrgScanReport {
 	return result.target.type === 'org-fleet';
+}
+
+/**
+ * Resolve a file path to its canonical form, following symlinks when the
+ * file exists. Falls back to `resolve()` when the file does not yet exist
+ * (e.g. `--out` for a new file).
+ *
+ * @param filePath - The path to resolve.
+ * @returns        The canonical absolute path.
+ */
+function resolvePath(filePath: string): string {
+	return existsSync(filePath) ?
+		realpathSync(filePath) :
+		resolve(filePath);
 }

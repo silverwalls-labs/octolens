@@ -4,6 +4,7 @@ import type {
 	Finding, OrgScanReport, RuleRun, ScanResult, Severity,
 } from '../types/index.ts';
 import { findOrgRuleById, findRuleById } from '../rules/index.ts';
+import { fingerprint } from '../engine/diff.ts';
 import { readVersion } from '../cli/version.ts';
 import { subjectLabel } from './subject.ts';
 
@@ -279,7 +280,7 @@ function buildResults(entries: Entry[], ruleIds: string[], fleet: boolean): Sari
 	const occurrences = new Map<string, number>();
 
 	return entries.map((entry) => {
-		const key = `${entry.finding.ruleId}:${entry.subject}:${entry.finding.title}`;
+		const key = fingerprint(entry.finding);
 		const occurrence = occurrences.get(key) ?? 0;
 
 		occurrences.set(key, occurrence + 1);
@@ -357,7 +358,7 @@ function toResult(
 	fleet: boolean,
 ): SarifResult {
 	const { finding, subject } = entry;
-	const identity = `${finding.ruleId}:${subject}:${finding.title}:${occurrence}`;
+	const identity = `${fingerprint(finding)}:${occurrence}`;
 	const body = finding.detail ?
 		`${finding.title}\n\n${finding.detail}` :
 		finding.title;

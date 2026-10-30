@@ -476,6 +476,26 @@ describe('baseline finding validation', () => {
 		);
 	});
 
+	test('throws on a finding with an empty "org" string', () => {
+		const path = tmpFile('empty-org.json', JSON.stringify({
+			schemaVersion: 1,
+			target: {
+				type: 'repo', owner: 'a', name: 'b',
+			},
+			findings: [
+				{
+					ruleId: 'r/x', severity: 'high', title: 'x', org: '',
+				},
+			],
+		}));
+
+		assert.throws(
+			() => loadBaseline(path),
+			(err: unknown) => err instanceof BaselineError &&
+				err.message.includes('invalid "org" string'),
+		);
+	});
+
 	test('throws on a malformed finding inside a fleet repo entry', () => {
 		const path = tmpFile('fleet-bad-entry.json', JSON.stringify({
 			schemaVersion: 1,
@@ -532,6 +552,20 @@ describe('baseline threshold', () => {
 			target: {
 				type: 'repo', owner: 'a', name: 'b',
 			},
+			findings: [],
+		}));
+		const baseline = loadBaseline(path);
+
+		assert.equal(baseline.threshold, undefined);
+	});
+
+	test('treats null threshold as absent', () => {
+		const path = tmpFile('null-threshold.json', JSON.stringify({
+			schemaVersion: 1,
+			target: {
+				type: 'repo', owner: 'a', name: 'b',
+			},
+			threshold: null,
 			findings: [],
 		}));
 		const baseline = loadBaseline(path);
