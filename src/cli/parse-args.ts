@@ -29,6 +29,9 @@ export type ScanCommandArgs = {
 	failOnSkip: boolean;
 	onlyRules: string[];
 	skipRules: string[];
+
+	/** Path to a prior JSON report used as a baseline for diff mode. */
+	baseline?: string;
 };
 
 /** Parsed arguments for `--help`. */
@@ -84,6 +87,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
 	let verbose = false;
 	let includeArchived = false;
 	let failOnSkip = false;
+	let baseline: string | undefined;
 	const formats: Format[] = [];
 	const allowPublic: string[] = [];
 	const allowInternal: string[] = [];
@@ -138,6 +142,9 @@ export function parseArgs(argv: string[]): ParsedArgs {
 				break;
 			case '--skip-rules':
 				skipRules.push(parseRulePattern(readValue(argv, ++i, arg), arg));
+				break;
+			case '--baseline':
+				baseline = readValue(argv, ++i, arg);
 				break;
 			case '-h':
 			case '--help':
@@ -203,6 +210,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
 		failOnSkip,
 		onlyRules,
 		skipRules,
+		baseline,
 	};
 }
 

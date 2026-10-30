@@ -648,4 +648,46 @@ describe('parseArgs', () => {
 			);
 		},
 	);
+
+	test('--baseline parses its value', () => {
+		const result = parseArgs([
+			'scan',
+			'--repo',
+			'a/b',
+			'--baseline',
+			'report.json',
+		]);
+
+		assert.equal(result.command, 'scan');
+		if (result.command !== 'scan') {
+			return;
+		}
+		assert.equal(result.baseline, 'report.json');
+	});
+
+	test('--baseline defaults to undefined', () => {
+		const result = parseArgs([
+			'scan',
+			'--repo',
+			'a/b',
+		]);
+
+		assert.equal(result.command, 'scan');
+		if (result.command !== 'scan') {
+			return;
+		}
+		assert.equal(result.baseline, undefined);
+	});
+
+	test('--baseline without a value is rejected', () => {
+		assert.throws(
+			() => parseArgs([
+				'scan',
+				'--repo',
+				'a/b',
+				'--baseline',
+			]),
+			CliUsageError,
+		);
+	});
 });

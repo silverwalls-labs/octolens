@@ -126,6 +126,49 @@ describe('exitCodeFor', () => {
 			);
 		},
 	);
+
+	test('errored rules exit 1 under fail-on-errored, skipped rules do not', () => {
+		const errored = makeResult({
+			summary: { rulesErrored: 2 },
+		});
+		const skipped = makeResult({
+			summary: { rulesSkipped: 2 },
+		});
+
+		assert.equal(exitCodeFor(errored), 0);
+		assert.equal(exitCodeFor(errored, { failOnErrored: true }), 1);
+		assert.equal(exitCodeFor(skipped, { failOnErrored: true }), 0);
+		assert.equal(
+			exitCodeFor(errored, { failOnErrored: true, failOnIncomplete: true }),
+			1,
+		);
+	});
+
+	test(
+		'report: errored rules or failed repositories exit 1 under fail-on-errored',
+		() => {
+			const failure: FailedRepo = {
+				repo: {
+					owner: 'silverwalls-labs',
+					name: 'broken',
+				},
+				error: 'boom',
+			};
+			const withFailure = makeReport({
+				failures: [ failure ],
+			});
+			const errored = makeReport({
+				summary: { rulesErrored: 1 },
+			});
+			const skipped = makeReport({
+				summary: { rulesSkipped: 3 },
+			});
+
+			assert.equal(exitCodeForReport(withFailure, { failOnErrored: true }), 1);
+			assert.equal(exitCodeForReport(errored, { failOnErrored: true }), 1);
+			assert.equal(exitCodeForReport(skipped, { failOnErrored: true }), 0);
+		},
+	);
 });
 
 function makeResult(options: ResultOptions = {}): ScanResult {

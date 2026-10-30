@@ -4,19 +4,30 @@ import type { OrgScanReport, ScanResult } from '../types/index.ts';
 export type ExitCodeOptions = {
 	/** Return `1` if any rule was skipped or errored (incomplete coverage). */
 	failOnIncomplete?: boolean;
+
+	/**
+	 * Return `1` if any rule errored, or (for fleet reports) any repository
+	 * scan failed: the scan could not fully answer what it was asked.
+	 */
+	failOnErrored?: boolean;
 };
 
 /**
  * Determine the process exit code for a scan result.
  *
- * Returns `1` if there are any findings, or if `failOnIncomplete` is set
- * and the scan has skipped or errored rules. Returns `0` otherwise.
+ * Returns `1` if there are any findings, if `failOnErrored` is set and any
+ * rule errored, or if `failOnIncomplete` is set and the scan has skipped or
+ * errored rules. Returns `0` otherwise.
  *
  * @param result  - The scan result to evaluate.
  * @param options - Optional flags.
  */
 export function exitCodeFor(result: ScanResult, options: ExitCodeOptions = {}): 0 | 1 {
 	if (result.findings.length > 0) {
+		return 1;
+	}
+
+	if (options.failOnErrored && result.summary.rulesErrored > 0) {
 		return 1;
 	}
 
@@ -41,9 +52,10 @@ function isIncomplete(result: ScanResult): boolean {
  * Determine the process exit code for an organisation fleet scan report.
  *
  * Returns `1` if there are any findings across the org or its repositories,
+ * if `failOnErrored` is set and any rule errored or repository scan failed,
  * or if `failOnIncomplete` is set and coverage is incomplete: skipped or
- * errored rules anywhere, repositories whose scan failed, or a truncated
- * repository listing. Returns `0` otherwise.
+ * errored rules anywhere, failed repositories, or a truncated repository
+ * listing. Returns `0` otherwise.
  *
  * @param report  - The fleet scan report to evaluate.
  * @param options - Optional flags.
@@ -53,11 +65,27 @@ export function exitCodeForReport(report: OrgScanReport, options: ExitCodeOption
 		return 1;
 	}
 
+	if (options.failOnErrored && isReportErrored(report)) {
+		return 1;
+	}
+
 	if (options.failOnIncomplete && isReportIncomplete(report)) {
 		return 1;
 	}
 
 	return 0;
+}
+
+/**
+ * Check whether any rule errored or a repository scan failed: the scan
+ * could not fully answer what it was asked, so its "no findings" cannot
+ * be trusted.
+ *
+ * @param report - Fleet report to inspect.
+ * @returns      True when a rule errored or a repository scan failed.
+ */
+function isReportErrored(report: OrgScanReport): boolean {
+	return report.summary.rulesErrored > 0 || report.failures.length > 0;
 }
 
 /**

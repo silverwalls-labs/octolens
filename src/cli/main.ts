@@ -1,10 +1,15 @@
-import { writeFileSync } from 'node:fs';
+import {
+	existsSync, statSync, writeFileSync,
+} from 'node:fs';
+import { resolve } from 'node:path';
 import { resolveAuth, AuthError } from '../github/auth.ts';
 import { createOctokit } from '../github/client.ts';
 import {
 	createLogger, scanRepo, scanOrg, scanOrgAllRepos, exitCodeFor, exitCodeForReport,
-	filterRulesByGlob, unmatchedPatterns,
+	filterRulesByGlob, unmatchedPatterns, diffFindings, filterScanResult, filterOrgScanReport,
+	loadBaseline, assertBaselineCompatible, BaselineError,
 } from '../engine/index.ts';
+import type { Baseline, BaselineTarget } from '../engine/index.ts';
 import { allRules, allOrgRules } from '../rules/index.ts';
 import type { OrgRule, Rule } from '../types/index.ts';
 import {
@@ -65,10 +70,10 @@ export async function main(argv: string[]): Promise<number> {
  * @returns    Process exit code for the scan.
  */
 async function runScanCommand(args: ScanCommandArgs): Promise<number> {
-	// Fleet scans can run for a long time; surface progress by default.
+	// Fleet scans and baseline diffs surface progress by default.
 	const logger = createLogger(args.verbose ?
 		'debug' :
-		args.allRepos ?
+		args.allRepos || args.baseline !== undefined ?
 			'info' :
 			'warn');
 
@@ -147,6 +152,52 @@ async function runScanCommand(args: ScanCommandArgs): Promise<number> {
 	}
 
 	/*
+	 * Load and validate the baseline early so a bad file is caught before
+	 * spending API calls on the scan.
+	 */
+	let baseline: Baseline | undefined;
+
+	if (args.baseline !== undefined) {
+		if (args.out !== undefined && isSameFile(args.baseline, args.out)) {
+			process.stderr.write('--out and --baseline must not point to the same file: ' +
+				'in baseline mode --out receives only the new findings and ' +
+				'writing it to the baseline would destroy the known findings.\n');
+
+			return 2;
+		}
+
+		// parseArgs guarantees exactly one of repo/org is set.
+		const repo = args.repo as { owner: string; name: string; };
+		const expected: BaselineTarget = args.org !== undefined && args.allRepos ?
+			{ type: 'org-fleet', org: args.org } :
+			args.org !== undefined ?
+				{ type: 'org', org: args.org } :
+				{
+					type: 'repo', owner: repo.owner, name: repo.name,
+				};
+
+		try {
+			baseline = loadBaseline(args.baseline);
+			assertBaselineCompatible(baseline, expected);
+		} catch (err) {
+			if (!(err instanceof BaselineError)) throw err;
+
+			process.stderr.write(`${err.message}\n`);
+
+			return 2;
+		}
+
+		if (baseline.threshold !== undefined && baseline.threshold !== args.severity) {
+			logger.warn(`baseline was produced with --severity ${baseline.threshold} ` +
+				`but the current scan uses ${args.severity}; ` +
+				'the diff counts may be misleading');
+		}
+
+		logger.debug(`baseline loaded from ${args.baseline}` +
+			` (${baseline.findings.length} findings)`);
+	}
+
+	/*
 	 * A fleet scan fans out over every repository even when no repo rule
 	 * survives the filters, and still evaluates org rules when none survive.
 	 * Both are legal but surprising, so surface them instead of reporting
@@ -203,6 +254,38 @@ async function runScanCommand(args: ScanCommandArgs): Promise<number> {
 			concurrency: args.concurrency,
 		});
 
+		if (baseline !== undefined) {
+			const allFindings = [
+				...report.org.findings,
+				...report.repos.flatMap((r) => r.findings),
+			];
+			const { added, summary: diff } = diffFindings(baseline.findings, allFindings);
+
+			logger.info(`baseline: ${diff.added} new, ` +
+				`${diff.removed} resolved, ` +
+				`${diff.unchanged} unchanged`);
+
+			if (report.summary.rulesErrored > 0 || report.failures.length > 0) {
+				logger.warn('the scan has errored rules or failed repositories; ' +
+					'the diff may be missing findings');
+			}
+
+			const filtered = filterOrgScanReport(report, added);
+
+			emitOutput(filtered, args.formats, args.out);
+
+			/*
+			 * Errored rules and failed repositories fail the gate by
+			 * default: a scan that could not run cannot prove the absence
+			 * of new findings. Skipped rules stay opt-in (--fail-on-skip)
+			 * because skips are recorded, deliberate outcomes.
+			 */
+			return exitCodeForReport(filtered, {
+				failOnErrored: true,
+				failOnIncomplete: args.failOnSkip,
+			});
+		}
+
 		emitOutput(report, args.formats, args.out);
 
 		return exitCodeForReport(report, { failOnIncomplete: args.failOnSkip });
@@ -227,6 +310,33 @@ async function runScanCommand(args: ScanCommandArgs): Promise<number> {
 			config,
 			ruleConfig,
 		});
+
+	if (baseline !== undefined) {
+		const { added, summary: diff } = diffFindings(baseline.findings, result.findings);
+
+		const msg = `baseline: ${diff.added} new, ` +
+			`${diff.removed} resolved, ${diff.unchanged} unchanged`;
+
+		logger.info(msg);
+
+		if (result.summary.rulesErrored > 0) {
+			logger.warn(`${result.summary.rulesErrored} rule run(s) errored; ` +
+				'the diff may be missing findings');
+		}
+
+		const filtered = filterScanResult(result, added);
+
+		emitOutput(filtered, args.formats, args.out);
+
+		/*
+		 * Same semantics as the fleet branch above: errored rules fail the
+		 * gate by default, skipped rules only under --fail-on-skip.
+		 */
+		return exitCodeFor(filtered, {
+			failOnErrored: true,
+			failOnIncomplete: args.failOnSkip,
+		});
+	}
 
 	emitOutput(result, args.formats, args.out);
 
@@ -340,4 +450,26 @@ function render(result: ScanResult | OrgScanReport, format: Format): string {
  */
 function isFleetReport(result: ScanResult | OrgScanReport): result is OrgScanReport {
 	return result.target.type === 'org-fleet';
+}
+
+/**
+ * Check whether two paths refer to the same file.
+ *
+ * When both files exist, compares device + inode so hard links and
+ * symlinks are caught. When one does not exist yet (e.g. `--out` for a
+ * new file), falls back to comparing canonical path strings.
+ *
+ * @param a - First path.
+ * @param b - Second path.
+ * @returns True when both paths identify the same file.
+ */
+function isSameFile(a: string, b: string): boolean {
+	if (existsSync(a) && existsSync(b)) {
+		const sa = statSync(a);
+		const sb = statSync(b);
+
+		return sa.dev === sb.dev && sa.ino === sb.ino;
+	}
+
+	return resolve(a) === resolve(b);
 }

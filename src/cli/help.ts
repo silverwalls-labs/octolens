@@ -21,6 +21,12 @@ Options:
   --format <format>          Output format: pretty | json | md | sarif (repeatable).
                              sarif targets GitHub code-scanning upload. Default: pretty
   --out <file>               Write output to a file instead of stdout
+  --baseline <file>          Gate on new findings only: compare against a prior
+                             --format json scan of the same target (and, ideally,
+                             the same --severity — a mismatch is warned about).
+                             Severity changes to a known finding are not new.
+                             Also exits 1 when any rule errored: a scan that
+                             could not run cannot prove "no new findings"
   --severity <level>         Threshold: critical | high | medium | low | info. Default: high
   --verbose                  Enable debug logging on stderr
   --include-archived         Run rules against archived repositories (skipped by default).
@@ -45,7 +51,8 @@ Configuration:
   for the schema
 
 Exit codes:
-  0  no findings at or above the threshold (and, with --fail-on-skip, full coverage)
-  1  findings at or above the threshold, or incomplete coverage under --fail-on-skip
-  2  usage / configuration / authentication error
+  0  no findings at threshold (or no new findings with --baseline), full coverage if --fail-on-skip
+  1  findings at threshold (or new findings with --baseline), errored rules with --baseline,
+     or incomplete coverage under --fail-on-skip
+  2  usage / configuration / authentication / baseline error
 `;

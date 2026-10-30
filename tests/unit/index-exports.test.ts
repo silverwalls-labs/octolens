@@ -32,6 +32,13 @@ const FUNCTION_EXPORTS = [
 	'formatMarkdown',
 	'formatMarkdownReport',
 	'formatSarif',
+	'fingerprint',
+	'diffFindings',
+	'filterScanResult',
+	'filterOrgScanReport',
+	'loadBaseline',
+	'assertBaselineCompatible',
+	'BaselineError',
 ] as const;
 
 describe('index exports', () => {
