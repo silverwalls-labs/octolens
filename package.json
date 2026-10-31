@@ -24,7 +24,7 @@
 		"node": ">=24.0.0"
 	},
 	"scripts": {
-		"build": "tsc -p tsconfig.json",
+		"build": "tsc -p tsconfig.json --emitDeclarationOnly && tsc -p tsconfig.json --removeComments --declaration false --declarationMap false",
 		"clean": "rm -rf dist",
 		"lint": "eslint .",
 		"lint:fix": "eslint . --fix",
@@ -65,14 +65,11 @@
 	},
 	"homepage": "https://github.com/silverwalls-labs/octolens#readme",
 	"dependencies": {
-		"@octokit/auth-token": "^6.0.0",
 		"@octokit/plugin-retry": "^8.1.1",
 		"@octokit/plugin-throttling": "^11.0.5",
 		"@octokit/rest": "^22.0.1",
 		"json5": "^2.2.3",
-		"jsonc-parser": "^3.3.1",
-		"picocolors": "^1.1.1",
-		"picomatch": "^4.0.7"
+		"jsonc-parser": "^3.3.1"
 	},
 	"devDependencies": {
 		"@eslint/js": "^10.0.1",
@@ -80,7 +77,6 @@
 		"@sheplu/eslint-config": "^0.767.3",
 		"@stylistic/eslint-plugin": "^5.10.0",
 		"@types/node": "^26.6.5",
-		"@types/picomatch": "^4.0.3",
 		"eslint": "^10.13.0",
 		"eslint-plugin-jsdoc": "^64.5.4",
 		"fast-check": "^4.10.2",

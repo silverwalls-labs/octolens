@@ -1,4 +1,4 @@
-import picomatch from 'picomatch';
+import { matchesGlob } from 'node:path';
 
 /**
  * Filter rules by glob patterns applied to their IDs.
@@ -22,15 +22,11 @@ export function filterRulesByGlob<R extends { id: string; }>(
 	let result: R[] = [ ...rules ];
 
 	if (options.only.length > 0) {
-		const match = picomatch([ ...options.only ]);
-
-		result = result.filter((r) => match(r.id));
+		result = result.filter((r) => options.only.some((p) => matchesGlob(r.id, p)));
 	}
 
 	if (options.skip.length > 0) {
-		const match = picomatch([ ...options.skip ]);
-
-		result = result.filter((r) => !match(r.id));
+		result = result.filter((r) => !options.skip.some((p) => matchesGlob(r.id, p)));
 	}
 
 	return result;
@@ -51,5 +47,5 @@ export function unmatchedPatterns(
 	knownIds: readonly string[],
 	patterns: readonly string[],
 ): string[] {
-	return patterns.filter((pattern) => !knownIds.some((id) => picomatch.isMatch(id, pattern)));
+	return patterns.filter((pattern) => !knownIds.some((id) => matchesGlob(id, pattern)));
 }

@@ -1,17 +1,39 @@
-import pc from 'picocolors';
+import { styleText } from 'node:util';
 import { compareSeverity } from '../types/severity.ts';
 import type {
 	Finding, OrgScanReport, RuleRun, ScanResult, Severity,
 } from '../types/index.ts';
 import { subjectLabel } from './subject.ts';
 
-const SEVERITY_COLORS: Record<Severity, (s: string) => string> = {
-	critical: (s) => pc.bold(pc.red(s)),
-	high: (s) => pc.red(s),
-	medium: (s) => pc.yellow(s),
-	low: (s) => pc.cyan(s),
-	info: (s) => pc.gray(s),
+/** Accepted style format values for {@link styleText}. */
+type StyleFormat = Parameters<typeof styleText>[0];
+
+/** A function that conditionally applies ANSI styling to text. */
+type StyleFn = (format: StyleFormat, text: string) => string;
+
+/** Map severity levels to their ANSI style descriptors. */
+const SEVERITY_STYLE: Record<Severity, StyleFormat> = {
+	critical: [ 'bold', 'red' ],
+	high: 'red',
+	medium: 'yellow',
+	low: 'cyan',
+	info: 'gray',
 };
+
+/**
+ * Build a style function that either applies ANSI formatting or passes
+ * text through unchanged.
+ *
+ * @param useColor - Whether ANSI escape sequences should be emitted.
+ * @returns        A function that applies (or skips) styling.
+ */
+function createStyleFn(useColor: boolean): StyleFn {
+	if (!useColor) {
+		return (_format, text) => text;
+	}
+
+	return (format, text) => styleText(format, text, { validateStream: false });
+}
 
 /** Options for {@link formatPretty}. */
 export type PrettyOptions = {
@@ -31,9 +53,7 @@ export type PrettyOptions = {
  */
 export function formatPretty(result: ScanResult, options: PrettyOptions = {}): string {
 	const useColor = options.color ?? process.stdout.isTTY ?? false;
-	const colorize = useColor ?
-		identity :
-		stripColor;
+	const style = createStyleFn(useColor);
 
 	const lines: string[] = [];
 
@@ -41,16 +61,16 @@ export function formatPretty(result: ScanResult, options: PrettyOptions = {}): s
 		`${result.target.owner}/${result.target.name}` :
 		result.target.org;
 
-	lines.push(colorize(pc.bold(`Octolens scan — ${targetLabel}`)));
+	lines.push(style('bold', `Octolens scan — ${targetLabel}`));
 	lines.push('');
 
 	if (result.findings.length === 0) {
-		lines.push(colorize(pc.green('  No findings at or above severity threshold.')));
+		lines.push(style('green', '  No findings at or above severity threshold.'));
 	} else {
 		const sorted = [ ...result.findings ].sort(bySeverityDesc);
 
 		for (const finding of sorted) {
-			lines.push(formatFinding(finding, colorize));
+			lines.push(formatFinding(finding, style));
 			lines.push('');
 		}
 	}
@@ -58,11 +78,11 @@ export function formatPretty(result: ScanResult, options: PrettyOptions = {}): s
 	const counts = result.summary.findingsBySeverity;
 	const summaryParts = (Object.keys(counts) as Severity[])
 		.filter((s) => counts[s] > 0)
-		.map((s) => `${colorize(SEVERITY_COLORS[s](s))}: ${counts[s]}`);
+		.map((s) => `${style(SEVERITY_STYLE[s], s)}: ${counts[s]}`);
 
-	lines.push(colorize(pc.bold('Summary')));
+	lines.push(style('bold', 'Summary'));
 	if (result.runs.length > 0) {
-		lines.push(`  ${formatCoverage(result.runs, colorize)}`);
+		lines.push(`  ${formatCoverage(result.runs, style)}`);
 	}
 	lines.push(`  Findings (>= ${result.threshold}): ${result.summary.findingsTotal}`);
 	if (summaryParts.length > 0) {
@@ -84,33 +104,31 @@ export function formatPretty(result: ScanResult, options: PrettyOptions = {}): s
  */
 export function formatPrettyReport(report: OrgScanReport, options: PrettyOptions = {}): string {
 	const useColor = options.color ?? process.stdout.isTTY ?? false;
-	const colorize = useColor ?
-		identity :
-		stripColor;
+	const style = createStyleFn(useColor);
 
 	const lines: string[] = [];
 	const header = `Octolens scan — ${report.target.org} ` +
 		`(organization + ${report.summary.reposScanned} repositories)`;
 
-	lines.push(colorize(pc.bold(header)));
+	lines.push(style('bold', header));
 	lines.push('');
 
-	lines.push(colorize(pc.bold('Organization posture')));
-	pushFindings(lines, report.org.findings, colorize);
+	lines.push(style('bold', 'Organization posture'));
+	pushFindings(lines, report.org.findings, style);
 	lines.push('');
 
 	const flagged = report.repos.filter((r) => r.findings.length > 0);
 	const cleanCount = report.repos.length - flagged.length;
 
-	lines.push(colorize(pc.bold(`Repositories (${report.summary.reposScanned} scanned)`)));
+	lines.push(style('bold', `Repositories (${report.summary.reposScanned} scanned)`));
 	for (const repo of flagged) {
 		for (const finding of [ ...repo.findings ].sort(bySeverityDesc)) {
-			lines.push(formatFinding(finding, colorize));
+			lines.push(formatFinding(finding, style));
 			lines.push('');
 		}
 	}
 	if (cleanCount > 0) {
-		lines.push(colorize(pc.green(`  ${cleanCount} repositories with no findings.`)));
+		lines.push(style('green', `  ${cleanCount} repositories with no findings.`));
 	}
 	if (report.repos.length === 0) {
 		lines.push('  No repositories scanned.');
@@ -118,36 +136,36 @@ export function formatPrettyReport(report: OrgScanReport, options: PrettyOptions
 	lines.push('');
 
 	if (report.failures.length > 0) {
-		lines.push(colorize(pc.bold(`Failed repositories (${report.failures.length})`)));
+		lines.push(style('bold', `Failed repositories (${report.failures.length})`));
 		for (const failure of report.failures) {
 			const label = `${failure.repo.owner}/${failure.repo.name}`;
 
-			lines.push(colorize(pc.yellow(`  ${label}: ${failure.error}`)));
+			lines.push(style('yellow', `  ${label}: ${failure.error}`));
 		}
 		lines.push('');
 	}
 
 	if (report.skipped.length > 0) {
-		lines.push(colorize(pc.gray(`  Skipped: ${formatSkipCounts(report.skipped)}`)));
+		lines.push(style('gray', `  Skipped: ${formatSkipCounts(report.skipped)}`));
 		lines.push('');
 	}
 
 	const counts = report.summary.findingsBySeverity;
 	const summaryParts = (Object.keys(counts) as Severity[])
 		.filter((s) => counts[s] > 0)
-		.map((s) => `${colorize(SEVERITY_COLORS[s](s))}: ${counts[s]}`);
+		.map((s) => `${style(SEVERITY_STYLE[s], s)}: ${counts[s]}`);
 	const allRuns = [ report.org, ...report.repos ].flatMap((r) => r.runs);
 
-	lines.push(colorize(pc.bold('Summary')));
+	lines.push(style('bold', 'Summary'));
 	lines.push(`  Repositories: ${report.summary.reposScanned} scanned · ` +
 		`${report.summary.reposSkipped} skipped · ${report.summary.reposFailed} failed`);
 	if (!report.summary.listingComplete) {
 		const warning = '  Repository listing incomplete — some repositories may be missing.';
 
-		lines.push(colorize(pc.yellow(warning)));
+		lines.push(style('yellow', warning));
 	}
 	if (allRuns.length > 0) {
-		lines.push(`  ${formatCoverage(allRuns, colorize)}`);
+		lines.push(`  ${formatCoverage(allRuns, style)}`);
 	}
 	lines.push(`  Findings (>= ${report.threshold}): ${report.summary.findingsTotal}`);
 	if (summaryParts.length > 0) {
@@ -162,17 +180,17 @@ export function formatPrettyReport(report: OrgScanReport, options: PrettyOptions
  *
  * @param lines    - Output line accumulator (mutated in place).
  * @param findings - Findings to render.
- * @param colorize - Applied to highlight severity and metadata segments.
+ * @param style    - Applies ANSI styling when color is enabled.
  */
-function pushFindings(lines: string[], findings: Finding[], colorize: (s: string) => string): void {
+function pushFindings(lines: string[], findings: Finding[], style: StyleFn): void {
 	if (findings.length === 0) {
-		lines.push(colorize(pc.green('  No findings at or above severity threshold.')));
+		lines.push(style('green', '  No findings at or above severity threshold.'));
 
 		return;
 	}
 
 	for (const finding of [ ...findings ].sort(bySeverityDesc)) {
-		lines.push(formatFinding(finding, colorize));
+		lines.push(formatFinding(finding, style));
 		lines.push('');
 	}
 }
@@ -198,11 +216,11 @@ function formatSkipCounts(skipped: OrgScanReport['skipped']): string {
 /**
  * Format the passed/flagged/skipped/errored counters for the summary line.
  *
- * @param runs     - Rule runs to aggregate.
- * @param colorize - Applied to highlight severity and metadata segments.
- * @returns        The formatted counter line.
+ * @param runs  - Rule runs to aggregate.
+ * @param style - Applies ANSI styling when color is enabled.
+ * @returns     The formatted counter line.
  */
-function formatCoverage(runs: RuleRun[], colorize: (s: string) => string): string {
+function formatCoverage(runs: RuleRun[], style: StyleFn): string {
 	const passed = runs.filter(isPass).length;
 	const flagged = runs.filter(isFlagged).length;
 	const skipped = runs.filter((run) => run.status === 'skipped').length;
@@ -214,7 +232,7 @@ function formatCoverage(runs: RuleRun[], colorize: (s: string) => string): strin
 		`${flagged} flagged`,
 		`${skipped} skipped`,
 		errored > 0 ?
-			colorize(pc.yellow(erroredText)) :
+			style('yellow', erroredText) :
 			erroredText,
 	];
 
@@ -255,14 +273,14 @@ function bySeverityDesc(a: Finding, b: Finding): number {
 /**
  * Render a single finding with severity colouring and metadata lines.
  *
- * @param finding  - Finding to render.
- * @param colorize - Applied to highlight severity and metadata segments.
- * @returns        The rendered finding block.
+ * @param finding - Finding to render.
+ * @param style   - Applies ANSI styling when color is enabled.
+ * @returns       The rendered finding block.
  */
-function formatFinding(finding: Finding, colorize: (s: string) => string): string {
-	const tag = colorize(SEVERITY_COLORS[finding.severity](`[${finding.severity.toUpperCase()}]`));
-	const head = `${tag} ${colorize(pc.bold(finding.title))}`;
-	const meta = colorize(pc.gray(`  ${finding.ruleId} - ${subjectLabel(finding)}`));
+function formatFinding(finding: Finding, style: StyleFn): string {
+	const tag = style(SEVERITY_STYLE[finding.severity], `[${finding.severity.toUpperCase()}]`);
+	const head = `${tag} ${style('bold', finding.title)}`;
+	const meta = style('gray', `  ${finding.ruleId} - ${subjectLabel(finding)}`);
 
 	const out = [ head, meta ];
 
@@ -270,35 +288,13 @@ function formatFinding(finding: Finding, colorize: (s: string) => string): strin
 		out.push(`  ${finding.detail}`);
 	}
 	if (finding.remediation) {
-		out.push(colorize(pc.gray(`  Remediation: ${finding.remediation}`)));
+		out.push(style('gray', `  Remediation: ${finding.remediation}`));
 	}
 	if (finding.references && finding.references.length > 0) {
 		for (const ref of finding.references) {
-			out.push(colorize(pc.gray(`    -> ${ref.name}: ${ref.url}`)));
+			out.push(style('gray', `    -> ${ref.name}: ${ref.url}`));
 		}
 	}
 
 	return out.join('\n');
-}
-
-/**
- * No-op colorizer used when colors are disabled.
- *
- * @param s - Input string.
- * @returns The input, unchanged.
- */
-function identity(s: string): string {
-	return s;
-}
-
-const ANSI_RE = /\[[0-9;]*m/g;
-
-/**
- * Remove ANSI escape sequences from a string.
- *
- * @param s - Input string.
- * @returns The string without escape sequences.
- */
-function stripColor(s: string): string {
-	return s.replace(ANSI_RE, '');
 }
