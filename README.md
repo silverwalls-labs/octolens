@@ -8,7 +8,7 @@ OctoLens is a CLI tool that scans and analyzes GitHub repositories — individua
 - **Configuration compliance** – repository settings, governance rules, industry standards.
 - **Best practices** – branch protection, workflow safety, and repository hygiene.
 
-Whether you’re running a compliance audit, reviewing security health, or ensuring consistent configuration across teams, OctoLens delivers clear, actionable insights.
+Whether you're running a compliance audit, reviewing security health, or ensuring consistent configuration across teams, OctoLens delivers clear, actionable insights.
 
 ## ✨ Features
 
@@ -52,50 +52,8 @@ org **owner** token for full coverage — with a regular member token the
 admin-only checks are reported as skipped, never as silent passes
 (combine with `--fail-on-skip` to treat incomplete coverage as a failure).
 
-### Scanning every repository of an organization (`--all-repos`)
-
-`--org my-org --all-repos` runs the org-posture rules **and** the full
-repo rule set against every repository in the organization:
-
-- The repository listing is streamed, so scanning starts immediately.
-- Archived repositories are skipped by default (`--include-archived` to
-  include them); skipped repos cost zero extra API requests.
-- Repositories are scanned concurrently (`--concurrency <n>`, default 4,
-  max 32).
-- The scan **paces itself against the GitHub API rate limit**: it watches
-  the remaining request budget on every response and, when the budget runs
-  low, pauses until the rate window resets instead of failing. Large
-  organizations complete — they just take longer (progress and pause ETAs
-  are logged on stderr).
-- A repository that fails to scan is recorded in the report and never
-  aborts the rest of the run (`--fail-on-skip` turns any such gap into a
-  non-zero exit).
-- Output is an aggregate report (`target.type: "org-fleet"` in JSON);
-  use `--out report.json` on large organizations.
-
-### Gating CI on new findings (`--baseline`)
-
-```bash
-# Produce a baseline from a full scan
-octolens scan --repo owner/name --format json --out baseline.json
-
-# Gate: exit 1 only on findings not present in the baseline
-octolens scan --repo owner/name --format json --baseline baseline.json
-```
-
-- A finding is "new" when no baseline finding shares its `ruleId`,
-  subject, and title. Severity changes to a known finding are **not**
-  treated as new.
-- The baseline must be a JSON report of the same target (repo, org, or
-  org-fleet). A `--severity` mismatch between the two runs is warned
-  about, because the diff counts become misleading.
-- `--baseline` exits 1 when any rule errored, even without
-  `--fail-on-skip`: a scan that could not run cannot prove the absence
-  of new findings. Skipped rules remain opt-in via `--fail-on-skip`.
-- In baseline mode the output contains only the new findings. Do not
-  point `--out` at the baseline file itself — octolens refuses that,
-  because it would destroy the known findings and re-report them as new
-  on the next run.
+See [doc/usage.md](doc/usage.md) for details on `--all-repos` fleet scanning
+and `--baseline` CI gating.
 
 ## 🔧 Environment Variables
 
@@ -104,50 +62,10 @@ OctoLens requires a GitHub token and the target organization to run.
 - **`ORGANISATION`** – The name of the GitHub organization to scan.
 - **`GITHUB_TOKEN`** – A valid GitHub Personal Access Token (classic or fine-grained) with `repo` and `read:org` permissions.
 
-**Example:**
-
 ```bash
 export ORGANISATION=my-org
 export GITHUB_TOKEN=ghp_yourtokenhere
 ```
-
-## 🔍 Checks Performed
-
-### Repository checks (`--repo`)
-
-- Branch Protection Rules – required reviews, status checks, force push restrictions.
-- Secret Detection – scan for keys, tokens, and sensitive strings.
-- Workflow Security – GitHub Actions pinned versions and allowed actions list.
-- Repo Settings – visibility, forking policy, issues enabled, wiki status.
-- Dependency Health – dependabot enabled, outdated dependencies.
-- License & Docs – presence of license, README, and contributing guidelines.
-
-### Organization checks (`--org`)
-
-Rules in the `org` category audit the organization's own settings:
-
-- `org/two-factor-required` – 2FA must be required for all members.
-- `org/default-repo-permission` – base repository permission must be read or none.
-- `org/members-cannot-create-public-repos` – members must not create public repos.
-- `org/members-cannot-fork-private-repos` – private repos must not be forkable.
-- `org/members-cannot-change-repo-visibility` – repo admins must not flip visibility.
-- `org/members-cannot-delete-repos` – repo admins must not delete or transfer repos.
-- `org/members-cannot-invite-outside-collaborators` – invitations require an owner.
-- `org/members-cannot-create-public-pages` – members must not publish public Pages sites.
-- `org/members-cannot-delete-issues` – repo admins must not hard-delete issues.
-- `org/web-commit-signoff-required` – web-UI commits must carry a DCO sign-off.
-- `org/deploy-keys-disabled` – deploy keys should be disabled organization-wide.
-- `org/dependabot-alerts-for-new-repos` – Dependabot alerts on by default.
-- `org/dependabot-security-updates-for-new-repos` – security updates on by default.
-- `org/secret-scanning-for-new-repos` – secret scanning on by default.
-- `org/secret-scanning-push-protection-for-new-repos` – push protection on by default.
-- `org/actions-allowlist` – marketplace actions must be restricted.
-- `org/actions-allowlist-pinned` – allowlisted actions must pin a full commit SHA.
-- `org/default-workflow-permissions-read` – org-wide GITHUB_TOKEN default must be read-only.
-- `org/forbid-workflow-pr-approval` – workflows must not approve pull requests.
-- `org/fork-pr-approval-all-contributors` – fork PR runs need approval for all externals.
-- `org/limit-private-fork-pr-workflows` – no write tokens/secrets for private fork PR runs.
-- `org/webhooks-use-https` – org webhooks must use HTTPS with SSL verification.
 
 ## 📂 Output Formats
 
@@ -159,89 +77,13 @@ Rules in the `org` category audit the organization's own settings:
 `--format` is repeatable; with `--out <file>` the last format goes to the
 file and the others to stdout.
 
-### Uploading to GitHub code scanning
-
-`--format sarif` emits a [SARIF 2.1.0](https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html)
-report that GitHub code scanning accepts, so findings appear as alerts
-under **Security → Code scanning** (category `octolens/...`):
-
-```yaml
-permissions:
-  contents: read
-  security-events: write
-  # required for private repositories
-  actions: read
-
-steps:
-  - uses: actions/checkout@v4
-  - uses: actions/setup-node@v4
-    with:
-      node-version: 24
-  - name: Octolens scan
-    run: >
-      npx @silverwalls-labs/octolens scan --repo ${{ github.repository }}
-      --format sarif --out octolens.sarif
-    env:
-      GITHUB_TOKEN: ${{ secrets.OCTOLENS_TOKEN }}
-    # octolens exits 1 when it finds issues; the SARIF file is still written
-    continue-on-error: true
-  - name: Upload only complete scans
-    # an incomplete scan (errored rules, failed repositories, or a
-    # truncated fleet listing) would close every alert missing from it
-    run: jq -e '.runs[0].invocations[0].executionSuccessful' octolens.sarif > /dev/null
-  - uses: github/codeql-action/upload-sarif@v4
-    with:
-      sarif_file: octolens.sarif
-```
-
-Notes:
-
-- The workflow's default `GITHUB_TOKEN` lacks the admin-read scopes many
-  rules need — those rules are reported as skipped. Use a PAT (stored as
-  a secret) for full coverage. Skipped rules do not fail the upload
-  guard; only errored rules, failed repositories, or a truncated fleet
-  listing do.
-- Octolens findings describe repository/organization *settings*, not
-  files, so alerts point at a representative file (`.github/CODEOWNERS`,
-  `SECURITY.md`, `LICENSE`, or `README.md` as fallback) — which may not
-  exist in the repository; the alert is still created and tracked.
-- A fleet report (`--org X --all-repos`) flattens every repository's
-  findings into one run, with each alert message prefixed by
-  `owner/name`. Upload it to a dedicated audit repository rather than a
-  regular code repository.
-- GitHub rejects SARIF uploads over 10 MB (gzip-compressed) or 25,000
-  results per run, and displays only the top 5,000 results per run,
-  prioritized by severity. Large fleet reports should raise
-  `--severity` to stay within the limits.
-- Repositories excluded by fleet filters (archived, fork, or on the
-  ignore list) contribute no results, so alerts previously uploaded for
-  them are closed on the next upload.
+See [doc/sarif.md](doc/sarif.md) for setting up GitHub code-scanning integration.
 
 ## 🛠 Configuration
 
-OctoLens reads an optional config from two locations, merged in order
-(the later source wins per key; `rules` entries merge by rule ID):
-
-1. `$XDG_CONFIG_HOME/octolens/config.{json,jsonc,json5}` — defaults to
-   `~/.config/octolens/`
-2. `./octolens.config.{json,jsonc,json5}` in the working directory, or
-   an `"octolens"` key in its `package.json`
-
-Each extension is parsed with its exact grammar: `.json` is strict JSON,
-`.jsonc` adds comments and trailing commas (and nothing more), `.json5`
-follows the [JSON5 spec](https://json5.org). The `package.json` key is
-strict JSON like the rest of the manifest.
-
-Each location accepts **at most one source**: finding several (say, a
-`.json` next to a `.jsonc`, or a config file plus a populated
-`package.json` key) aborts with exit code 2 listing every source found —
-nothing is silently picked. Explicitly typed CLI flags override config
-values; config values override built-in defaults. An invalid source
-(malformed syntax, unknown keys, wrong types, or a `rules` entry whose
-ID matches no built-in rule) also aborts with exit
-code 2 and a message naming the source and the offending key.
-
-**Example:**
+OctoLens reads an optional config from `$XDG_CONFIG_HOME/octolens/config.{json,jsonc,json5}`
+(defaults to `~/.config/octolens/`) and `./octolens.config.{json,jsonc,json5}` in the
+working directory (or an `"octolens"` key in `package.json`).
 
 ```json
 {
@@ -253,61 +95,16 @@ code 2 and a message naming the source and the offending key.
     "repos": ["acme/sandbox"],
     "archived": true,
     "forks": true
-  },
-  "org": {
-    "concurrency": 8
   }
 }
 ```
 
-- `rules` — map a rule ID to `"off"` to disable it, or to a severity
-  (`critical` | `high` | `medium` | `low` | `info`) to remap the rule's
-  findings; remapped severities respect the `--severity` threshold. A rule
-  ID that matches no built-in rule aborts with exit code 2.
-- `ignore.repos` — repositories (`owner/name`) skipped in `--all-repos` scans.
-- `ignore.archived` — skip archived repositories (default `true`;
-  `--include-archived` forces it to `false`).
-- `ignore.forks` — skip forked repositories in `--all-repos` scans.
-- `org.concurrency` — repositories scanned in parallel with `--all-repos`,
-  between 1 and 32 (overridden by `--concurrency`).
+See [doc/configuration.md](doc/configuration.md) for the full reference.
 
-In a Node project the same shape can live under a `package.json` key
-instead of a dedicated file:
+## 📖 Documentation
 
-```json
-{
-  "name": "my-app",
-  "octolens": {
-    "rules": { "repo-config/topics-present": "off" }
-  }
-}
-```
-
-## 🧪 Testing
-
-Tests run on Node's built-in test runner with native TypeScript
-type-stripping — no transpiler in the loop, so coverage maps to true
-source lines. Five categories live under `tests/`:
-
-| Category | Command | What it covers | Coverage thresholds (L/B/F) |
-| --- | --- | --- | --- |
-| Unit | `npm run test:unit` | Every module in isolation (nock-mocked HTTP) | 100 / 98 / 100 |
-| Integration | `npm run test:integration` | Full scan pipelines against mocked APIs | 90 / 85 / 90 |
-| Smoke | `npm run test:smoke` | The CLI end to end, in process | 75 / 70 / 75 |
-| Fuzz | `npm run test:fuzz` | Property-based invariants (fast-check) | reported only |
-| E2E | `npm run test:e2e` | Real GitHub API + the built `bin/` | reported only |
-
-Append `:cov` to a category script (e.g. `npm run test:unit:cov`) to
-write `coverage/<category>.lcov` (and enforce thresholds where they
-exist). `npm run coverage:report` then merges unit+integration+smoke+
-fuzz into a global report and fails below 98% aggregate line coverage;
-e2e coverage is shown as its own row but stays out of the merge. CI
-runs each category as its own job and posts the table as a sticky PR
-comment.
-
-- **E2E**: set `OCTOLENS_E2E_TOKEN` (falls back to `GITHUB_TOKEN` /
-  `OCTOLENS_TOKEN`) to a fine-grained read-only PAT; the suite skips
-  cleanly without it. The bin tests also need `npm run build` first.
-  In CI the token comes from the `OCTOLENS_E2E_TOKEN` repository secret.
-- **Fuzz**: runs are deterministic by default. Set `FUZZ_SEED` to
-  explore new inputs and `FUZZ_ITERS` (default 250) to change depth.
+- [Usage Guide](doc/usage.md) – Fleet scanning, baseline CI gating.
+- [Rules Reference](doc/rules.md) – All repository and organization checks.
+- [SARIF Integration](doc/sarif.md) – GitHub code-scanning workflow setup.
+- [Configuration](doc/configuration.md) – Config file format and options.
+- [Contributing](doc/contributing.md) – Testing guide.
