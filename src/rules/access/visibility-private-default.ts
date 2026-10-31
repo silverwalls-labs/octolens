@@ -1,8 +1,8 @@
 import { getRepoMetadata } from '../../github/queries.ts';
 import type { RepoVisibility } from '../../github/queries.ts';
-import type {
-	Finding, RepoRef, Rule, RuleContext,
-} from '../../types/index.ts';
+import type { RepoRef, RuleContext } from '../../types/index.ts';
+import type { FindingBody } from '../define.ts';
+import { defineRule } from '../define.ts';
 
 const RULE_ID = 'access/visibility-private-default';
 
@@ -10,29 +10,28 @@ const RULE_ID = 'access/visibility-private-default';
  * Flags public or internal repositories unless the configuration
  * explicitly approves their visibility.
  */
-export const rule: Rule = {
+export const rule = defineRule({
 	id: RULE_ID,
 	category: 'access',
 	defaultSeverity: 'medium',
 	summary: 'Repositories should be private unless explicitly approved',
-	docs: RULE_ID,
 
 	async check(ctx) {
 		const meta = await getRepoMetadata(ctx.octokit, ctx.cache, ctx.repo);
 
 		if (meta.visibility === 'private') {
-			return [];
+			return null;
 		}
 
 		const config = readConfig(ctx);
 
 		if (isAllowed(ctx.repo, meta.visibility, config)) {
-			return [];
+			return null;
 		}
 
-		return [ buildFinding(ctx.repo, meta.visibility) ];
+		return buildFinding(ctx.repo, meta.visibility);
 	},
-};
+});
 
 /**
  * Parsed configuration for the visibility rule.
@@ -79,14 +78,11 @@ function isAllowed(repo: RepoRef, visibility: RepoVisibility, config: Visibility
  *
  * @param repo       - Target repository.
  * @param visibility - Repository visibility level.
- * @returns          The constructed finding.
+ * @returns          The constructed finding body.
  */
-function buildFinding(repo: RepoRef, visibility: RepoVisibility): Finding {
+function buildFinding(repo: RepoRef, visibility: RepoVisibility): FindingBody {
 	if (visibility === 'public') {
 		return {
-			ruleId: RULE_ID,
-			severity: 'medium',
-			repo,
 			title: 'Repository is public and not on the allow-public list',
 			detail: 'This repository is publicly visible. Public repos expose source, ' +
 				'history, issues, and metadata to the entire internet, and any leaked ' +
@@ -99,9 +95,6 @@ function buildFinding(repo: RepoRef, visibility: RepoVisibility): Finding {
 	}
 
 	return {
-		ruleId: RULE_ID,
-		severity: 'medium',
-		repo,
 		title: 'Repository is internal and not on the allow-internal list',
 		detail: 'This repository is internal (visible to all enterprise members). ' +
 			'Internal visibility is a deliberate trust boundary; repos should be on the ' +

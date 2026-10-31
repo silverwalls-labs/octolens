@@ -1,24 +1,15 @@
 import { getActionsPermissions } from '../../github/queries.ts';
 import { skip } from '../../types/index.ts';
-import type { Finding, Rule } from '../../types/index.ts';
-
-const RULE_ID = 'cicd/actions-enabled';
-
-const DETAIL = 'GitHub Actions is disabled for this repository. ' +
-	'No workflows will run, including any security or release automation.';
-
-const REMEDIATION = 'If Actions is intentionally disabled, ignore this finding. ' +
-	'Otherwise enable it under Settings -> Actions -> General.';
+import { defineRule } from '../define.ts';
 
 /**
  * Flags repositories where GitHub Actions is turned off entirely.
  */
-export const rule: Rule = {
-	id: RULE_ID,
+export const rule = defineRule({
+	id: 'cicd/actions-enabled',
 	category: 'cicd',
 	defaultSeverity: 'info',
 	summary: 'GitHub Actions should be enabled',
-	docs: RULE_ID,
 
 	async check(ctx) {
 		const perms = await getActionsPermissions(ctx.octokit, ctx.cache, ctx.repo);
@@ -28,18 +19,15 @@ export const rule: Rule = {
 		}
 
 		if (perms.enabled) {
-			return [];
+			return null;
 		}
 
-		const finding: Finding = {
-			ruleId: RULE_ID,
-			severity: 'info',
-			repo: ctx.repo,
+		return {
 			title: 'GitHub Actions is disabled',
-			detail: DETAIL,
-			remediation: REMEDIATION,
+			detail: 'GitHub Actions is disabled for this repository. ' +
+				'No workflows will run, including any security or release automation.',
+			remediation: 'If Actions is intentionally disabled, ignore this finding. ' +
+				'Otherwise enable it under Settings -> Actions -> General.',
 		};
-
-		return [ finding ];
 	},
-};
+});

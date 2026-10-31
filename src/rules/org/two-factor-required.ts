@@ -1,27 +1,15 @@
 import { getOrgMetadata } from '../../github/queries.ts';
 import { skip } from '../../types/index.ts';
-import type { Finding, OrgRule } from '../../types/index.ts';
-
-const RULE_ID = 'org/two-factor-required';
-
-const DETAIL = 'The organisation does not require two-factor authentication for ' +
-	'its members. A single phished or reused password is enough to compromise an ' +
-	'account with access to every repository it can reach.';
-
-const REMEDIATION = 'Organization Settings -> Authentication security: enable ' +
-	'"Require two-factor authentication for everyone in your organization". ' +
-	'Members without 2FA are removed from the organisation, so announce it first.';
+import { defineOrgRule } from '../define.ts';
 
 /**
  * Flags organisations that do not enforce two-factor authentication
  * for membership. Skips when the token cannot see the setting.
  */
-export const rule: OrgRule = {
-	id: RULE_ID,
-	category: 'org',
+export const rule = defineOrgRule({
+	id: 'org/two-factor-required',
 	defaultSeverity: 'high',
 	summary: 'Organisation must require two-factor authentication',
-	docs: RULE_ID,
 
 	async check(ctx) {
 		const meta = await getOrgMetadata(ctx.octokit, ctx.cache, ctx.org);
@@ -31,16 +19,17 @@ export const rule: OrgRule = {
 		}
 
 		if (meta.twoFactorRequirementEnabled) {
-			return [];
+			return null;
 		}
 
-		const finding: Finding = {
-			ruleId: RULE_ID,
-			severity: 'high',
-			org: ctx.org,
+		return {
 			title: 'Two-factor authentication is not required',
-			detail: DETAIL,
-			remediation: REMEDIATION,
+			detail: 'The organisation does not require two-factor authentication for ' +
+				'its members. A single phished or reused password is enough to compromise an ' +
+				'account with access to every repository it can reach.',
+			remediation: 'Organization Settings -> Authentication security: enable ' +
+				'"Require two-factor authentication for everyone in your organization". ' +
+				'Members without 2FA are removed from the organisation, so announce it first.',
 			references: [
 				{
 					name: 'Requiring two-factor authentication in your organization',
@@ -48,7 +37,5 @@ export const rule: OrgRule = {
 				},
 			],
 		};
-
-		return [ finding ];
 	},
-};
+});

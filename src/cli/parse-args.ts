@@ -236,11 +236,11 @@ function readValue(argv: string[], index: number, flag: string): string {
 /**
  * Validate a `--only-rules` / `--skip-rules` glob pattern.
  *
- * Rejects negated patterns: picomatch compiles `!pattern` into "matches
- * everything that is not `pattern`", so a negation inside the OR'd pattern
- * list silently inverts the filter (e.g. `--skip-rules '!security/*'`
- * removes every non-security rule). Exclusions are expressed by combining
- * `--only-rules` with `--skip-rules` instead.
+ * Rejects negated patterns (`!pattern`) as an intentional CLI restriction.
+ * A negation inside the OR'd pattern list would silently invert the filter
+ * (e.g. `--skip-rules '!security/*'` would remove every non-security rule).
+ * Exclusions are expressed by combining `--only-rules` with `--skip-rules`
+ * instead.
  *
  * @param    spec - Raw command-line value to parse.
  * @param    flag - Flag name used in error messages.

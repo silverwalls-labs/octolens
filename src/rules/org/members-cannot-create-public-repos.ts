@@ -1,27 +1,15 @@
 import { getOrgMetadata } from '../../github/queries.ts';
 import { skip } from '../../types/index.ts';
-import type { Finding, OrgRule } from '../../types/index.ts';
-
-const RULE_ID = 'org/members-cannot-create-public-repos';
-
-const DETAIL = 'Any organisation member can create a public repository. One ' +
-	'accidental `git push` to a member-created public repo is an immediate, ' +
-	'indexable data leak — no compromised account required.';
-
-const REMEDIATION = 'Organization Settings -> Member privileges -> Repository ' +
-	'creation: uncheck "Public". Repositories that must be public can be made ' +
-	'so deliberately by an owner.';
+import { defineOrgRule } from '../define.ts';
 
 /**
  * Flags organisations where members can create repositories visible
  * to the internet.
  */
-export const rule: OrgRule = {
-	id: RULE_ID,
-	category: 'org',
+export const rule = defineOrgRule({
+	id: 'org/members-cannot-create-public-repos',
 	defaultSeverity: 'high',
 	summary: 'Members must not be able to create public repositories',
-	docs: RULE_ID,
 
 	async check(ctx) {
 		const meta = await getOrgMetadata(ctx.octokit, ctx.cache, ctx.org);
@@ -31,16 +19,17 @@ export const rule: OrgRule = {
 		}
 
 		if (!meta.membersCanCreatePublicRepositories) {
-			return [];
+			return null;
 		}
 
-		const finding: Finding = {
-			ruleId: RULE_ID,
-			severity: 'high',
-			org: ctx.org,
+		return {
 			title: 'Members can create public repositories',
-			detail: DETAIL,
-			remediation: REMEDIATION,
+			detail: 'Any organisation member can create a public repository. One ' +
+				'accidental `git push` to a member-created public repo is an immediate, ' +
+				'indexable data leak — no compromised account required.',
+			remediation: 'Organization Settings -> Member privileges -> Repository ' +
+				'creation: uncheck "Public". Repositories that must be public can be made ' +
+				'so deliberately by an owner.',
 			references: [
 				{
 					name: 'Restricting repository creation in your organization',
@@ -48,7 +37,5 @@ export const rule: OrgRule = {
 				},
 			],
 		};
-
-		return [ finding ];
 	},
-};
+});

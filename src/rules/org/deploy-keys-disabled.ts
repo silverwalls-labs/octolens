@@ -1,27 +1,14 @@
 import { getOrgMetadata } from '../../github/queries.ts';
 import { skip } from '../../types/index.ts';
-import type { Finding, OrgRule } from '../../types/index.ts';
-
-const RULE_ID = 'org/deploy-keys-disabled';
-
-const DETAIL = 'Repositories in the organisation may use deploy keys. Deploy ' +
-	'keys are long-lived SSH credentials tied to no user account: they bypass ' +
-	'2FA and SSO, are rarely rotated, and often outlive the machine or person ' +
-	'they were created for.';
-
-const REMEDIATION = 'Organization Settings -> Member privileges -> Deploy keys: ' +
-	'disable deploy keys for all repositories. Use short-lived credentials ' +
-	'instead (GitHub App installation tokens or OIDC in Actions).';
+import { defineOrgRule } from '../define.ts';
 
 /**
  * Flags organisations that still permit repository deploy keys.
  */
-export const rule: OrgRule = {
-	id: RULE_ID,
-	category: 'org',
+export const rule = defineOrgRule({
+	id: 'org/deploy-keys-disabled',
 	defaultSeverity: 'medium',
 	summary: 'Deploy keys should be disabled organisation-wide',
-	docs: RULE_ID,
 
 	async check(ctx) {
 		const meta = await getOrgMetadata(ctx.octokit, ctx.cache, ctx.org);
@@ -31,16 +18,18 @@ export const rule: OrgRule = {
 		}
 
 		if (!meta.deployKeysEnabledForRepositories) {
-			return [];
+			return null;
 		}
 
-		const finding: Finding = {
-			ruleId: RULE_ID,
-			severity: 'medium',
-			org: ctx.org,
+		return {
 			title: 'Deploy keys are enabled for repositories',
-			detail: DETAIL,
-			remediation: REMEDIATION,
+			detail: 'Repositories in the organisation may use deploy keys. Deploy ' +
+				'keys are long-lived SSH credentials tied to no user account: they bypass ' +
+				'2FA and SSO, are rarely rotated, and often outlive the machine or person ' +
+				'they were created for.',
+			remediation: 'Organization Settings -> Member privileges -> Deploy keys: ' +
+				'disable deploy keys for all repositories. Use short-lived credentials ' +
+				'instead (GitHub App installation tokens or OIDC in Actions).',
 			references: [
 				{
 					name: 'Managing deploy keys',
@@ -48,7 +37,5 @@ export const rule: OrgRule = {
 				},
 			],
 		};
-
-		return [ finding ];
 	},
-};
+});

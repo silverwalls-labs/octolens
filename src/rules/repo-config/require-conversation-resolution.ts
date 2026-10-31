@@ -3,25 +3,16 @@ import {
 	getRepoMetadata,
 } from '../../github/queries.ts';
 import { skip } from '../../types/index.ts';
-import type { Finding, Rule } from '../../types/index.ts';
-
-const RULE_ID = 'repo-config/require-conversation-resolution';
-
-const DETAIL = 'Pull requests can be merged with unresolved review conversations, which can ' +
-	'leave reviewer concerns unanswered.';
-
-const REMEDIATION = 'In the default branch protection rule, enable ' +
-	'"Require conversation resolution before merging".';
+import { defineRule } from '../define.ts';
 
 /**
  * Flags default branches that can merge with unresolved review conversations.
  */
-export const rule: Rule = {
-	id: RULE_ID,
+export const rule = defineRule({
+	id: 'repo-config/require-conversation-resolution',
 	category: 'repo-config',
 	defaultSeverity: 'medium',
 	summary: 'Conversation resolution must be required before merge',
-	docs: RULE_ID,
 
 	async check(ctx) {
 		const meta = await getRepoMetadata(ctx.octokit, ctx.cache, ctx.repo);
@@ -37,18 +28,15 @@ export const rule: Rule = {
 		}
 
 		if (protection.requireConversationResolution) {
-			return [];
+			return null;
 		}
 
-		const finding: Finding = {
-			ruleId: RULE_ID,
-			severity: 'medium',
-			repo: ctx.repo,
+		return {
 			title: 'Conversation resolution is not required before merge',
-			detail: DETAIL,
-			remediation: REMEDIATION,
+			detail: 'Pull requests can be merged with unresolved review conversations, which can ' +
+				'leave reviewer concerns unanswered.',
+			remediation: 'In the default branch protection rule, enable ' +
+				'"Require conversation resolution before merging".',
 		};
-
-		return [ finding ];
 	},
-};
+});

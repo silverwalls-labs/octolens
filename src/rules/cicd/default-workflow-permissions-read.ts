@@ -1,26 +1,15 @@
 import { getDefaultWorkflowPermissions } from '../../github/queries.ts';
 import { skip } from '../../types/index.ts';
-import type { Finding, Rule } from '../../types/index.ts';
-
-const RULE_ID = 'cicd/default-workflow-permissions-read';
-
-const DETAIL = 'The default GITHUB_TOKEN granted to workflows has write permissions. ' +
-	'A compromised action or pull request could push code, publish releases, or ' +
-	'modify repository settings.';
-
-const REMEDIATION = 'Settings -> Actions -> General -> Workflow permissions: ' +
-	'select "Read repository contents and packages permissions". Grant additional ' +
-	'scopes per-workflow with `permissions:` blocks instead.';
+import { defineRule } from '../define.ts';
 
 /**
  * Flags repositories whose default `GITHUB_TOKEN` grants write access to workflows.
  */
-export const rule: Rule = {
-	id: RULE_ID,
+export const rule = defineRule({
+	id: 'cicd/default-workflow-permissions-read',
 	category: 'cicd',
 	defaultSeverity: 'high',
 	summary: 'Default GITHUB_TOKEN permissions must be read-only',
-	docs: RULE_ID,
 
 	async check(ctx) {
 		const perms = await getDefaultWorkflowPermissions(ctx.octokit, ctx.cache, ctx.repo);
@@ -30,16 +19,17 @@ export const rule: Rule = {
 		}
 
 		if (perms.defaultPermissions === 'read') {
-			return [];
+			return null;
 		}
 
-		const finding: Finding = {
-			ruleId: RULE_ID,
-			severity: 'high',
-			repo: ctx.repo,
+		return {
 			title: 'Default workflow GITHUB_TOKEN has write permissions',
-			detail: DETAIL,
-			remediation: REMEDIATION,
+			detail: 'The default GITHUB_TOKEN granted to workflows has write permissions. ' +
+				'A compromised action or pull request could push code, publish releases, or ' +
+				'modify repository settings.',
+			remediation: 'Settings -> Actions -> General -> Workflow permissions: ' +
+				'select "Read repository contents and packages permissions". Grant additional ' +
+				'scopes per-workflow with `permissions:` blocks instead.',
 			references: [
 				{
 					name: 'Permissions for the GITHUB_TOKEN',
@@ -47,7 +37,5 @@ export const rule: Rule = {
 				},
 			],
 		};
-
-		return [ finding ];
 	},
-};
+});

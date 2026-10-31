@@ -3,25 +3,16 @@ import {
 	getRepoMetadata,
 } from '../../github/queries.ts';
 import { skip } from '../../types/index.ts';
-import type { Finding, Rule } from '../../types/index.ts';
-
-const RULE_ID = 'repo-config/require-pull-request';
-
-const DETAIL = 'The default branch does not require pull requests, so commits can be ' +
-	'pushed directly without review.';
-
-const REMEDIATION = 'In the default branch protection rule, enable ' +
-	'"Require a pull request before merging".';
+import { defineRule } from '../define.ts';
 
 /**
  * Flags default branches that accept direct pushes without a pull request.
  */
-export const rule: Rule = {
-	id: RULE_ID,
+export const rule = defineRule({
+	id: 'repo-config/require-pull-request',
 	category: 'repo-config',
 	defaultSeverity: 'high',
 	summary: 'Pull requests must be required before merging to the default branch',
-	docs: RULE_ID,
 
 	async check(ctx) {
 		const meta = await getRepoMetadata(ctx.octokit, ctx.cache, ctx.repo);
@@ -37,18 +28,15 @@ export const rule: Rule = {
 		}
 
 		if (protection.requiredPullRequest) {
-			return [];
+			return null;
 		}
 
-		const finding: Finding = {
-			ruleId: RULE_ID,
-			severity: 'high',
-			repo: ctx.repo,
+		return {
 			title: `Default branch '${meta.defaultBranch}' does not require pull requests`,
-			detail: DETAIL,
-			remediation: REMEDIATION,
+			detail: 'The default branch does not require pull requests, so commits can be ' +
+				'pushed directly without review.',
+			remediation: 'In the default branch protection rule, enable ' +
+				'"Require a pull request before merging".',
 		};
-
-		return [ finding ];
 	},
-};
+});
