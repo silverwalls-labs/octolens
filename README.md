@@ -28,7 +28,7 @@ npm install -g @silverwalls-labs/octolens
 npx @silverwalls-labs/octolens <command>
 ```
 
-Requires Node.js 24 or later.
+Requires Node.js 24.8 or later.
 
 ## 🏃 Usage
 
@@ -57,13 +57,13 @@ and `--baseline` CI gating.
 
 ## 🔧 Environment Variables
 
-OctoLens requires a GitHub token and the target organization to run.
+OctoLens needs a GitHub token to run; the target is given by `--repo` or `--org`.
 
-- **`ORGANISATION`** – The name of the GitHub organization to scan.
 - **`GITHUB_TOKEN`** – A valid GitHub Personal Access Token (classic or fine-grained) with `repo` and `read:org` permissions.
+- **`OCTOLENS_TOKEN`** – Alternative to `GITHUB_TOKEN`, checked if the former is absent.
+- Without either variable, OctoLens falls back to `gh auth token` (the GitHub CLI login).
 
 ```bash
-export ORGANISATION=my-org
 export GITHUB_TOKEN=ghp_yourtokenhere
 ```
 

@@ -17,6 +17,7 @@
 		"bin",
 		"dist",
 		"!dist/**/*.map",
+		"doc",
 		"README.md",
 		"LICENSE"
 	],
