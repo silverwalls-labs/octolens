@@ -20,16 +20,18 @@ const SEVERITY_STYLE: Record<Severity, StyleFormat> = {
 	info: 'gray',
 };
 
+const ANSI_RE = /\x1b\[[0-9;]*m/g;
+
 /**
- * Build a style function that either applies ANSI formatting or passes
- * text through unchanged.
+ * Build a style function that either applies ANSI formatting or strips
+ * any pre-existing ANSI sequences.
  *
  * @param useColor - Whether ANSI escape sequences should be emitted.
- * @returns        A function that applies (or skips) styling.
+ * @returns        A function that applies (or strips) styling.
  */
 function createStyleFn(useColor: boolean): StyleFn {
 	if (!useColor) {
-		return (_format, text) => text;
+		return (_format, text) => text.replace(ANSI_RE, '');
 	}
 
 	return (format, text) => styleText(format, text, { validateStream: false });
@@ -52,7 +54,8 @@ export type PrettyOptions = {
  * @param options - Formatting options.
  */
 export function formatPretty(result: ScanResult, options: PrettyOptions = {}): string {
-	const useColor = options.color ?? process.stdout.isTTY ?? false;
+	const useColor = options.color ??
+		(!process.env.NO_COLOR && (process.stdout.isTTY ?? false));
 	const style = createStyleFn(useColor);
 
 	const lines: string[] = [];
@@ -103,7 +106,8 @@ export function formatPretty(result: ScanResult, options: PrettyOptions = {}): s
  * @param options - Formatting options.
  */
 export function formatPrettyReport(report: OrgScanReport, options: PrettyOptions = {}): string {
-	const useColor = options.color ?? process.stdout.isTTY ?? false;
+	const useColor = options.color ??
+		(!process.env.NO_COLOR && (process.stdout.isTTY ?? false));
 	const style = createStyleFn(useColor);
 
 	const lines: string[] = [];

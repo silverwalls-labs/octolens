@@ -21,7 +21,7 @@
 		"LICENSE"
 	],
 	"engines": {
-		"node": ">=24.0.0"
+		"node": ">=24.8.0"
 	},
 	"scripts": {
 		"build": "tsc -p tsconfig.json --emitDeclarationOnly && tsc -p tsconfig.json --removeComments --declaration false --declarationMap false",
