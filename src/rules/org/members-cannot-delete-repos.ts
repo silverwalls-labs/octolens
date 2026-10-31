@@ -1,27 +1,14 @@
 import { getOrgMetadata } from '../../github/queries.ts';
 import { skip } from '../../types/index.ts';
-import type { Finding, OrgRule } from '../../types/index.ts';
-
-const RULE_ID = 'org/members-cannot-delete-repos';
-
-const DETAIL = 'Members with admin permissions on a repository can delete it or ' +
-	'transfer it out of the organisation. A transfer to a personal account moves ' +
-	'the full history outside organisational control in one click.';
-
-const REMEDIATION = 'Organization Settings -> Member privileges -> Repository ' +
-	'deletion and transfer: uncheck "Allow members to delete or transfer ' +
-	'repositories for this organization". Deletion and transfer then require ' +
-	'an organisation owner.';
+import { defineOrgRule } from '../define.ts';
 
 /**
  * Flags organisations where members can delete or transfer repositories.
  */
-export const rule: OrgRule = {
-	id: RULE_ID,
-	category: 'org',
+export const rule = defineOrgRule({
+	id: 'org/members-cannot-delete-repos',
 	defaultSeverity: 'medium',
 	summary: 'Members must not be able to delete or transfer repositories',
-	docs: RULE_ID,
 
 	async check(ctx) {
 		const meta = await getOrgMetadata(ctx.octokit, ctx.cache, ctx.org);
@@ -31,16 +18,18 @@ export const rule: OrgRule = {
 		}
 
 		if (!meta.membersCanDeleteRepositories) {
-			return [];
+			return null;
 		}
 
-		const finding: Finding = {
-			ruleId: RULE_ID,
-			severity: 'medium',
-			org: ctx.org,
+		return {
 			title: 'Members can delete or transfer repositories',
-			detail: DETAIL,
-			remediation: REMEDIATION,
+			detail: 'Members with admin permissions on a repository can delete it or ' +
+				'transfer it out of the organisation. A transfer to a personal account moves ' +
+				'the full history outside organisational control in one click.',
+			remediation: 'Organization Settings -> Member privileges -> Repository ' +
+				'deletion and transfer: uncheck "Allow members to delete or transfer ' +
+				'repositories for this organization". Deletion and transfer then require ' +
+				'an organisation owner.',
 			references: [
 				{
 					name: 'Setting permissions for deleting or transferring repositories',
@@ -48,7 +37,5 @@ export const rule: OrgRule = {
 				},
 			],
 		};
-
-		return [ finding ];
 	},
-};
+});

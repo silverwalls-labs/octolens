@@ -2,23 +2,17 @@ import {
 	getOrgCustomPropertySchema,
 	getRepoCustomPropertyValues,
 } from '../../github/queries.ts';
-import type { Finding, Rule } from '../../types/index.ts';
-
-const RULE_ID = 'access/required-custom-properties';
-
-const REMEDIATION = 'Set the property under Settings -> Custom properties, or have ' +
-	'your org admin update the value through the org-level custom properties UI.';
+import { defineRule } from '../define.ts';
 
 /**
  * Flags repositories missing a value for any custom property the
  * organisation marks as required.
  */
-export const rule: Rule = {
-	id: RULE_ID,
+export const rule = defineRule({
+	id: 'access/required-custom-properties',
 	category: 'access',
 	defaultSeverity: 'medium',
 	summary: 'All required organization custom properties must be set',
-	docs: RULE_ID,
 
 	async check(ctx) {
 		const schema = await getOrgCustomPropertySchema(
@@ -28,19 +22,19 @@ export const rule: Rule = {
 		);
 
 		if (!schema) {
-			return [];
+			return null;
 		}
 
 		const required = schema.filter(isRequired);
 
 		if (required.length === 0) {
-			return [];
+			return null;
 		}
 
 		const values = await getRepoCustomPropertyValues(ctx.octokit, ctx.cache, ctx.repo);
 
 		if (values === null) {
-			return [];
+			return null;
 		}
 
 		const present = new Set<string>();
@@ -51,26 +45,17 @@ export const rule: Rule = {
 			}
 		}
 
-		const findings: Finding[] = [];
-
-		for (const def of required) {
-			if (present.has(def.propertyName)) {
-				continue;
-			}
-			findings.push({
-				ruleId: RULE_ID,
-				severity: 'medium',
-				repo: ctx.repo,
+		return required
+			.filter((def) => !present.has(def.propertyName))
+			.map((def) => ({
 				title: `Required custom property '${def.propertyName}' is unset`,
 				detail: `The organization marks '${def.propertyName}' as required, ` +
 					'but this repository does not have a value for it.',
-				remediation: REMEDIATION,
-			});
-		}
-
-		return findings;
+				remediation: 'Set the property under Settings -> Custom properties, or have ' +
+					'your org admin update the value through the org-level custom properties UI.',
+			}));
 	},
-};
+});
 
 /**
  * Subset of a property definition carrying the required flag.

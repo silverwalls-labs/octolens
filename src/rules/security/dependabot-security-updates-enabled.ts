@@ -1,38 +1,28 @@
 import { getAutomatedSecurityFixesEnabled } from '../../github/queries.ts';
-import type { Finding, Rule } from '../../types/index.ts';
-
-const RULE_ID = 'security/dependabot-security-updates-enabled';
-
-const DETAIL = 'Dependabot security updates are disabled. ' +
-	'Vulnerable dependencies will be flagged but no automated fix PRs will be opened.';
-
-const REMEDIATION = 'Settings -> Code security -> Dependabot security updates: enable. ' +
-	'Requires Dependabot alerts to also be enabled.';
+import { defineRule } from '../define.ts';
 
 /**
  * Flags repositories with automated security fixes turned off.
  */
-export const rule: Rule = {
-	id: RULE_ID,
+export const rule = defineRule({
+	id: 'security/dependabot-security-updates-enabled',
 	category: 'security',
 	defaultSeverity: 'high',
 	summary: 'Dependabot security updates must be enabled',
-	docs: RULE_ID,
 
 	async check(ctx) {
 		const enabled = await getAutomatedSecurityFixesEnabled(ctx.octokit, ctx.cache, ctx.repo);
 
 		if (enabled) {
-			return [];
+			return null;
 		}
 
-		const finding: Finding = {
-			ruleId: RULE_ID,
-			severity: 'high',
-			repo: ctx.repo,
+		return {
 			title: 'Dependabot security updates are disabled',
-			detail: DETAIL,
-			remediation: REMEDIATION,
+			detail: 'Dependabot security updates are disabled. ' +
+				'Vulnerable dependencies will be flagged but no automated fix PRs will be opened.',
+			remediation: 'Settings -> Code security -> Dependabot security updates: enable. ' +
+				'Requires Dependabot alerts to also be enabled.',
 			references: [
 				{
 					name: 'About Dependabot security updates',
@@ -40,7 +30,5 @@ export const rule: Rule = {
 				},
 			],
 		};
-
-		return [ finding ];
 	},
-};
+});

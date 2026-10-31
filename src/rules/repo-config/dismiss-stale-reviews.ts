@@ -3,25 +3,16 @@ import {
 	getRepoMetadata,
 } from '../../github/queries.ts';
 import { skip } from '../../types/index.ts';
-import type { Finding, Rule } from '../../types/index.ts';
-
-const RULE_ID = 'repo-config/dismiss-stale-reviews';
-
-const DETAIL = 'Approving reviews are not dismissed when new commits are pushed, so a PR ' +
-	'can be merged with approvals that pre-date the latest changes.';
-
-const REMEDIATION = 'In the default branch protection rule, enable ' +
-	'"Dismiss stale pull request approvals when new commits are pushed".';
+import { defineRule } from '../define.ts';
 
 /**
  * Flags default branches that keep stale approvals when new commits are pushed.
  */
-export const rule: Rule = {
-	id: RULE_ID,
+export const rule = defineRule({
+	id: 'repo-config/dismiss-stale-reviews',
 	category: 'repo-config',
 	defaultSeverity: 'medium',
 	summary: 'Stale reviews must be dismissed on new commits',
-	docs: RULE_ID,
 
 	async check(ctx) {
 		const meta = await getRepoMetadata(ctx.octokit, ctx.cache, ctx.repo);
@@ -37,22 +28,19 @@ export const rule: Rule = {
 		}
 
 		if (!protection.requiredPullRequest) {
-			return [];
+			return null;
 		}
 
 		if (protection.dismissStaleReviews) {
-			return [];
+			return null;
 		}
 
-		const finding: Finding = {
-			ruleId: RULE_ID,
-			severity: 'medium',
-			repo: ctx.repo,
+		return {
 			title: 'Stale reviews are not dismissed on new commits',
-			detail: DETAIL,
-			remediation: REMEDIATION,
+			detail: 'Approving reviews are not dismissed when new commits are pushed, so a PR ' +
+				'can be merged with approvals that pre-date the latest changes.',
+			remediation: 'In the default branch protection rule, enable ' +
+				'"Dismiss stale pull request approvals when new commits are pushed".',
 		};
-
-		return [ finding ];
 	},
-};
+});

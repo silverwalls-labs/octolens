@@ -1,34 +1,22 @@
 import { getOrgMetadata } from '../../github/queries.ts';
 import { skip } from '../../types/index.ts';
-import type { Finding, OrgRule } from '../../types/index.ts';
-
-const RULE_ID = 'org/members-cannot-create-public-pages';
-
-const DETAIL = 'Members can publish public GitHub Pages sites. A Pages site ' +
-	'built from a private repository serves its content publicly, so one ' +
-	'member publishing a site is enough to expose private material.';
-
-const REMEDIATION = 'Organization Settings -> Member privileges -> Pages ' +
-	'creation: uncheck "Public". Members can still publish private Pages ' +
-	'sites if those remain allowed.';
+import { defineOrgRule } from '../define.ts';
 
 /**
  * Flags organisations where members can publish GitHub Pages sites
  * visible to the internet.
  */
-export const rule: OrgRule = {
-	id: RULE_ID,
-	category: 'org',
+export const rule = defineOrgRule({
+	id: 'org/members-cannot-create-public-pages',
 	defaultSeverity: 'medium',
 	summary: 'Members must not be able to publish public GitHub Pages sites',
-	docs: RULE_ID,
 
 	async check(ctx) {
 		const meta = await getOrgMetadata(ctx.octokit, ctx.cache, ctx.org);
 
 		// Pages creation disabled entirely covers the public case.
 		if (meta.membersCanCreatePages === false) {
-			return [];
+			return null;
 		}
 
 		if (meta.membersCanCreatePublicPages === undefined) {
@@ -36,16 +24,17 @@ export const rule: OrgRule = {
 		}
 
 		if (!meta.membersCanCreatePublicPages) {
-			return [];
+			return null;
 		}
 
-		const finding: Finding = {
-			ruleId: RULE_ID,
-			severity: 'medium',
-			org: ctx.org,
+		return {
 			title: 'Members can publish public GitHub Pages sites',
-			detail: DETAIL,
-			remediation: REMEDIATION,
+			detail: 'Members can publish public GitHub Pages sites. A Pages site ' +
+				'built from a private repository serves its content publicly, so one ' +
+				'member publishing a site is enough to expose private material.',
+			remediation: 'Organization Settings -> Member privileges -> Pages ' +
+				'creation: uncheck "Public". Members can still publish private Pages ' +
+				'sites if those remain allowed.',
 			references: [
 				{
 					name: 'Managing the publication of GitHub Pages sites for your organization',
@@ -53,7 +42,5 @@ export const rule: OrgRule = {
 				},
 			],
 		};
-
-		return [ finding ];
 	},
-};
+});
