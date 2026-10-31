@@ -27,7 +27,7 @@ repo rule set against every repository in the organization:
 # Produce a baseline from a full scan
 octolens scan --repo owner/name --format json --out baseline.json
 
-# Gate: exit 1 only on findings not present in the baseline
+# Gate: exit 1 on new findings (and on errored rules or failed repo scans)
 octolens scan --repo owner/name --format json --baseline baseline.json
 ```
 

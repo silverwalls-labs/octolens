@@ -5,33 +5,49 @@ report that GitHub code scanning accepts, so findings appear as alerts
 under **Security → Code scanning** (category `octolens/...`):
 
 ```yaml
+name: Octolens audit
+
+on:
+  push:
+    branches: [ main ]
+  schedule:
+    - cron: '0 6 * * 1'
+
 permissions:
   contents: read
   security-events: write
   # required for private repositories
   actions: read
 
-steps:
-  - uses: actions/checkout@v4
-  - uses: actions/setup-node@v4
-    with:
-      node-version: 24
-  - name: Octolens scan
-    run: >
-      npx @silverwalls-labs/octolens scan --repo ${{ github.repository }}
-      --format sarif --out octolens.sarif
-    env:
-      GITHUB_TOKEN: ${{ secrets.OCTOLENS_TOKEN }}
-    # octolens exits 1 when it finds issues; the SARIF file is still written
-    continue-on-error: true
-  - name: Upload only complete scans
-    # an incomplete scan (errored rules, failed repositories, or a
-    # truncated fleet listing) would close every alert missing from it
-    run: jq -e '.runs[0].invocations[0].executionSuccessful' octolens.sarif > /dev/null
-  - uses: github/codeql-action/upload-sarif@v4
-    with:
-      sarif_file: octolens.sarif
+jobs:
+  octolens:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - name: Octolens scan
+        run: >
+          npx --yes @silverwalls-labs/octolens scan --repo ${{ github.repository }}
+          --format sarif --out octolens.sarif
+        env:
+          GITHUB_TOKEN: ${{ secrets.OCTOLENS_TOKEN }}
+        # octolens exits 1 when it finds issues; the SARIF file is still written
+        continue-on-error: true
+      - name: Upload only complete scans
+        # an incomplete scan (errored rules, failed repositories, or a
+        # truncated fleet listing) would close every alert missing from it
+        run: jq -e '.runs[0].invocations[0].executionSuccessful' octolens.sarif > /dev/null
+      - uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4
+        with:
+          sarif_file: octolens.sarif
 ```
+
+The example pins the third-party actions to full commit SHAs; pin the
+octolens package the same way (e.g. `npx --yes
+@silverwalls-labs/octolens@<version>`) once it is published, so audit
+behavior cannot change between runs.
 
 ## Notes
 
