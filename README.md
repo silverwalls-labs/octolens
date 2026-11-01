@@ -2,7 +2,7 @@
 
 **Security & Configuration Auditing for GitHub Repositories**
 
-OctoLens is a CLI tool that scans and analyzes GitHub repositories — individually, in bulk, or across entire organizations — to produce detailed reports on:
+OctoLens is a CLI tool that scans and analyzes GitHub repositories — individually or across entire organizations — to produce detailed reports on:
 
 - **Security posture** – vulnerabilities, secret leaks, insecure configurations.
 - **Configuration compliance** – repository settings, governance rules, industry standards.
@@ -12,7 +12,7 @@ Whether you're running a compliance audit, reviewing security health, or ensurin
 
 ## ✨ Features
 
-- 🔍 **Full-Org Scanning** – Audit one, multiple, or all repositories in a GitHub organization.
+- 🔍 **Full-Org Scanning** – Audit a single repository, an organization's own settings, or every repository in a GitHub organization.
 - 📋 **Detailed Reports** – Export findings in human-readable or machine-consumable formats (JSON, Markdown, SARIF).
 - 🛡 **Security Checks** – Detect risky settings, missing protections, and potential vulnerabilities.
 - ⚙ **Configuration Review** – Validate settings against good practices and compliance requirements.
