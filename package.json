@@ -89,6 +89,10 @@
 		"typescript-eslint": "^8.72.0"
 	},
 	"overrides": {
-		"katex": "0.18.9"
+		"katex": "0.18.9",
+		"minimatch": "^11.0.1",
+		"typedoc": {
+			"minimatch": "10.2.6"
+		}
 	}
 }
