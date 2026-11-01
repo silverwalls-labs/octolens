@@ -37,6 +37,20 @@ function createStyleFn(useColor: boolean): StyleFn {
 	return (format, text) => styleText(format, text, { validateStream: false });
 }
 
+/**
+ * Whether color should be enabled by default: stdout must be a TTY
+ * attached to a terminal that can render ANSI (`TERM=dumb` cannot),
+ * and `NO_COLOR` must be unset. An explicit `color` option always
+ * wins over this detection.
+ *
+ * @returns True when ANSI colors should be emitted by default.
+ */
+function colorEnabledByDefault(): boolean {
+	return !process.env.NO_COLOR &&
+		process.env.TERM !== 'dumb' &&
+		(process.stdout.isTTY ?? false);
+}
+
 /** Options for {@link formatPretty}. */
 export type PrettyOptions = {
 	/** Enable ANSI colors. Defaults to TTY detection on stdout. */
@@ -54,8 +68,7 @@ export type PrettyOptions = {
  * @param options - Formatting options.
  */
 export function formatPretty(result: ScanResult, options: PrettyOptions = {}): string {
-	const useColor = options.color ??
-		(!process.env.NO_COLOR && (process.stdout.isTTY ?? false));
+	const useColor = options.color ?? colorEnabledByDefault();
 	const style = createStyleFn(useColor);
 
 	const lines: string[] = [];
@@ -106,8 +119,7 @@ export function formatPretty(result: ScanResult, options: PrettyOptions = {}): s
  * @param options - Formatting options.
  */
 export function formatPrettyReport(report: OrgScanReport, options: PrettyOptions = {}): string {
-	const useColor = options.color ??
-		(!process.env.NO_COLOR && (process.stdout.isTTY ?? false));
+	const useColor = options.color ?? colorEnabledByDefault();
 	const style = createStyleFn(useColor);
 
 	const lines: string[] = [];

@@ -55,13 +55,17 @@ admin-only checks are reported as skipped, never as silent passes
 See [doc/usage.md](doc/usage.md) for details on `--all-repos` fleet scanning
 and `--baseline` CI gating.
 
-## 🔧 Environment Variables
+## 🔧 Authentication
 
 OctoLens needs a GitHub token to run; the target is given by `--repo` or `--org`.
+The token is resolved in this order:
 
-- **`GITHUB_TOKEN`** – A valid GitHub Personal Access Token (classic or fine-grained) with `repo` and `read:org` permissions.
-- **`OCTOLENS_TOKEN`** – Alternative to `GITHUB_TOKEN`, checked if the former is absent.
-- Without either variable, OctoLens falls back to `gh auth token` (the GitHub CLI login).
+1. **`--token <token>`** – explicit flag, highest priority.
+2. **`GITHUB_TOKEN`** – environment variable; empty values are treated as unset.
+3. **`OCTOLENS_TOKEN`** – alternative environment variable, checked when `GITHUB_TOKEN` is absent or empty.
+4. **`gh auth token`** – fallback to the GitHub CLI login.
+
+The token needs `repo` and `read:org` permissions (classic or fine-grained PAT).
 
 ```bash
 export GITHUB_TOKEN=ghp_yourtokenhere

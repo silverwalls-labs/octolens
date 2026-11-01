@@ -2,7 +2,9 @@
 
 ## Repository checks (`--repo`)
 
-Rules audit repository settings via the GitHub API — no repository content is
+Rules audit repository settings and metadata via the GitHub API. A few
+checks verify specific files (CODEOWNERS presence and errors, SECURITY.md
+presence, license detection); arbitrary repository source code is never
 scanned. Grouped by category:
 
 ### `repo-config`

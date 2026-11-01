@@ -177,7 +177,111 @@ describe('formatPretty', () => {
 			assert.match(output, /editorconfig/);
 		},
 	);
+
+	test(
+		'default color is enabled on a TTY with a capable TERM',
+		() => {
+			const savedTerm = process.env.TERM;
+			const savedNoColor = process.env.NO_COLOR;
+
+			delete process.env.NO_COLOR;
+			process.env.TERM = 'xterm-256color';
+			stubIsTTY(true);
+
+			try {
+				const output = formatPretty(makeResult([ FINDING ]));
+
+				assert.match(output, /\u001b\[/);
+			} finally {
+				restoreIsTTY();
+				process.env.TERM = savedTerm;
+
+				if (savedNoColor === undefined) {
+					delete process.env.NO_COLOR;
+				} else {
+					process.env.NO_COLOR = savedNoColor;
+				}
+			}
+		},
+	);
+
+	test(
+		'TERM=dumb disables default color even on a TTY',
+		() => {
+			const savedTerm = process.env.TERM;
+			const savedNoColor = process.env.NO_COLOR;
+
+			delete process.env.NO_COLOR;
+			process.env.TERM = 'dumb';
+			stubIsTTY(true);
+
+			try {
+				const output = formatPretty(makeResult([ FINDING ]));
+
+				assert.doesNotMatch(output, /\u001b\[/);
+			} finally {
+				restoreIsTTY();
+				process.env.TERM = savedTerm;
+
+				if (savedNoColor === undefined) {
+					delete process.env.NO_COLOR;
+				} else {
+					process.env.NO_COLOR = savedNoColor;
+				}
+			}
+		},
+	);
+
+	test(
+		'NO_COLOR disables default color even on a TTY',
+		() => {
+			const savedTerm = process.env.TERM;
+			const savedNoColor = process.env.NO_COLOR;
+
+			process.env.NO_COLOR = '1';
+			process.env.TERM = 'xterm-256color';
+			stubIsTTY(true);
+
+			try {
+				const output = formatPretty(makeResult([ FINDING ]));
+
+				assert.doesNotMatch(output, /\u001b\[/);
+			} finally {
+				restoreIsTTY();
+				process.env.TERM = savedTerm;
+
+				if (savedNoColor === undefined) {
+					delete process.env.NO_COLOR;
+				} else {
+					process.env.NO_COLOR = savedNoColor;
+				}
+			}
+		},
+	);
 });
+
+/**
+ * Override `process.stdout.isTTY` for color-detection tests.
+ *
+ * @param value - The stubbed TTY flag.
+ */
+function stubIsTTY(value: boolean): void {
+	Object.defineProperty(process.stdout, 'isTTY', {
+		value,
+		configurable: true,
+	});
+}
+
+/** Restore the original `isTTY` descriptor on stdout. */
+function restoreIsTTY(): void {
+	const descriptor = Object.getOwnPropertyDescriptor(process.stdout, 'isTTY');
+
+	if (descriptor === undefined) {
+		delete (process.stdout as { isTTY?: boolean; }).isTTY;
+	} else {
+		Object.defineProperty(process.stdout, 'isTTY', descriptor);
+	}
+}
 
 function makeResult(
 	findings: Finding[],

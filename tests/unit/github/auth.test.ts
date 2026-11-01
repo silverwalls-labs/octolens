@@ -95,6 +95,20 @@ describe('resolveAuth', () => {
 	);
 
 	test(
+		'OCTOLENS_TOKEN is used when GITHUB_TOKEN is empty',
+		() => {
+			process.env.GITHUB_TOKEN = '';
+			process.env.OCTOLENS_TOKEN = 'octolens-env-token';
+
+			const auth = resolveAuth();
+
+			assert.deepEqual(auth, {
+				token: 'octolens-env-token', source: 'env',
+			});
+		},
+	);
+
+	test(
 		'the gh CLI is used when no flag or env token exists',
 		() => {
 			process.env.PATH = makeFakeGhDir('gh-cli-token');
