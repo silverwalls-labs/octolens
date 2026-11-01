@@ -3,24 +3,16 @@ import {
 	getRepoMetadata,
 } from '../../github/queries.ts';
 import { skip } from '../../types/index.ts';
-import type { Finding, Rule } from '../../types/index.ts';
-
-const RULE_ID = 'repo-config/block-force-push';
-
-const DETAIL = 'Force pushes to the default branch are allowed, which can rewrite history ' +
-	'and erase merged work.';
-
-const REMEDIATION = 'In the default branch protection rule, disable "Allow force pushes".';
+import { defineRule } from '../define.ts';
 
 /**
  * Flags default branches whose protection still permits force pushes.
  */
-export const rule: Rule = {
-	id: RULE_ID,
+export const rule = defineRule({
+	id: 'repo-config/block-force-push',
 	category: 'repo-config',
 	defaultSeverity: 'high',
 	summary: 'Force pushes must be disabled on the default branch',
-	docs: RULE_ID,
 
 	async check(ctx) {
 		const meta = await getRepoMetadata(ctx.octokit, ctx.cache, ctx.repo);
@@ -36,18 +28,14 @@ export const rule: Rule = {
 		}
 
 		if (!protection.allowsForcePushes) {
-			return [];
+			return null;
 		}
 
-		const finding: Finding = {
-			ruleId: RULE_ID,
-			severity: 'high',
-			repo: ctx.repo,
+		return {
 			title: `Default branch '${meta.defaultBranch}' allows force pushes`,
-			detail: DETAIL,
-			remediation: REMEDIATION,
+			detail: 'Force pushes to the default branch are allowed, which can rewrite history ' +
+				'and erase merged work.',
+			remediation: 'In the default branch protection rule, disable "Allow force pushes".',
 		};
-
-		return [ finding ];
 	},
-};
+});

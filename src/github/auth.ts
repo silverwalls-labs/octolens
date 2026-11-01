@@ -44,7 +44,11 @@ export function resolveAuth(options: AuthOptions = {}): ResolvedAuth {
 		return { token: options.token, source: 'flag' };
 	}
 
-	const envToken = process.env.GITHUB_TOKEN ?? process.env.OCTOLENS_TOKEN;
+	/*
+	 * Empty-string values are treated as unset so that, say, an empty
+	 * GITHUB_TOKEN does not shadow a populated OCTOLENS_TOKEN.
+	 */
+	const envToken = process.env.GITHUB_TOKEN || process.env.OCTOLENS_TOKEN;
 
 	if (envToken && envToken.length > 0) {
 		return { token: envToken, source: 'env' };

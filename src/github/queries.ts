@@ -1000,26 +1000,22 @@ async function fetchBranchProtection(
  * @param repo    - Target repository.
  * @returns       The validation outcome.
  */
-async function fetchCodeownersErrors(
+function fetchCodeownersErrors(
 	octokit: Octokit,
 	repo: RepoRef,
 ): Promise<CodeownersErrors> {
-	try {
-		const response = await octokit.rest.repos.codeownersErrors({
-			owner: repo.owner,
-			repo: repo.name,
-		});
+	return guarded(
+		async () => {
+			const response = await octokit.rest.repos.codeownersErrors({
+				owner: repo.owner,
+				repo: repo.name,
+			});
 
-		return {
-			checked: true,
-			errorCount: response.data.errors.length,
-		};
-	} catch (err: unknown) {
-		if (isHttpStatus(err, 404)) {
-			return { checked: false, errorCount: 0 };
-		}
-		throw err;
-	}
+			return { checked: true, errorCount: response.data.errors.length };
+		},
+		{ checked: false, errorCount: 0 },
+		{ catch404Only: true },
+	);
 }
 
 /**
@@ -1057,23 +1053,22 @@ async function fetchCodeownersFilePresent(
  * @param repo    - Target repository.
  * @returns       Summaries of the active rulesets.
  */
-async function fetchRepoRulesets(
+function fetchRepoRulesets(
 	octokit: Octokit,
 	repo: RepoRef,
 ): Promise<RepoRulesetSummary[]> {
-	try {
-		const response = await octokit.rest.repos.getRepoRulesets({
-			owner: repo.owner,
-			repo: repo.name,
-		});
+	return guarded(
+		async () => {
+			const response = await octokit.rest.repos.getRepoRulesets({
+				owner: repo.owner,
+				repo: repo.name,
+			});
 
-		return response.data.map(toRulesetSummary);
-	} catch (err: unknown) {
-		if (isHttpStatus(err, 404)) {
-			return [];
-		}
-		throw err;
-	}
+			return response.data.map(toRulesetSummary);
+		},
+		[],
+		{ catch404Only: true },
+	);
 }
 
 /**
@@ -1083,23 +1078,22 @@ async function fetchRepoRulesets(
  * @param repo    - Target repository.
  * @returns       The assigned property values.
  */
-async function fetchRepoCustomPropertyValues(
+function fetchRepoCustomPropertyValues(
 	octokit: Octokit,
 	repo: RepoRef,
 ): Promise<CustomPropertyValue[] | null> {
-	try {
-		const response = await octokit.rest.repos.customPropertiesForReposGetRepositoryValues({
-			owner: repo.owner,
-			repo: repo.name,
-		});
+	return guarded(
+		async () => {
+			const api = octokit.rest.repos;
+			const response = await api.customPropertiesForReposGetRepositoryValues({
+				owner: repo.owner,
+				repo: repo.name,
+			});
 
-		return response.data.map(toPropertyValue);
-	} catch (err: unknown) {
-		if (isHttpStatus(err, 404) || isForbiddenNotRateLimited(err)) {
-			return null;
-		}
-		throw err;
-	}
+			return response.data.map(toPropertyValue);
+		},
+		null,
+	);
 }
 
 /**
@@ -1109,21 +1103,19 @@ async function fetchRepoCustomPropertyValues(
  * @param org     - Organisation login.
  * @returns       The property definitions.
  */
-async function fetchOrgCustomPropertySchema(
+function fetchOrgCustomPropertySchema(
 	octokit: Octokit,
 	org: string,
 ): Promise<CustomPropertyDefinition[] | null> {
-	try {
-		const orgsApi = octokit.rest.orgs;
-		const response = await orgsApi.customPropertiesForReposGetOrganizationDefinitions({ org });
+	return guarded(
+		async () => {
+			const api = octokit.rest.orgs;
+			const response = await api.customPropertiesForReposGetOrganizationDefinitions({ org });
 
-		return response.data.map(toPropertyDefinition);
-	} catch (err: unknown) {
-		if (isHttpStatus(err, 404) || isForbiddenNotRateLimited(err)) {
-			return null;
-		}
-		throw err;
-	}
+			return response.data.map(toPropertyDefinition);
+		},
+		null,
+	);
 }
 
 /**
@@ -1189,27 +1181,25 @@ function toOptionalBoolean(value: boolean | null | undefined): boolean | undefin
  * @param org     - Organisation login.
  * @returns       The effective policy for the organisation.
  */
-async function fetchOrgActionsPermissions(
+function fetchOrgActionsPermissions(
 	octokit: Octokit,
 	org: string,
 ): Promise<OrgActionsPermissions> {
-	try {
-		const actionsApi = octokit.rest.actions;
-		const response = await actionsApi.getGithubActionsPermissionsOrganization({ org });
+	return guarded(
+		async () => {
+			const api = octokit.rest.actions;
+			const response = await api.getGithubActionsPermissionsOrganization({ org });
 
-		return {
-			checked: true,
-			enabledRepositories: response.data.enabled_repositories ?? null,
-			allowedActions: response.data.allowed_actions ?? null,
-		};
-	} catch (err: unknown) {
-		if (isHttpStatus(err, 404) || isForbiddenNotRateLimited(err)) {
 			return {
-				checked: false, enabledRepositories: null, allowedActions: null,
+				checked: true,
+				enabledRepositories: response.data.enabled_repositories ?? null,
+				allowedActions: response.data.allowed_actions ?? null,
 			};
-		}
-		throw err;
-	}
+		},
+		{
+			checked: false, enabledRepositories: null, allowedActions: null,
+		},
+	);
 }
 
 /**
@@ -1219,31 +1209,28 @@ async function fetchOrgActionsPermissions(
  * @param org     - Organisation login.
  * @returns       Token defaults reported by the API.
  */
-async function fetchOrgDefaultWorkflowPermissions(
+function fetchOrgDefaultWorkflowPermissions(
 	octokit: Octokit,
 	org: string,
 ): Promise<OrgWorkflowPermissions> {
-	try {
-		const actionsApi = octokit.rest.actions;
-		const response = await actionsApi.getGithubActionsDefaultWorkflowPermissionsOrganization({
-			org,
-		});
+	return guarded(
+		async () => {
+			const api = octokit.rest.actions;
+			const response = await api.getGithubActionsDefaultWorkflowPermissionsOrganization({
+				org,
+			});
 
-		return {
-			checked: true,
-			defaultPermissions: response.data.default_workflow_permissions ?? null,
-			canApprovePullRequestReviews: response.data.can_approve_pull_request_reviews === true,
-		};
-	} catch (err: unknown) {
-		if (isHttpStatus(err, 404) || isForbiddenNotRateLimited(err)) {
 			return {
-				checked: false,
-				defaultPermissions: null,
-				canApprovePullRequestReviews: false,
+				checked: true,
+				defaultPermissions: response.data.default_workflow_permissions ?? null,
+				canApprovePullRequestReviews:
+					response.data.can_approve_pull_request_reviews === true,
 			};
-		}
-		throw err;
-	}
+		},
+		{
+			checked: false, defaultPermissions: null, canApprovePullRequestReviews: false,
+		},
+	);
 }
 
 /**
@@ -1253,31 +1240,32 @@ async function fetchOrgDefaultWorkflowPermissions(
  * @param org     - Organisation login.
  * @returns       The allowed-actions selection.
  */
-async function fetchOrgAllowedActions(
+function fetchOrgAllowedActions(
 	octokit: Octokit,
 	org: string,
 ): Promise<OrgAllowedActions> {
-	try {
-		const response = await octokit.rest.actions.getAllowedActionsOrganization({ org });
+	return guarded(
+		async () => {
+			const api = octokit.rest.actions;
+			const response = await api.getAllowedActionsOrganization({ org });
 
-		return {
-			checked: true,
-			githubOwnedAllowed: response.data.github_owned_allowed === true,
-			verifiedAllowed: response.data.verified_allowed === true,
-			patternsAllowed: response.data.patterns_allowed ?? [],
-		};
-	} catch (err: unknown) {
-		// 409: allowed-actions config does not apply (policy is not 'selected').
-		if (isHttpStatus(err, 404) || isHttpStatus(err, 409) || isForbiddenNotRateLimited(err)) {
 			return {
-				checked: false,
-				githubOwnedAllowed: false,
-				verifiedAllowed: false,
-				patternsAllowed: [],
+				checked: true,
+				githubOwnedAllowed: response.data.github_owned_allowed === true,
+				verifiedAllowed: response.data.verified_allowed === true,
+				patternsAllowed: response.data.patterns_allowed ?? [],
 			};
-		}
-		throw err;
-	}
+		},
+		{
+			checked: false,
+			githubOwnedAllowed: false,
+			verifiedAllowed: false,
+			patternsAllowed: [],
+		},
+
+		// 409: allowed-actions config does not apply (policy is not 'selected').
+		{ catch409: true },
+	);
 }
 
 /**
@@ -1287,24 +1275,22 @@ async function fetchOrgAllowedActions(
  * @param org     - Organisation login.
  * @returns       The approval policy.
  */
-async function fetchOrgForkPrApproval(
+function fetchOrgForkPrApproval(
 	octokit: Octokit,
 	org: string,
 ): Promise<OrgForkPrApproval> {
-	try {
-		const response = await octokit.request(
-			'GET /orgs/{org}/actions/permissions/fork-pr-contributor-approval',
-			{ org },
-		);
-		const data = response.data as { approval_policy?: string; };
+	return guarded(
+		async () => {
+			const response = await octokit.request(
+				'GET /orgs/{org}/actions/permissions/fork-pr-contributor-approval',
+				{ org },
+			);
+			const data = response.data as { approval_policy?: string; };
 
-		return { checked: true, approvalPolicy: data.approval_policy ?? null };
-	} catch (err: unknown) {
-		if (isHttpStatus(err, 404) || isForbiddenNotRateLimited(err)) {
-			return { checked: false, approvalPolicy: null };
-		}
-		throw err;
-	}
+			return { checked: true, approvalPolicy: data.approval_policy ?? null };
+		},
+		{ checked: false, approvalPolicy: null },
+	);
 }
 
 /**
@@ -1324,36 +1310,38 @@ type RawPrivateForkPrWorkflows = {
  * @param org     - Organisation login.
  * @returns       The private-fork workflow settings.
  */
-async function fetchOrgPrivateForkPrWorkflows(
+function fetchOrgPrivateForkPrWorkflows(
 	octokit: Octokit,
 	org: string,
 ): Promise<OrgPrivateForkPrWorkflows> {
-	try {
-		const response = await octokit.request(
-			'GET /orgs/{org}/actions/permissions/fork-pr-workflows-private-repos',
-			{ org },
-		);
-		const data = response.data as RawPrivateForkPrWorkflows;
+	return guarded(
+		async () => {
+			const response = await octokit.request(
+				'GET /orgs/{org}/actions/permissions/fork-pr-workflows-private-repos',
+				{ org },
+			);
+			const data = response.data as RawPrivateForkPrWorkflows;
 
-		return {
-			checked: true,
-			runWorkflowsFromForkPullRequests: data.run_workflows_from_fork_pull_requests === true,
-			sendWriteTokensToWorkflows: data.send_write_tokens_to_workflows === true,
-			sendSecretsAndVariables: data.send_secrets_and_variables === true,
-			requireApprovalForForkPrWorkflows: data.require_approval_for_fork_pr_workflows === true,
-		};
-	} catch (err: unknown) {
-		if (isHttpStatus(err, 404) || isForbiddenNotRateLimited(err)) {
 			return {
-				checked: false,
-				runWorkflowsFromForkPullRequests: false,
-				sendWriteTokensToWorkflows: false,
-				sendSecretsAndVariables: false,
-				requireApprovalForForkPrWorkflows: false,
+				checked: true,
+				runWorkflowsFromForkPullRequests:
+					data.run_workflows_from_fork_pull_requests === true,
+				sendWriteTokensToWorkflows:
+					data.send_write_tokens_to_workflows === true,
+				sendSecretsAndVariables:
+					data.send_secrets_and_variables === true,
+				requireApprovalForForkPrWorkflows:
+					data.require_approval_for_fork_pr_workflows === true,
 			};
-		}
-		throw err;
-	}
+		},
+		{
+			checked: false,
+			runWorkflowsFromForkPullRequests: false,
+			sendWriteTokensToWorkflows: false,
+			sendSecretsAndVariables: false,
+			requireApprovalForForkPrWorkflows: false,
+		},
+	);
 }
 
 /**
@@ -1363,20 +1351,16 @@ async function fetchOrgPrivateForkPrWorkflows(
  * @param org     - Organisation login.
  * @returns       The webhook inventory.
  */
-async function fetchOrgWebhooks(octokit: Octokit, org: string): Promise<OrgWebhookInventory> {
-	try {
-		const data = await octokit.paginate(octokit.rest.orgs.listWebhooks, {
-			org,
-			per_page: 100,
-		});
+function fetchOrgWebhooks(octokit: Octokit, org: string): Promise<OrgWebhookInventory> {
+	const ep = octokit.rest.orgs.listWebhooks;
 
-		return { checked: true, hooks: data.map(toWebhookSummary) };
-	} catch (err: unknown) {
-		if (isHttpStatus(err, 404) || isForbiddenNotRateLimited(err)) {
-			return { checked: false, hooks: [] };
-		}
-		throw err;
-	}
+	return guarded(
+		async () => ({
+			checked: true,
+			hooks: await paginateOrg(octokit, org, ep, toWebhookSummary),
+		}),
+		{ checked: false, hooks: [] },
+	);
 }
 
 /**
@@ -1510,32 +1494,29 @@ async function fetchActionsPermissions(
  * @param repo    - Target repository.
  * @returns       Token defaults reported by the API.
  */
-async function fetchDefaultWorkflowPermissions(
+function fetchDefaultWorkflowPermissions(
 	octokit: Octokit,
 	repo: RepoRef,
 ): Promise<DefaultWorkflowPermissions> {
-	try {
-		const actionsApi = octokit.rest.actions;
-		const response = await actionsApi.getGithubActionsDefaultWorkflowPermissionsRepository({
-			owner: repo.owner,
-			repo: repo.name,
-		});
+	return guarded(
+		async () => {
+			const api = octokit.rest.actions;
+			const response = await api.getGithubActionsDefaultWorkflowPermissionsRepository({
+				owner: repo.owner,
+				repo: repo.name,
+			});
 
-		return {
-			checked: true,
-			defaultPermissions: response.data.default_workflow_permissions ?? null,
-			canApprovePullRequestReviews: response.data.can_approve_pull_request_reviews === true,
-		};
-	} catch (err: unknown) {
-		if (isHttpStatus(err, 404) || isForbiddenNotRateLimited(err)) {
 			return {
-				checked: false,
-				defaultPermissions: null,
-				canApprovePullRequestReviews: false,
+				checked: true,
+				defaultPermissions: response.data.default_workflow_permissions ?? null,
+				canApprovePullRequestReviews:
+					response.data.can_approve_pull_request_reviews === true,
 			};
-		}
-		throw err;
-	}
+		},
+		{
+			checked: false, defaultPermissions: null, canApprovePullRequestReviews: false,
+		},
+	);
 }
 
 /**
@@ -1545,23 +1526,22 @@ async function fetchDefaultWorkflowPermissions(
  * @param repo    - Target repository.
  * @returns       Whether security updates are enabled.
  */
-async function fetchAutomatedSecurityFixesEnabled(
+function fetchAutomatedSecurityFixesEnabled(
 	octokit: Octokit,
 	repo: RepoRef,
 ): Promise<boolean> {
-	try {
-		const response = await octokit.rest.repos.checkAutomatedSecurityFixes({
-			owner: repo.owner,
-			repo: repo.name,
-		});
+	return guarded(
+		async () => {
+			const response = await octokit.rest.repos.checkAutomatedSecurityFixes({
+				owner: repo.owner,
+				repo: repo.name,
+			});
 
-		return response.data.enabled === true;
-	} catch (err: unknown) {
-		if (isHttpStatus(err, 404)) {
-			return false;
-		}
-		throw err;
-	}
+			return response.data.enabled === true;
+		},
+		false,
+		{ catch404Only: true },
+	);
 }
 
 /**
@@ -1572,26 +1552,24 @@ async function fetchAutomatedSecurityFixesEnabled(
  * @param affiliation - Affiliation filter passed to the API.
  * @returns           The direct collaborators.
  */
-async function fetchCollaborators(
+function fetchCollaborators(
 	octokit: Octokit,
 	repo: RepoRef,
 	affiliation: 'direct' | 'outside',
 ): Promise<Collaborator[]> {
-	try {
-		const data = await octokit.paginate(octokit.rest.repos.listCollaborators, {
-			owner: repo.owner,
-			repo: repo.name,
-			affiliation,
-			per_page: 100,
-		});
+	return guarded(
+		async () => {
+			const data = await octokit.paginate(
+				octokit.rest.repos.listCollaborators,
+				{
+					owner: repo.owner, repo: repo.name, affiliation, per_page: 100,
+				},
+			);
 
-		return data.map(toCollaborator);
-	} catch (err: unknown) {
-		if (isHttpStatus(err, 404) || isForbiddenNotRateLimited(err)) {
-			return [];
-		}
-		throw err;
-	}
+			return data.map(toCollaborator);
+		},
+		[],
+	);
 }
 
 /**
@@ -1601,28 +1579,23 @@ async function fetchCollaborators(
  * @param repo    - Target repository.
  * @returns       The environment summaries.
  */
-async function fetchEnvironments(
+function fetchEnvironments(
 	octokit: Octokit,
 	repo: RepoRef,
 ): Promise<EnvironmentInventory> {
-	try {
-		const response = await octokit.rest.repos.getAllEnvironments({
-			owner: repo.owner,
-			repo: repo.name,
-			per_page: 100,
-		});
-		const list = response.data.environments ?? [];
+	return guarded(
+		async () => {
+			const response = await octokit.rest.repos.getAllEnvironments({
+				owner: repo.owner,
+				repo: repo.name,
+				per_page: 100,
+			});
+			const list = response.data.environments ?? [];
 
-		return {
-			checked: true,
-			environments: list.map(toEnvironmentSummary),
-		};
-	} catch (err: unknown) {
-		if (isHttpStatus(err, 404) || isForbiddenNotRateLimited(err)) {
-			return { checked: false, environments: [] };
-		}
-		throw err;
-	}
+			return { checked: true, environments: list.map(toEnvironmentSummary) };
+		},
+		{ checked: false, environments: [] },
+	);
 }
 
 /**
@@ -1643,35 +1616,42 @@ async function fetchBranchCount(octokit: Octokit, repo: RepoRef): Promise<number
 }
 
 /**
+ * Fetch secret metadata from a single store (Actions, Dependabot, or Codespaces).
+ *
+ * @param octokit  - Authenticated Octokit client.
+ * @param repo     - Target repository.
+ * @param store    - Which secret store to query.
+ * @param endpoint - Paginating endpoint for the store.
+ * @returns        Names and timestamps of the secrets, or a `checked: false` fallback.
+ */
+function fetchSecretInventory(
+	octokit: Octokit,
+	repo: RepoRef,
+	store: SecretStore,
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	endpoint: any,
+): Promise<SecretInventory> {
+	return guarded(
+		async () => ({
+			store,
+			checked: true,
+			secrets: await paginateRepo(octokit, repo, endpoint, toSecretMetadata),
+		}),
+		{
+			store, checked: false, secrets: [],
+		},
+	);
+}
+
+/**
  * Fetch Actions secret metadata for the repository.
  *
  * @param octokit - Authenticated Octokit client.
  * @param repo    - Target repository.
  * @returns       The secret inventory.
  */
-async function fetchActionsSecrets(octokit: Octokit, repo: RepoRef): Promise<SecretInventory> {
-	try {
-		const data = await octokit.paginate(octokit.rest.actions.listRepoSecrets, {
-			owner: repo.owner,
-			repo: repo.name,
-			per_page: 100,
-		});
-
-		return {
-			store: 'actions',
-			checked: true,
-			secrets: data.map(toSecretMetadata),
-		};
-	} catch (err: unknown) {
-		if (isHttpStatus(err, 404) || isForbiddenNotRateLimited(err)) {
-			return {
-				store: 'actions',
-				checked: false,
-				secrets: [],
-			};
-		}
-		throw err;
-	}
+function fetchActionsSecrets(octokit: Octokit, repo: RepoRef): Promise<SecretInventory> {
+	return fetchSecretInventory(octokit, repo, 'actions', octokit.rest.actions.listRepoSecrets);
 }
 
 /**
@@ -1681,29 +1661,10 @@ async function fetchActionsSecrets(octokit: Octokit, repo: RepoRef): Promise<Sec
  * @param repo    - Target repository.
  * @returns       The secret inventory.
  */
-async function fetchDependabotSecrets(octokit: Octokit, repo: RepoRef): Promise<SecretInventory> {
-	try {
-		const data = await octokit.paginate(octokit.rest.dependabot.listRepoSecrets, {
-			owner: repo.owner,
-			repo: repo.name,
-			per_page: 100,
-		});
+function fetchDependabotSecrets(octokit: Octokit, repo: RepoRef): Promise<SecretInventory> {
+	const ep = octokit.rest.dependabot.listRepoSecrets;
 
-		return {
-			store: 'dependabot',
-			checked: true,
-			secrets: data.map(toSecretMetadata),
-		};
-	} catch (err: unknown) {
-		if (isHttpStatus(err, 404) || isForbiddenNotRateLimited(err)) {
-			return {
-				store: 'dependabot',
-				checked: false,
-				secrets: [],
-			};
-		}
-		throw err;
-	}
+	return fetchSecretInventory(octokit, repo, 'dependabot', ep);
 }
 
 /**
@@ -1713,29 +1674,10 @@ async function fetchDependabotSecrets(octokit: Octokit, repo: RepoRef): Promise<
  * @param repo    - Target repository.
  * @returns       The secret inventory.
  */
-async function fetchCodespacesSecrets(octokit: Octokit, repo: RepoRef): Promise<SecretInventory> {
-	try {
-		const data = await octokit.paginate(octokit.rest.codespaces.listRepoSecrets, {
-			owner: repo.owner,
-			repo: repo.name,
-			per_page: 100,
-		});
+function fetchCodespacesSecrets(octokit: Octokit, repo: RepoRef): Promise<SecretInventory> {
+	const ep = octokit.rest.codespaces.listRepoSecrets;
 
-		return {
-			store: 'codespaces',
-			checked: true,
-			secrets: data.map(toSecretMetadata),
-		};
-	} catch (err: unknown) {
-		if (isHttpStatus(err, 404) || isForbiddenNotRateLimited(err)) {
-			return {
-				store: 'codespaces',
-				checked: false,
-				secrets: [],
-			};
-		}
-		throw err;
-	}
+	return fetchSecretInventory(octokit, repo, 'codespaces', ep);
 }
 
 /** Raw secret entry from the API response. */
@@ -1766,24 +1708,22 @@ function toSecretMetadata(raw: RawSecret): SecretMetadata {
  * @param repo    - Target repository.
  * @returns       Whether the feature is enabled.
  */
-async function fetchPrivateVulnerabilityReporting(
+function fetchPrivateVulnerabilityReporting(
 	octokit: Octokit,
 	repo: RepoRef,
 ): Promise<PrivateVulnerabilityReporting> {
-	try {
-		const response = await octokit.request(
-			'GET /repos/{owner}/{repo}/private-vulnerability-reporting',
-			{ owner: repo.owner, repo: repo.name },
-		);
-		const data = response.data as { enabled?: boolean; };
+	return guarded(
+		async () => {
+			const response = await octokit.request(
+				'GET /repos/{owner}/{repo}/private-vulnerability-reporting',
+				{ owner: repo.owner, repo: repo.name },
+			);
+			const data = response.data as { enabled?: boolean; };
 
-		return { checked: true, enabled: data.enabled === true };
-	} catch (err: unknown) {
-		if (isHttpStatus(err, 404) || isForbiddenNotRateLimited(err)) {
-			return { checked: false, enabled: false };
-		}
-		throw err;
-	}
+			return { checked: true, enabled: data.enabled === true };
+		},
+		{ checked: false, enabled: false },
+	);
 }
 
 /**
@@ -1793,21 +1733,16 @@ async function fetchPrivateVulnerabilityReporting(
  * @param repo    - Target repository.
  * @returns       The runner inventory.
  */
-async function fetchRepoRunners(octokit: Octokit, repo: RepoRef): Promise<RunnerInventory> {
-	try {
-		const data = await octokit.paginate(octokit.rest.actions.listSelfHostedRunnersForRepo, {
-			owner: repo.owner,
-			repo: repo.name,
-			per_page: 100,
-		});
+function fetchRepoRunners(octokit: Octokit, repo: RepoRef): Promise<RunnerInventory> {
+	const ep = octokit.rest.actions.listSelfHostedRunnersForRepo;
 
-		return { checked: true, runners: data.map(toRunnerSummary) };
-	} catch (err: unknown) {
-		if (isHttpStatus(err, 404) || isForbiddenNotRateLimited(err)) {
-			return { checked: false, runners: [] };
-		}
-		throw err;
-	}
+	return guarded(
+		async () => ({
+			checked: true,
+			runners: await paginateRepo(octokit, repo, ep, toRunnerSummary),
+		}),
+		{ checked: false, runners: [] },
+	);
 }
 
 /**
@@ -1817,21 +1752,11 @@ async function fetchRepoRunners(octokit: Octokit, repo: RepoRef): Promise<Runner
  * @param repo    - Target repository.
  * @returns       The webhook summaries.
  */
-async function fetchRepoWebhooks(octokit: Octokit, repo: RepoRef): Promise<WebhookSummary[]> {
-	try {
-		const data = await octokit.paginate(octokit.rest.repos.listWebhooks, {
-			owner: repo.owner,
-			repo: repo.name,
-			per_page: 100,
-		});
-
-		return data.map(toWebhookSummary);
-	} catch (err: unknown) {
-		if (isHttpStatus(err, 404) || isForbiddenNotRateLimited(err)) {
-			return [];
-		}
-		throw err;
-	}
+function fetchRepoWebhooks(octokit: Octokit, repo: RepoRef): Promise<WebhookSummary[]> {
+	return guarded(
+		() => paginateRepo(octokit, repo, octokit.rest.repos.listWebhooks, toWebhookSummary),
+		[],
+	);
 }
 
 /**
@@ -1841,21 +1766,11 @@ async function fetchRepoWebhooks(octokit: Octokit, repo: RepoRef): Promise<Webho
  * @param repo    - Target repository.
  * @returns       The deploy key summaries.
  */
-async function fetchDeployKeys(octokit: Octokit, repo: RepoRef): Promise<DeployKeySummary[]> {
-	try {
-		const data = await octokit.paginate(octokit.rest.repos.listDeployKeys, {
-			owner: repo.owner,
-			repo: repo.name,
-			per_page: 100,
-		});
-
-		return data.map(toDeployKeySummary);
-	} catch (err: unknown) {
-		if (isHttpStatus(err, 404) || isForbiddenNotRateLimited(err)) {
-			return [];
-		}
-		throw err;
-	}
+function fetchDeployKeys(octokit: Octokit, repo: RepoRef): Promise<DeployKeySummary[]> {
+	return guarded(
+		() => paginateRepo(octokit, repo, octokit.rest.repos.listDeployKeys, toDeployKeySummary),
+		[],
+	);
 }
 
 /**
@@ -1865,21 +1780,16 @@ async function fetchDeployKeys(octokit: Octokit, repo: RepoRef): Promise<DeployK
  * @param repo    - Target repository.
  * @returns       The team access summary.
  */
-async function fetchRepoTeams(octokit: Octokit, repo: RepoRef): Promise<RepoTeamsResult> {
-	try {
-		const data = await octokit.paginate(octokit.rest.repos.listTeams, {
-			owner: repo.owner,
-			repo: repo.name,
-			per_page: 100,
-		});
+function fetchRepoTeams(octokit: Octokit, repo: RepoRef): Promise<RepoTeamsResult> {
+	const ep = octokit.rest.repos.listTeams;
 
-		return { checked: true, teams: data.map(toRepoTeamSummary) };
-	} catch (err: unknown) {
-		if (isHttpStatus(err, 404) || isForbiddenNotRateLimited(err)) {
-			return { checked: false, teams: [] };
-		}
-		throw err;
-	}
+	return guarded(
+		async () => ({
+			checked: true,
+			teams: await paginateRepo(octokit, repo, ep, toRepoTeamSummary),
+		}),
+		{ checked: false, teams: [] },
+	);
 }
 
 /**
@@ -2188,6 +2098,105 @@ function isReviewerRule(rule: { type: string; }): boolean {
  */
 function isWaitTimerRule(rule: { type: string; wait_timer?: number; }): boolean {
 	return rule.type === 'wait_timer' && (rule.wait_timer ?? 0) > 0;
+}
+
+/*
+ * ---------------------------------------------------------------------------
+ * Internal helpers — error-guarded fetch and pagination
+ * ---------------------------------------------------------------------------
+ */
+
+/** Options for {@link guarded}. */
+type GuardOptions = {
+	/** When `true`, only 404 is caught (403 is re-thrown). */
+	catch404Only?: boolean;
+
+	/** When `true`, 409 is also caught alongside 404 and 403. */
+	catch409?: boolean;
+};
+
+/**
+ * Run an async function and return its result, or a static fallback when the
+ * call fails with a swallowable HTTP status (404, and by default also
+ * non-rate-limited 403). Rate-limit errors always propagate.
+ *
+ * @param    fn       - Async operation to execute.
+ * @param    fallback - Value returned on a caught error.
+ * @param    options  - Adjust which statuses are caught.
+ * @returns           The result or the fallback.
+ * @template T        Result type of the async operation.
+ */
+async function guarded<T>(
+	fn: () => Promise<T>,
+	/* eslint-disable-next-line @typescript-eslint/no-explicit-any --
+	   The fallback must be structurally compatible with T but TypeScript
+	   infers literal types from fn that are too narrow for the error case
+	   (e.g. checked:true vs checked:false). Widening via mapped types is
+	   fragile so we accept `any` and cast on the way out. */
+	fallback: any,
+	options?: GuardOptions,
+): Promise<T> {
+	try {
+		return await fn();
+	} catch (err: unknown) {
+		if (isHttpStatus(err, 404)) return fallback as T;
+		if (!options?.catch404Only && isForbiddenNotRateLimited(err)) return fallback as T;
+		if (options?.catch409 && isHttpStatus(err, 409)) return fallback as T;
+		throw err;
+	}
+}
+
+/**
+ * Paginate a repo-scoped endpoint and map each item.
+ *
+ * @param    octokit  - Authenticated Octokit client.
+ * @param    repo     - Target repository.
+ * @param    endpoint - Paginating endpoint from `octokit.rest.*`.
+ * @param    map      - Per-item mapper applied to each raw API object.
+ * @returns           The mapped result array.
+ * @template TRaw     Raw item type returned by the API.
+ * @template TResult  Mapped item type after transformation.
+ */
+async function paginateRepo<TRaw, TResult>(
+	octokit: Octokit,
+	repo: RepoRef,
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	endpoint: any,
+	map: (raw: TRaw) => TResult,
+): Promise<TResult[]> {
+	const data: unknown[] = await octokit.paginate(endpoint, {
+		owner: repo.owner,
+		repo: repo.name,
+		per_page: 100,
+	});
+
+	return (data as TRaw[]).map(map);
+}
+
+/**
+ * Paginate an org-scoped endpoint and map each item.
+ *
+ * @param    octokit  - Authenticated Octokit client.
+ * @param    org      - Organisation login.
+ * @param    endpoint - Paginating endpoint from `octokit.rest.*`.
+ * @param    map      - Per-item mapper applied to each raw API object.
+ * @returns           The mapped result array.
+ * @template TRaw     Raw item type returned by the API.
+ * @template TResult  Mapped item type after transformation.
+ */
+async function paginateOrg<TRaw, TResult>(
+	octokit: Octokit,
+	org: string,
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	endpoint: any,
+	map: (raw: TRaw) => TResult,
+): Promise<TResult[]> {
+	const data: unknown[] = await octokit.paginate(endpoint, {
+		org,
+		per_page: 100,
+	});
+
+	return (data as TRaw[]).map(map);
 }
 
 /**

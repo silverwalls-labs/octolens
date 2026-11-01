@@ -1,39 +1,29 @@
 import { getRepoRulesets } from '../../github/queries.ts';
-import type { Finding, Rule } from '../../types/index.ts';
-
-const RULE_ID = 'repo-config/tag-protection';
-
-const DETAIL = 'No active ruleset targets tags, so anyone with write access can create, ' +
-	'move, or delete tags (including release tags) without review.';
-
-const REMEDIATION = 'Add a tag ruleset under Settings -> Rules -> Rulesets, target tags, ' +
-	'and set enforcement to "Active".';
+import { defineRule } from '../define.ts';
 
 /**
  * Flags repositories with no active ruleset targeting tags.
  */
-export const rule: Rule = {
-	id: RULE_ID,
+export const rule = defineRule({
+	id: 'repo-config/tag-protection',
 	category: 'repo-config',
 	defaultSeverity: 'medium',
 	summary: 'Tags must be protected by an active ruleset',
-	docs: RULE_ID,
 
 	async check(ctx) {
 		const rulesets = await getRepoRulesets(ctx.octokit, ctx.cache, ctx.repo);
 		const tagRulesets = rulesets.filter(isActiveTagRuleset);
 
 		if (tagRulesets.length > 0) {
-			return [];
+			return null;
 		}
 
-		const finding: Finding = {
-			ruleId: RULE_ID,
-			severity: 'medium',
-			repo: ctx.repo,
+		return {
 			title: 'No active tag-protection ruleset',
-			detail: DETAIL,
-			remediation: REMEDIATION,
+			detail: 'No active ruleset targets tags, so anyone with write access can create, ' +
+				'move, or delete tags (including release tags) without review.',
+			remediation: 'Add a tag ruleset under Settings -> Rules -> Rulesets, target tags, ' +
+				'and set enforcement to "Active".',
 			references: [
 				{
 					name: 'About rulesets',
@@ -41,10 +31,8 @@ export const rule: Rule = {
 				},
 			],
 		};
-
-		return [ finding ];
 	},
-};
+});
 
 /**
  * Subset of a ruleset relevant to tag protection.

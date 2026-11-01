@@ -1,28 +1,15 @@
 import { getOrgActionsPermissions } from '../../github/queries.ts';
 import { skip } from '../../types/index.ts';
-import type { Finding, OrgRule } from '../../types/index.ts';
-
-const RULE_ID = 'org/actions-allowlist';
-
-const DETAIL = 'The organisation allows workflows to use any action from the ' +
-	'marketplace. A malicious or hijacked third-party action runs with access ' +
-	'to repository contents and secrets in every repo that uses it.';
-
-const REMEDIATION = 'Organization Settings -> Actions -> General -> Policies: ' +
-	'select "Allow <org>, and select non-<org>, actions and reusable workflows" ' +
-	'and allowlist the actions you trust (GitHub-owned, verified creators, or ' +
-	'pinned patterns).';
+import { defineOrgRule } from '../define.ts';
 
 /**
  * Flags organisations that let workflows run arbitrary actions
  * instead of a restricted selection.
  */
-export const rule: OrgRule = {
-	id: RULE_ID,
-	category: 'org',
+export const rule = defineOrgRule({
+	id: 'org/actions-allowlist',
 	defaultSeverity: 'medium',
 	summary: 'Organisation must restrict which actions workflows can use',
-	docs: RULE_ID,
 
 	async check(ctx) {
 		const perms = await getOrgActionsPermissions(ctx.octokit, ctx.cache, ctx.org);
@@ -32,20 +19,22 @@ export const rule: OrgRule = {
 		}
 
 		if (perms.enabledRepositories === 'none') {
-			return [];
+			return null;
 		}
 
 		if (perms.allowedActions !== 'all') {
-			return [];
+			return null;
 		}
 
-		const finding: Finding = {
-			ruleId: RULE_ID,
-			severity: 'medium',
-			org: ctx.org,
+		return {
 			title: 'All marketplace actions are allowed organisation-wide',
-			detail: DETAIL,
-			remediation: REMEDIATION,
+			detail: 'The organisation allows workflows to use any action from the ' +
+				'marketplace. A malicious or hijacked third-party action runs with access ' +
+				'to repository contents and secrets in every repo that uses it.',
+			remediation: 'Organization Settings -> Actions -> General -> Policies: ' +
+				'select "Allow <org>, and select non-<org>, actions and reusable workflows" ' +
+				'and allowlist the actions you trust (GitHub-owned, verified creators, or ' +
+				'pinned patterns).',
 			references: [
 				{
 					name: 'Disabling or limiting GitHub Actions for your organization',
@@ -53,7 +42,5 @@ export const rule: OrgRule = {
 				},
 			],
 		};
-
-		return [ finding ];
 	},
-};
+});

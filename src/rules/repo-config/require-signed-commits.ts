@@ -3,26 +3,16 @@ import {
 	getRepoMetadata,
 } from '../../github/queries.ts';
 import { skip } from '../../types/index.ts';
-import type { Finding, Rule } from '../../types/index.ts';
-
-const RULE_ID = 'repo-config/require-signed-commits';
-
-const DETAIL = 'The default branch does not require signed commits, so unsigned ' +
-	'commits can land via merge or direct push. Signature requirements help detect ' +
-	'tampered or impersonated commits.';
-
-const REMEDIATION = 'In the default branch protection rule, enable ' +
-	'"Require signed commits".';
+import { defineRule } from '../define.ts';
 
 /**
  * Flags default branches that accept unsigned commits.
  */
-export const rule: Rule = {
-	id: RULE_ID,
+export const rule = defineRule({
+	id: 'repo-config/require-signed-commits',
 	category: 'repo-config',
 	defaultSeverity: 'medium',
 	summary: 'Default branch should require signed commits',
-	docs: RULE_ID,
 
 	async check(ctx) {
 		const meta = await getRepoMetadata(ctx.octokit, ctx.cache, ctx.repo);
@@ -38,16 +28,16 @@ export const rule: Rule = {
 		}
 
 		if (protection.requireSignedCommits) {
-			return [];
+			return null;
 		}
 
-		const finding: Finding = {
-			ruleId: RULE_ID,
-			severity: 'medium',
-			repo: ctx.repo,
+		return {
 			title: `Default branch '${meta.defaultBranch}' does not require signed commits`,
-			detail: DETAIL,
-			remediation: REMEDIATION,
+			detail: 'The default branch does not require signed commits, so unsigned ' +
+				'commits can land via merge or direct push. Signature requirements help detect ' +
+				'tampered or impersonated commits.',
+			remediation: 'In the default branch protection rule, enable ' +
+				'"Require signed commits".',
 			references: [
 				{
 					name: 'About commit signature verification',
@@ -55,7 +45,5 @@ export const rule: Rule = {
 				},
 			],
 		};
-
-		return [ finding ];
 	},
-};
+});

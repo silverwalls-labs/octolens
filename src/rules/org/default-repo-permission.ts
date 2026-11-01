@@ -1,29 +1,17 @@
 import { getOrgMetadata } from '../../github/queries.ts';
 import { skip } from '../../types/index.ts';
-import type { Finding, OrgRule } from '../../types/index.ts';
-
-const RULE_ID = 'org/default-repo-permission';
+import { defineOrgRule } from '../define.ts';
 
 const SAFE_PERMISSIONS = [ 'read', 'none' ];
-
-const DETAIL = 'Every organisation member automatically receives this permission ' +
-	'on every repository. A write-or-higher base permission lets any member push ' +
-	'to any repository, bypassing per-repo access control entirely.';
-
-const REMEDIATION = 'Organization Settings -> Member privileges -> Base ' +
-	'permissions: select "Read" or "No permission". Grant write access ' +
-	'per-repository through teams instead.';
 
 /**
  * Flags organisations whose base permission grants members write or
  * admin on every repository.
  */
-export const rule: OrgRule = {
-	id: RULE_ID,
-	category: 'org',
+export const rule = defineOrgRule({
+	id: 'org/default-repo-permission',
 	defaultSeverity: 'high',
 	summary: 'Organisation base repository permission must be read or none',
-	docs: RULE_ID,
 
 	async check(ctx) {
 		const meta = await getOrgMetadata(ctx.octokit, ctx.cache, ctx.org);
@@ -33,16 +21,17 @@ export const rule: OrgRule = {
 		}
 
 		if (SAFE_PERMISSIONS.includes(meta.defaultRepositoryPermission)) {
-			return [];
+			return null;
 		}
 
-		const finding: Finding = {
-			ruleId: RULE_ID,
-			severity: 'high',
-			org: ctx.org,
+		return {
 			title: `Base repository permission is "${meta.defaultRepositoryPermission}"`,
-			detail: DETAIL,
-			remediation: REMEDIATION,
+			detail: 'Every organisation member automatically receives this permission ' +
+				'on every repository. A write-or-higher base permission lets any member push ' +
+				'to any repository, bypassing per-repo access control entirely.',
+			remediation: 'Organization Settings -> Member privileges -> Base ' +
+				'permissions: select "Read" or "No permission". Grant write access ' +
+				'per-repository through teams instead.',
 			references: [
 				{
 					name: 'Setting base permissions for an organization',
@@ -50,7 +39,5 @@ export const rule: OrgRule = {
 				},
 			],
 		};
-
-		return [ finding ];
 	},
-};
+});

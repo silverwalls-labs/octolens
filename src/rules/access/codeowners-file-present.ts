@@ -1,37 +1,27 @@
 import { getCodeownersFilePresent } from '../../github/queries.ts';
-import type { Finding, Rule } from '../../types/index.ts';
-
-const RULE_ID = 'access/codeowners-file-present';
-
-const DETAIL = 'No CODEOWNERS file was found, so GitHub cannot route review requests by ' +
-	'path or enforce code-owner approvals.';
-
-const REMEDIATION = 'Add a CODEOWNERS file at the repository root or under .github/.';
+import { defineRule } from '../define.ts';
 
 /**
  * Flags repositories without a CODEOWNERS file in any of the standard locations.
  */
-export const rule: Rule = {
-	id: RULE_ID,
+export const rule = defineRule({
+	id: 'access/codeowners-file-present',
 	category: 'access',
 	defaultSeverity: 'medium',
 	summary: 'A CODEOWNERS file must be present',
-	docs: RULE_ID,
 
 	async check(ctx) {
 		const present = await getCodeownersFilePresent(ctx.octokit, ctx.cache, ctx.repo);
 
 		if (present) {
-			return [];
+			return null;
 		}
 
-		const finding: Finding = {
-			ruleId: RULE_ID,
-			severity: 'medium',
-			repo: ctx.repo,
+		return {
 			title: 'No CODEOWNERS file found',
-			detail: DETAIL,
-			remediation: REMEDIATION,
+			detail: 'No CODEOWNERS file was found, so GitHub cannot route review requests by ' +
+				'path or enforce code-owner approvals.',
+			remediation: 'Add a CODEOWNERS file at the repository root or under .github/.',
 			references: [
 				{
 					name: 'About code owners',
@@ -39,7 +29,5 @@ export const rule: Rule = {
 				},
 			],
 		};
-
-		return [ finding ];
 	},
-};
+});

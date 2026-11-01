@@ -1,29 +1,15 @@
 import { getOrgMetadata } from '../../github/queries.ts';
 import { skip } from '../../types/index.ts';
-import type { Finding, OrgRule } from '../../types/index.ts';
-
-const RULE_ID = 'org/web-commit-signoff-required';
-
-const DETAIL = 'Commits made through the GitHub web interface do not require a ' +
-	'sign-off. Without a Signed-off-by trailer there is no explicit attestation ' +
-	'trail for web-UI edits. Note this is DCO sign-off (attribution), not ' +
-	'cryptographic commit signing — enforce signing per-repo via branch ' +
-	'protection.';
-
-const REMEDIATION = 'Organization Settings -> Repository -> "Require ' +
-	'contributors to sign off on web-based commits". Commits made in the web ' +
-	'UI then carry a Signed-off-by trailer from the author.';
+import { defineOrgRule } from '../define.ts';
 
 /**
  * Flags organisations that accept web-based commits without
  * contributor sign-off.
  */
-export const rule: OrgRule = {
-	id: RULE_ID,
-	category: 'org',
+export const rule = defineOrgRule({
+	id: 'org/web-commit-signoff-required',
 	defaultSeverity: 'low',
 	summary: 'Web-based commits must require contributor sign-off',
-	docs: RULE_ID,
 
 	async check(ctx) {
 		const meta = await getOrgMetadata(ctx.octokit, ctx.cache, ctx.org);
@@ -33,16 +19,19 @@ export const rule: OrgRule = {
 		}
 
 		if (meta.webCommitSignoffRequired) {
-			return [];
+			return null;
 		}
 
-		const finding: Finding = {
-			ruleId: RULE_ID,
-			severity: 'low',
-			org: ctx.org,
+		return {
 			title: 'Web-based commits do not require sign-off',
-			detail: DETAIL,
-			remediation: REMEDIATION,
+			detail: 'Commits made through the GitHub web interface do not require a ' +
+				'sign-off. Without a Signed-off-by trailer there is no explicit attestation ' +
+				'trail for web-UI edits. Note this is DCO sign-off (attribution), not ' +
+				'cryptographic commit signing — enforce signing per-repo via branch ' +
+				'protection.',
+			remediation: 'Organization Settings -> Repository -> "Require ' +
+				'contributors to sign off on web-based commits". Commits made in the web ' +
+				'UI then carry a Signed-off-by trailer from the author.',
 			references: [
 				{
 					name: 'Managing the commit signoff policy for your organization',
@@ -50,7 +39,5 @@ export const rule: OrgRule = {
 				},
 			],
 		};
-
-		return [ finding ];
 	},
-};
+});

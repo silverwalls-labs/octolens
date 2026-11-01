@@ -1,27 +1,15 @@
 import { getOrgDefaultWorkflowPermissions } from '../../github/queries.ts';
 import { skip } from '../../types/index.ts';
-import type { Finding, OrgRule } from '../../types/index.ts';
-
-const RULE_ID = 'org/forbid-workflow-pr-approval';
-
-const DETAIL = 'GitHub Actions workflows are allowed to create and approve pull ' +
-	'requests organisation-wide. A workflow can approve its own PR, satisfying ' +
-	'required-review protections without any human involvement.';
-
-const REMEDIATION = 'Organization Settings -> Actions -> General -> Workflow ' +
-	'permissions: uncheck "Allow GitHub Actions to create and approve pull ' +
-	'requests".';
+import { defineOrgRule } from '../define.ts';
 
 /**
  * Flags organisations that allow workflows to approve pull requests
  * anywhere in the organisation.
  */
-export const rule: OrgRule = {
-	id: RULE_ID,
-	category: 'org',
+export const rule = defineOrgRule({
+	id: 'org/forbid-workflow-pr-approval',
 	defaultSeverity: 'high',
 	summary: 'Workflows must not be able to approve pull requests organisation-wide',
-	docs: RULE_ID,
 
 	async check(ctx) {
 		const perms = await getOrgDefaultWorkflowPermissions(ctx.octokit, ctx.cache, ctx.org);
@@ -31,16 +19,17 @@ export const rule: OrgRule = {
 		}
 
 		if (!perms.canApprovePullRequestReviews) {
-			return [];
+			return null;
 		}
 
-		const finding: Finding = {
-			ruleId: RULE_ID,
-			severity: 'high',
-			org: ctx.org,
+		return {
 			title: 'Workflows can create and approve pull requests',
-			detail: DETAIL,
-			remediation: REMEDIATION,
+			detail: 'GitHub Actions workflows are allowed to create and approve pull ' +
+				'requests organisation-wide. A workflow can approve its own PR, satisfying ' +
+				'required-review protections without any human involvement.',
+			remediation: 'Organization Settings -> Actions -> General -> Workflow ' +
+				'permissions: uncheck "Allow GitHub Actions to create and approve pull ' +
+				'requests".',
 			references: [
 				{
 					name: 'Preventing GitHub Actions from creating or approving pull requests',
@@ -48,7 +37,5 @@ export const rule: OrgRule = {
 				},
 			],
 		};
-
-		return [ finding ];
 	},
-};
+});

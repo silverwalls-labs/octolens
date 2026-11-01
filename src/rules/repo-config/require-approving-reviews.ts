@@ -3,24 +3,16 @@ import {
 	getRepoMetadata,
 } from '../../github/queries.ts';
 import { skip } from '../../types/index.ts';
-import type { Finding, Rule } from '../../types/index.ts';
-
-const RULE_ID = 'repo-config/require-approving-reviews';
-
-const DETAIL = 'Pull requests can be merged with zero approvals on the default branch.';
-
-const REMEDIATION = 'In the default branch protection rule, set ' +
-	'"Require approvals" to at least 1.';
+import { defineRule } from '../define.ts';
 
 /**
  * Flags default branches that can merge without an approving review.
  */
-export const rule: Rule = {
-	id: RULE_ID,
+export const rule = defineRule({
+	id: 'repo-config/require-approving-reviews',
 	category: 'repo-config',
 	defaultSeverity: 'high',
 	summary: 'Pull requests must require at least one approving review',
-	docs: RULE_ID,
 
 	async check(ctx) {
 		const meta = await getRepoMetadata(ctx.octokit, ctx.cache, ctx.repo);
@@ -36,22 +28,18 @@ export const rule: Rule = {
 		}
 
 		if (!protection.requiredPullRequest) {
-			return [];
+			return null;
 		}
 
 		if (protection.requiredApprovingReviewCount >= 1) {
-			return [];
+			return null;
 		}
 
-		const finding: Finding = {
-			ruleId: RULE_ID,
-			severity: 'high',
-			repo: ctx.repo,
+		return {
 			title: 'Default branch does not require approving reviews',
-			detail: DETAIL,
-			remediation: REMEDIATION,
+			detail: 'Pull requests can be merged with zero approvals on the default branch.',
+			remediation: 'In the default branch protection rule, set ' +
+				'"Require approvals" to at least 1.',
 		};
-
-		return [ finding ];
 	},
-};
+});

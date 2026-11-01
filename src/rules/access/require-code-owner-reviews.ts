@@ -4,27 +4,17 @@ import {
 	getRepoMetadata,
 } from '../../github/queries.ts';
 import { skip } from '../../types/index.ts';
-import type { Finding, Rule } from '../../types/index.ts';
-
-const RULE_ID = 'access/require-code-owner-reviews';
-
-const DETAIL = 'A CODEOWNERS file is committed to this repository, but the default ' +
-	'branch protection rule does not require review from code owners. ' +
-	'Pull requests touching owned paths can merge without owner approval.';
-
-const REMEDIATION = 'In the default branch protection rule, enable ' +
-	'"Require review from Code Owners" alongside required pull-request reviews.';
+import { defineRule } from '../define.ts';
 
 /**
  * Flags repositories that have a CODEOWNERS file but do not enforce
  * code owner review on the default branch.
  */
-export const rule: Rule = {
-	id: RULE_ID,
+export const rule = defineRule({
+	id: 'access/require-code-owner-reviews',
 	category: 'access',
 	defaultSeverity: 'medium',
 	summary: 'Code owner reviews must be required when CODEOWNERS is present',
-	docs: RULE_ID,
 
 	async check(ctx) {
 		const codeownersPresent = await getCodeownersFilePresent(
@@ -50,16 +40,16 @@ export const rule: Rule = {
 		}
 
 		if (protection.requireCodeOwnerReviews) {
-			return [];
+			return null;
 		}
 
-		const finding: Finding = {
-			ruleId: RULE_ID,
-			severity: 'medium',
-			repo: ctx.repo,
+		return {
 			title: 'Code owner reviews are not required',
-			detail: DETAIL,
-			remediation: REMEDIATION,
+			detail: 'A CODEOWNERS file is committed to this repository, but the default ' +
+				'branch protection rule does not require review from code owners. ' +
+				'Pull requests touching owned paths can merge without owner approval.',
+			remediation: 'In the default branch protection rule, enable ' +
+				'"Require review from Code Owners" alongside required pull-request reviews.',
 			references: [
 				{
 					name: 'About code owners',
@@ -67,7 +57,5 @@ export const rule: Rule = {
 				},
 			],
 		};
-
-		return [ finding ];
 	},
-};
+});

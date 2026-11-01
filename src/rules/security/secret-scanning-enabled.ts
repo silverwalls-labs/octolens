@@ -1,39 +1,29 @@
 import { getRepoMetadata } from '../../github/queries.ts';
-import type { Finding, Rule } from '../../types/index.ts';
-
-const RULE_ID = 'security/secret-scanning-enabled';
-
-const DETAIL = 'Secret scanning is disabled, so leaked credentials in the repository ' +
-	'will not be detected.';
-
-const REMEDIATION = 'Enable secret scanning: ' +
-	'Settings -> Code security -> Secret scanning.';
+import { defineRule } from '../define.ts';
 
 /**
  * Flags repositories with secret scanning turned off.
  */
-export const rule: Rule = {
-	id: RULE_ID,
+export const rule = defineRule({
+	id: 'security/secret-scanning-enabled',
 	category: 'security',
 	defaultSeverity: 'high',
 	summary: 'Secret scanning must be enabled',
-	docs: RULE_ID,
 
 	async check(ctx) {
 		const meta = await getRepoMetadata(ctx.octokit, ctx.cache, ctx.repo);
 		const status = meta.securityAndAnalysis?.secretScanning?.status;
 
 		if (status === 'enabled') {
-			return [];
+			return null;
 		}
 
-		const finding: Finding = {
-			ruleId: RULE_ID,
-			severity: 'high',
-			repo: ctx.repo,
+		return {
 			title: 'Secret scanning is disabled',
-			detail: DETAIL,
-			remediation: REMEDIATION,
+			detail: 'Secret scanning is disabled, so leaked credentials in the repository ' +
+				'will not be detected.',
+			remediation: 'Enable secret scanning: ' +
+				'Settings -> Code security -> Secret scanning.',
 			references: [
 				{
 					name: 'About secret scanning',
@@ -41,7 +31,5 @@ export const rule: Rule = {
 				},
 			],
 		};
-
-		return [ finding ];
 	},
-};
+});

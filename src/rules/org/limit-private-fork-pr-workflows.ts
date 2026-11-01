@@ -1,30 +1,15 @@
 import { getOrgPrivateForkPrWorkflows } from '../../github/queries.ts';
 import { skip } from '../../types/index.ts';
-import type { Finding, OrgRule } from '../../types/index.ts';
-
-const RULE_ID = 'org/limit-private-fork-pr-workflows';
-
-const DETAIL = 'Workflows triggered by fork pull requests on private ' +
-	'repositories run with dangerous privileges. A fork PR carries untrusted ' +
-	'code; giving it write tokens or secrets lets an attacker with fork access ' +
-	'exfiltrate credentials or push changes.';
-
-const REMEDIATION = 'Organization Settings -> Actions -> General -> Fork pull ' +
-	'request workflows in private repositories: uncheck "Send write tokens to ' +
-	'workflows from fork pull requests" and "Send secrets and variables to ' +
-	'workflows from fork pull requests", and check "Require approval for fork ' +
-	'pull request workflows".';
+import { defineOrgRule } from '../define.ts';
 
 /**
  * Flags organisations that hand write tokens or secrets to workflows
  * triggered from private repository forks.
  */
-export const rule: OrgRule = {
-	id: RULE_ID,
-	category: 'org',
+export const rule = defineOrgRule({
+	id: 'org/limit-private-fork-pr-workflows',
 	defaultSeverity: 'high',
 	summary: 'Private-repo fork PR workflows must not get write tokens or secrets',
-	docs: RULE_ID,
 
 	async check(ctx) {
 		const settings = await getOrgPrivateForkPrWorkflows(ctx.octokit, ctx.cache, ctx.org);
@@ -35,7 +20,7 @@ export const rule: OrgRule = {
 
 		// Fork PR workflows disabled entirely on private repos: nothing runs.
 		if (!settings.runWorkflowsFromForkPullRequests) {
-			return [];
+			return null;
 		}
 
 		const weaknesses: string[] = [];
@@ -51,16 +36,20 @@ export const rule: OrgRule = {
 		}
 
 		if (weaknesses.length === 0) {
-			return [];
+			return null;
 		}
 
-		const finding: Finding = {
-			ruleId: RULE_ID,
-			severity: 'high',
-			org: ctx.org,
+		return {
 			title: 'Private-repo fork PR workflows are over-privileged',
-			detail: `${DETAIL} Weak settings: ${weaknesses.join('; ')}.`,
-			remediation: REMEDIATION,
+			detail: 'Workflows triggered by fork pull requests on private ' +
+				'repositories run with dangerous privileges. A fork PR carries untrusted ' +
+				'code; giving it write tokens or secrets lets an attacker with fork access ' +
+				`exfiltrate credentials or push changes. Weak settings: ${weaknesses.join('; ')}.`,
+			remediation: 'Organization Settings -> Actions -> General -> Fork pull ' +
+				'request workflows in private repositories: uncheck "Send write tokens to ' +
+				'workflows from fork pull requests" and "Send secrets and variables to ' +
+				'workflows from fork pull requests", and check "Require approval for fork ' +
+				'pull request workflows".',
 			references: [
 				{
 					name: 'Security hardening for GitHub Actions',
@@ -68,7 +57,5 @@ export const rule: OrgRule = {
 				},
 			],
 		};
-
-		return [ finding ];
 	},
-};
+});

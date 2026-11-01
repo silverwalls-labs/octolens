@@ -1,27 +1,18 @@
 import { getEnvironments } from '../../github/queries.ts';
 import type { EnvironmentSummary } from '../../github/queries.ts';
 import { skip } from '../../types/index.ts';
-import type { Finding, Rule } from '../../types/index.ts';
-
-const RULE_ID = 'repo-config/environment-protection';
-
-const DETAIL_PREFIX = 'Environment has no protection rules. ' +
-	'Any successful workflow run can deploy to it without review, branch restriction, ' +
-	'or wait timer.';
-
-const REMEDIATION = 'Settings -> Environments -> <environment>: add at least one ' +
-	'protection rule (required reviewers, deployment branch policy, or wait timer).';
+import { defineRule } from '../define.ts';
+import type { FindingBody } from '../define.ts';
 
 /**
  * Flags deployment environments that have neither reviewers nor a
  * wait timer configured.
  */
-export const rule: Rule = {
-	id: RULE_ID,
+export const rule = defineRule({
+	id: 'repo-config/environment-protection',
 	category: 'repo-config',
 	defaultSeverity: 'medium',
 	summary: 'Environments must have at least one protection rule',
-	docs: RULE_ID,
 
 	async check(ctx) {
 		const inventory = await getEnvironments(ctx.octokit, ctx.cache, ctx.repo);
@@ -32,9 +23,9 @@ export const rule: Rule = {
 
 		return inventory.environments
 			.filter(isUnprotected)
-			.map((env) => buildFinding(ctx.repo, env));
+			.map(buildFindingBody);
 	},
-};
+});
 
 /**
  * Check whether an environment has no protection rules.
@@ -47,25 +38,19 @@ function isUnprotected(env: EnvironmentSummary): boolean {
 }
 
 /**
- * Build the finding reported for unprotected environments.
+ * Build the finding body for an unprotected environment.
  *
- * @param repo       - Target repository.
- * @param repo.owner - Repository owner login.
- * @param repo.name  - Repository name.
- * @param env        - Environment to inspect.
- * @returns          The constructed finding.
+ * @param env - Environment to report.
+ * @returns   Title, detail, and remediation for the given environment.
  */
-function buildFinding(
-	repo: { owner: string; name: string; },
-	env: EnvironmentSummary,
-): Finding {
+function buildFindingBody(env: EnvironmentSummary): FindingBody {
 	return {
-		ruleId: RULE_ID,
-		severity: 'medium',
-		repo,
 		title: `Environment '${env.name}' has no protection rules`,
-		detail: DETAIL_PREFIX,
-		remediation: REMEDIATION,
+		detail: 'Environment has no protection rules. ' +
+			'Any successful workflow run can deploy to it without review, branch restriction, ' +
+			'or wait timer.',
+		remediation: 'Settings -> Environments -> <environment>: add at least one ' +
+			'protection rule (required reviewers, deployment branch policy, or wait timer).',
 		references: [
 			{
 				name: 'Using environments for deployment',
