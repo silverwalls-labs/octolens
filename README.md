@@ -65,7 +65,17 @@ The token is resolved in this order:
 3. **`OCTOLENS_TOKEN`** – alternative environment variable, checked when `GITHUB_TOKEN` is absent or empty.
 4. **`gh auth token`** – fallback to the GitHub CLI login.
 
-The token needs `repo` and `read:org` permissions (classic or fine-grained PAT).
+Required permissions depend on the token type:
+
+- **Classic PAT** – `repo` and `read:org`; the organization checks additionally
+  require `admin:org` to read organization settings.
+- **Fine-grained PAT** – repository read permissions for the audited settings
+  (administration, secrets, webhooks, members, environments, and the security
+  products), plus the organization-level `Administration: read` permission for
+  the organization checks.
+
+A token missing a permission does not fail the scan — the affected rules are
+reported as skipped, never as silent passes.
 
 ```bash
 export GITHUB_TOKEN=ghp_yourtokenhere

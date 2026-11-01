@@ -181,26 +181,18 @@ describe('formatPretty', () => {
 	test(
 		'default color is enabled on a TTY with a capable TERM',
 		() => {
-			const savedTerm = process.env.TERM;
-			const savedNoColor = process.env.NO_COLOR;
-
-			delete process.env.NO_COLOR;
-			process.env.TERM = 'xterm-256color';
-			stubIsTTY(true);
+			const restoreTTY = stubIsTTY(true);
+			const restoreTerm = stubEnv('TERM', 'xterm-256color');
+			const restoreNoColor = stubEnv('NO_COLOR', undefined);
 
 			try {
 				const output = formatPretty(makeResult([ FINDING ]));
 
 				assert.match(output, /\u001b\[/);
 			} finally {
-				restoreIsTTY();
-				process.env.TERM = savedTerm;
-
-				if (savedNoColor === undefined) {
-					delete process.env.NO_COLOR;
-				} else {
-					process.env.NO_COLOR = savedNoColor;
-				}
+				restoreTTY();
+				restoreTerm();
+				restoreNoColor();
 			}
 		},
 	);
@@ -208,26 +200,18 @@ describe('formatPretty', () => {
 	test(
 		'TERM=dumb disables default color even on a TTY',
 		() => {
-			const savedTerm = process.env.TERM;
-			const savedNoColor = process.env.NO_COLOR;
-
-			delete process.env.NO_COLOR;
-			process.env.TERM = 'dumb';
-			stubIsTTY(true);
+			const restoreTTY = stubIsTTY(true);
+			const restoreTerm = stubEnv('TERM', 'dumb');
+			const restoreNoColor = stubEnv('NO_COLOR', undefined);
 
 			try {
 				const output = formatPretty(makeResult([ FINDING ]));
 
 				assert.doesNotMatch(output, /\u001b\[/);
 			} finally {
-				restoreIsTTY();
-				process.env.TERM = savedTerm;
-
-				if (savedNoColor === undefined) {
-					delete process.env.NO_COLOR;
-				} else {
-					process.env.NO_COLOR = savedNoColor;
-				}
+				restoreTTY();
+				restoreTerm();
+				restoreNoColor();
 			}
 		},
 	);
@@ -235,52 +219,71 @@ describe('formatPretty', () => {
 	test(
 		'NO_COLOR disables default color even on a TTY',
 		() => {
-			const savedTerm = process.env.TERM;
-			const savedNoColor = process.env.NO_COLOR;
-
-			process.env.NO_COLOR = '1';
-			process.env.TERM = 'xterm-256color';
-			stubIsTTY(true);
+			const restoreTTY = stubIsTTY(true);
+			const restoreTerm = stubEnv('TERM', 'xterm-256color');
+			const restoreNoColor = stubEnv('NO_COLOR', '1');
 
 			try {
 				const output = formatPretty(makeResult([ FINDING ]));
 
 				assert.doesNotMatch(output, /\u001b\[/);
 			} finally {
-				restoreIsTTY();
-				process.env.TERM = savedTerm;
-
-				if (savedNoColor === undefined) {
-					delete process.env.NO_COLOR;
-				} else {
-					process.env.NO_COLOR = savedNoColor;
-				}
+				restoreTTY();
+				restoreTerm();
+				restoreNoColor();
 			}
 		},
 	);
 });
 
 /**
- * Override `process.stdout.isTTY` for color-detection tests.
+ * Override `process.stdout.isTTY` and return a function restoring the
+ * original property descriptor.
  *
  * @param value - The stubbed TTY flag.
+ * @returns     Call to restore the original descriptor.
  */
-function stubIsTTY(value: boolean): void {
+function stubIsTTY(value: boolean): () => void {
+	const saved = Object.getOwnPropertyDescriptor(process.stdout, 'isTTY');
+
 	Object.defineProperty(process.stdout, 'isTTY', {
 		value,
 		configurable: true,
 	});
+
+	return () => {
+		if (saved === undefined) {
+			delete (process.stdout as { isTTY?: boolean; }).isTTY;
+		} else {
+			Object.defineProperty(process.stdout, 'isTTY', saved);
+		}
+	};
 }
 
-/** Restore the original `isTTY` descriptor on stdout. */
-function restoreIsTTY(): void {
-	const descriptor = Object.getOwnPropertyDescriptor(process.stdout, 'isTTY');
+/**
+ * Override an environment variable and return a function restoring the
+ * original value. Setting `undefined` unsets the variable.
+ *
+ * @param name  - Environment variable name.
+ * @param value - Value to set, or `undefined` to unset.
+ * @returns     Call to restore the original value.
+ */
+function stubEnv(name: string, value: string | undefined): () => void {
+	const saved = process.env[name];
 
-	if (descriptor === undefined) {
-		delete (process.stdout as { isTTY?: boolean; }).isTTY;
+	if (value === undefined) {
+		delete process.env[name];
 	} else {
-		Object.defineProperty(process.stdout, 'isTTY', descriptor);
+		process.env[name] = value;
 	}
+
+	return () => {
+		if (saved === undefined) {
+			delete process.env[name];
+		} else {
+			process.env[name] = saved;
+		}
+	};
 }
 
 function makeResult(
